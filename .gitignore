@@ -34,3 +34,6 @@ tests/fixtures/cards/
 
 # données de langue tesseract, téléchargées au premier run (5 Mo)
 *.traineddata
+
+# généré par Next à chaque build
+next-env.d.ts

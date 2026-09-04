@@ -1,0 +1,114 @@
+/* Tokens de docs/06-ui.md. Un composant qui n'utilise pas ces variables est un
+   bug, pas une variante. */
+
+:root {
+  --bg: #1b1b1b;
+  --surface: #212121;
+  --surface-2: #2a2a2a;
+  --border: #343434;
+  --border-lit: #4a4a4a;
+
+  --text: #ededed;
+  --text-dim: #a0a0a0;
+  --text-faint: #6b6b6b;
+
+  --green: #3ecf8e;
+  --green-dim: #2a9d6b;
+  --green-bg: #12241c;
+
+  --amber: #d99a3a;
+  --red: #e5484d;
+
+  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, monospace;
+
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* Tout ce qui est chiffré s'aligne verticalement pour être comparable d'un coup
+   d'oeil : prix, distances, numéros, SKU. */
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.dim {
+  color: var(--text-dim);
+}
+.faint {
+  color: var(--text-faint);
+}
+
+.label {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
+
+/* Le focus est l'état le plus important de l'interface : tout se pilote au
+   clavier. Deux signaux, jamais un — sur un écran mal calibré la bordure seule
+   disparaît. */
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--s1);
+  padding: 1px 5px;
+  color: var(--text-dim);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--s1);
+  padding: var(--s1) var(--s2);
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--border-lit);
+}
+
+input,
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--s1);
+  padding: var(--s1) var(--s2);
+}
+input:focus,
+select:focus {
+  border-color: var(--green);
+}

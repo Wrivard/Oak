@@ -1,10 +1,14 @@
 import { readFile } from 'node:fs/promises';
-import type { PoolClient } from 'pg';
-import { query, withTransaction } from '../../lib/db.js';
+import { query } from '../../lib/db.js';
 import { THRESHOLDS } from '../../lib/config/thresholds.js';
 import { log } from '../../lib/log.js';
 import { readCardNumbers } from '../../lib/ocr/number.js';
-import { buildSku, type CardCondition, type CardVariant } from '../../lib/sku.js';
+import {
+  applyResolution,
+  type Identity,
+  type MatchSource,
+} from '../../lib/resolution.js';
+import type { CardCondition, CardVariant } from '../../lib/sku.js';
 import { PermanentError } from '../queue/errors.js';
 import type { Job } from '../queue/queue.js';
 
@@ -15,8 +19,6 @@ import type { Job } from '../queue/queue.js';
  * Tous les seuils viennent de lib/config/thresholds.ts. Aucune valeur numérique
  * de seuil ici — c'est un invariant, pas une préférence de style.
  */
-export type MatchSource = 'own_history' | 'catalog' | 'llm' | 'manual';
-
 interface ScanContext {
   id: string;
   status: string;
@@ -27,14 +29,6 @@ interface ScanContext {
   default_variant: CardVariant;
   default_condition: CardCondition;
   default_language: string;
-}
-
-/** Identité d'une carte : ce qui suffit à dériver un SKU. */
-interface Identity {
-  card_id: string;
-  variant: CardVariant;
-  condition: CardCondition;
-  language: string;
 }
 
 interface Candidate {
@@ -77,7 +71,7 @@ export async function handleMatch(job: Job): Promise<void> {
       });
       return;
     }
-    await resolve(scan, own.identity, 'own_history', own.confidence);
+    await resolveScan(scan, own.identity, 'own_history', own.confidence);
     log.info('scan résolu', {
       scan_id: scanId,
       source: 'own_history',
@@ -90,7 +84,12 @@ export async function handleMatch(job: Job): Promise<void> {
   const level2 = await matchCatalog(scan);
 
   if (level2.resolved) {
-    await resolve(scan, level2.resolved.identity, 'catalog', level2.resolved.confidence);
+    await resolveScan(
+      scan,
+      level2.resolved.identity,
+      'catalog',
+      level2.resolved.confidence,
+    );
     log.info('scan résolu', {
       scan_id: scanId,
       source: 'catalog',
@@ -289,72 +288,22 @@ async function nearestFromCatalog(embedding: string): Promise<Candidate[]> {
   return rows;
 }
 
-/**
- * Applique une résolution. Tout se fait dans UNE transaction : la quantité, la
- * ligne d'inventaire, l'empreinte et l'état du scan bougent ensemble ou pas du
- * tout.
- */
-async function resolve(
+/** Adaptateur : le scan porte déjà ses empreintes, lib/resolution fait le reste. */
+async function resolveScan(
   scan: ScanContext,
   identity: Identity,
   source: MatchSource,
   confidence: number,
 ): Promise<void> {
-  const sku = buildSku(identity);
-
-  await withTransaction(async (client) => {
-    // La ligne d'inventaire peut ne pas exister : une empreinte connue dont le
-    // stock est retombé à zéro reste une empreinte connue (docs/01, décision B).
-    await client.query(
-      `insert into inventory (sku, card_id, variant, condition, language)
-       values ($1, $2, $3, $4, $5)
-       on conflict (sku) do nothing`,
-      [sku, identity.card_id, identity.variant, identity.condition, identity.language],
-    );
-
-    // Jamais de read-modify-write sur qty_on_hand (invariant 2).
-    await client.query('select apply_qty_delta($1, 1, $2)', [sku, `scan_${source}`]);
-
-    await writeFingerprint(client, scan, identity, source);
-
-    await client.query(
-      `update scans
-          set status = 'resolved', match_source = $2, confidence = $3,
-              resolved_sku = $4, resolved_at = now()
-        where id = $1`,
-      [scan.id, source, confidence.toFixed(3), sku],
-    );
+  await applyResolution({
+    scanId: scan.id,
+    identity,
+    source,
+    confidence,
+    phash: scan.phash_front as string,
+    dhash: scan.dhash_front as string,
+    embedding: scan.embedding as string,
   });
-}
-
-/**
- * Toute résolution confirmée nourrit known_fingerprints. C'est le mécanisme qui
- * fait tendre le coût marginal vers zéro — un chemin de résolution qui n'écrit
- * pas ici est un bug (skill §7).
- */
-async function writeFingerprint(
-  client: PoolClient,
-  scan: ScanContext,
-  identity: Identity,
-  source: MatchSource,
-): Promise<void> {
-  await client.query(
-    `insert into known_fingerprints
-       (card_id, variant, condition, language, phash, dhash, embedding,
-        source_scan, confirmed_by)
-     values ($1,$2,$3,$4,$5::bit(64),$6::bit(64),$7::vector,$8,$9)`,
-    [
-      identity.card_id,
-      identity.variant,
-      identity.condition,
-      identity.language,
-      scan.phash_front,
-      scan.dhash_front,
-      scan.embedding,
-      scan.id,
-      source,
-    ],
-  );
 }
 
 async function sendToReview(
