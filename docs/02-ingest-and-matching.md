@@ -184,7 +184,7 @@ scan → hash + embed (0 $, local, ~80 ms)
   │    → résolu, match_source = own_history. Incrémente qty. FIN.
   │
   ├─ NIVEAU 2 — catalogue
-  │    a) OCR du bloc numéro (tesseract sur le coin bas-gauche)
+  │    a) OCR du bloc numéro (tesseract, plusieurs bandes — voir ci-dessous)
   │       si "X/Y" lisible → filtre déterministe:
   │         where printed_total = Y and number = X and language = L
   │         fallback: where total = Y (secret rares)
@@ -197,6 +197,46 @@ scan → hash + embed (0 $, local, ~80 ms)
        status = needs_review, avec les candidats du niveau 2 pré-affichés.
        Résolution confirmée → écrit dans known_fingerprints.
 ```
+
+### Où est le bloc numéro : nulle part de fixe
+
+Le doc disait « coin bas-gauche ». C'est vrai sur le moderne et **faux sur le vintage** :
+sur les cartes Base, le numéro est en bas à **droite**. Mesuré, pas supposé — un crop
+bas-gauche unique lit 0 carte sur 7, toutes ères confondues.
+
+L'idée du crop « era-aware » se mord la queue : on ne connaît l'ère qu'une fois la carte
+identifiée, et c'est justement ce qu'on cherche à faire. La sortie est de renverser
+l'ordre : **l'OCR propose, le catalogue arbitre.**
+
+`readCardNumbers()` essaie chaque bande de `THRESHOLDS.ocr.bands` dans l'ordre et rend la
+main dès qu'une lecture produit des candidats réels. Une lecture erronée — `5/4`,
+`1/195` — ne correspond à aucune carte et s'élimine d'elle-même, sans heuristique de
+mise en page.
+
+| Bande essayée | Couvre |
+|---|---|
+| bas 12 %, moitié gauche | moderne (SV, SM, XY) |
+| bas 12 %, moitié droite | vintage (Base) |
+| bas 12 %, pleine largeur | filet |
+| bas 20 %, pleine largeur | promos, e-Card |
+
+**Résultat sur les renders officiels : 7 lectures correctes sur 10**, contre 0 avec le
+crop unique. Les trois échecs sont Neo, e-Card et une promo.
+
+> ⚠ **Ce n'est pas l'expérience 1bis.** Ces mesures portent sur les images officielles du
+> catalogue, pas sur des scans ADF à 300 dpi. Le domaine est différent — bruit,
+> éclairage, deskew. Ne calibre pas les seuils là-dessus : ce serait sur-ajuster sur les
+> mauvaises images. 1bis reste entièrement à faire, sur de vrais scans.
+
+### Quand l'OCR ne lit rien
+
+Sans `X/Y`, le filtre déterministe n'a rien sur quoi mordre et la carte part en review.
+Le handler remonte quand même les cinq plus proches voisins CLIP du catalogue entier
+(index HNSW) dans `scans.candidates`.
+
+Ça ne résout **jamais** automatiquement — sans le filtre, rien ne garantit que le bon
+candidat soit seulement dans la liste. Mais ça évite à la review de partir d'une page
+blanche, et c'est là qu'est le coût réel du système.
 
 **Ce que le filtre déterministe fait réellement — mesuré sur les 20 444 cartes
 anglaises seedées (2026-09-04), pas estimé :**

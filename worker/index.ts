@@ -2,6 +2,7 @@ import { closePool } from '../lib/db.js';
 import { loadEnv } from '../lib/env.js';
 import { log } from '../lib/log.js';
 import { handleFingerprint } from './handlers/fingerprint.js';
+import { handleMatch } from './handlers/match.js';
 import { startWatcher } from './ingest/watcher.js';
 import { Worker } from './queue/loop.js';
 
@@ -19,6 +20,8 @@ const REJECTED = process.env['REJECTED_DIR'] ?? './rejected';
 
 const worker = new Worker(env.WORKER_ID, {
   fingerprint: { handler: handleFingerprint, concurrency: 4 },
+  // OCR + rerank : du CPU local, mais tesseract est plus lourd que les hachages.
+  match: { handler: handleMatch, concurrency: 2 },
 });
 
 const watcher = startWatcher({ inbox: INBOX, processed: PROCESSED, rejected: REJECTED });

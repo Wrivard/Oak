@@ -31,3 +31,6 @@ coverage/
 
 # fixtures de cartes: renders officiels sous copyright, cache local seulement
 tests/fixtures/cards/
+
+# données de langue tesseract, téléchargées au premier run (5 Mo)
+*.traineddata
