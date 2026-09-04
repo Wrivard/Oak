@@ -39,6 +39,22 @@ create extension if not exists unaccent;
 create extension if not exists pgcrypto;
 
 -- ---------------------------------------------------------------
+-- unaccent() est déclarée STABLE, pas IMMUTABLE. Postgres refuse donc de
+-- l'utiliser dans une colonne générée :
+--   ERROR: 42P17: generation expression is not immutable
+-- Vérifié sur PG 17, pas supposé. Le wrapper la fixe ; la promesse tient tant
+-- que personne ne redéfinit le dictionnaire unaccent.
+-- ---------------------------------------------------------------
+create or replace function immutable_unaccent(text)
+returns text
+language sql
+immutable
+strict
+parallel safe
+set search_path = public, extensions, pg_catalog
+as $$ select unaccent($1) $$;
+
+-- ---------------------------------------------------------------
 -- Catalogue Pokémon. Source: pokemontcg.io (bulk JSON) + TCGdex (ja).
 -- Read-only après seed. Refresh mensuel par upsert.
 -- ---------------------------------------------------------------
@@ -59,9 +75,9 @@ create table cards (
   language          text not null default 'en',
   image_small       text,
   image_large       text,
-  tcgplayer_url     text,
-  cardmarket_id     text,
-  name_normalized   text generated always as (lower(unaccent(name))) stored,
+  tcgplayer_url     text,                     -- vide après seed, voir note ci-dessous
+  cardmarket_id     text,                     -- vide après seed, voir note ci-dessous
+  name_normalized   text generated always as (lower(immutable_unaccent(name))) stored,
   updated_at        timestamptz not null default now()
 );
 
@@ -69,6 +85,18 @@ create index cards_name_trgm    on cards using gin (name_normalized gin_trgm_ops
 create index cards_lookup       on cards (printed_total, number, language);
 create index cards_lookup_total on cards (total, number, language);
 create index cards_set          on cards (set_id, number);
+
+-- Ce que le dump contient réellement (vérifié sur pokemon-tcg-data au 2026-09-04) :
+--
+-- * `printedTotal` et `total` sont des champs du SET, pas de la carte. Le seed les
+--   recopie sur chaque ligne — c'est volontaire, le filtre du niveau 2 tape sur
+--   `cards` seule et ne doit pas faire de jointure.
+-- * Il n'y a PAS de champs `tcgplayer` ni `cardmarket` dans le dump. `tcgplayer_url`
+--   et `cardmarket_id` restent nulles après le seed et se remplissent à l'étape 10,
+--   au mapping TCGplayer.
+-- * `total` peut être INFÉRIEUR à `printedTotal` (set swshp : 307 imprimées, 304 au
+--   total). Le fallback « secret rare via total » ne doit donc pas supposer
+--   `total >= printed_total`.
 
 -- Embedding CLIP de l'image officielle. Rempli par un job de seed.
 create table card_embeddings (

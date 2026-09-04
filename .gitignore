@@ -1,0 +1,30 @@
+# dépendances
+node_modules/
+.pnpm-store/
+
+# build
+.next/
+out/
+dist/
+worker/dist/
+*.tsbuildinfo
+
+# secrets — invariant 6 de CLAUDE.md
+.env
+.env.*
+!.env.example
+
+# supabase local
+supabase/.temp/
+supabase/.branches/
+
+# données de scan — des milliers d'images n'ont rien à faire dans git
+inbox/
+processed/
+*.csv
+tests/fixtures/golden/scans/
+
+# divers
+.DS_Store
+coverage/
+*.log
