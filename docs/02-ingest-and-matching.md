@@ -146,6 +146,30 @@ scan → hash + embed (0 $, local, ~80 ms)
        Résolution confirmée → écrit dans known_fingerprints.
 ```
 
+**Ce que le filtre déterministe fait réellement — mesuré sur les 20 444 cartes
+anglaises seedées (2026-09-04), pas estimé :**
+
+| Candidats retournés | % des cartes |
+|---|---|
+| 1 | 45,4 % |
+| 2 | 32,4 % |
+| 3 | 9,5 % |
+| 4 | 11,4 % |
+| 6 et plus | 1,3 % |
+
+Le filtre **réduit, il ne résout pas.** 98,7 % des cartes tombent bien dans la
+fourchette 1-4 annoncée, mais seulement 45 % sortent avec un candidat unique. Exemple
+canonique : `printed_total = 102 and number = '4'` retourne trois cartes de trois
+époques — Charizard (Base, 1999), Drapion (HS—Triumphant, 2010), Mimikyu ex (promo SVP,
+2023), parce que trois sets partagent le même dénominateur imprimé.
+
+**Conséquence directe :** le rerank CLIP est sur le chemin critique dès la première
+carte, pour plus de la moitié du volume. Ce n'est pas un raffinement de second ordre.
+La qualité des embeddings (étape 3) et la marge minimum entre 1er et 2e candidat
+(`THRESHOLDS.catalog.minMargin`, étape 5) déterminent à eux seuls le taux de review
+manuelle. Le test `tests/catalog.test.ts` garde ce chiffre : il échoue si un refresh du
+catalogue fait passer la part 1-4 candidats sous 98 %.
+
 Chaque carte confirmée renforce le niveau 1. Après quelques milliers de cartes, ton taux
 de non-résolu devrait tomber sous 5 %.
 

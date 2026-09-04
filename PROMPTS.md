@@ -109,9 +109,14 @@ Puis écris scripts/seed-catalog.ts:
 - Log le compte final par set, et échoue si le total est sous 15000.
 
 Vérifie ensuite que ces requêtes retournent le bon résultat, et écris-les comme tests:
-- Charizard Base Set: where printed_total=102 and number='4' → exactement 1 ligne
-- Un secret rare moderne où number > printed_total → trouvé via `total`
-- Une promo type SWSH284 → trouvée sans dénominateur
+- Charizard Base Set: where printed_total=102 and number='4'
+  ATTENTION: ça retourne 3 lignes, pas 1 (Base 1999, HS—Triumphant 2010, promo SVP
+  2023 partagent printedTotal=102). Mesuré. Le filtre réduit, il ne résout pas.
+  Assertion correcte: <= 4 candidats, base1-4 dedans, sets tous distincts.
+- Un secret rare moderne où number > printed_total (sv3pt5-207) → trouvé par le
+  filtre principal, parce que printed_total est dénormalisé du set sur chaque carte
+- Une promo type SWSH284 → trouvée sans dénominateur. Piège: dans ce set, total (304)
+  est INFÉRIEUR à printed_total (307).
 
 Ne code rien d'autre. Pas d'UI (app/page.tsx reste un placeholder nu, sans branding),
 pas de handler de job, pas de route API, aucun appel externe.
@@ -374,7 +379,7 @@ que les futures sessions ne dérivent pas.
 
 | Après | Chiffre à noter |
 |---|---|
-| 2 | cartes seedées, requêtes de matching correctes |
+| 2 | cartes seedées, **distribution du nombre de candidats du filtre déterministe** |
 | 3 | temps d'embedding par carte, taille de l'index HNSW |
 | 4 | débit du pipeline en cartes/minute |
 | 5 | **répartition own_history / catalog / non-résolu** |
