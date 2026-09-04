@@ -14,7 +14,7 @@ Aucun changement de seuil, de modèle ou de logique de résolution ne se merge s
 
 Deux conditions, les deux doivent tenir :
 - la précision ne descend pas sous la ligne de base
-- le taux de fallback LLM ne monte pas de plus de 2 points
+- le taux de review manuelle ne monte pas de plus de 2 points
 
 Un seuil qui règle le cas que tu regardes en casse cinquante que tu ne regardes pas.
 Le golden set est la seule protection contre ça.
@@ -69,14 +69,16 @@ de prix.
 
 ## 7. Chaque confirmation nourrit le système
 
-Toute résolution confirmée — manuelle, catalogue ou LLM — écrit dans
+Toute résolution confirmée — catalogue ou manuelle — écrit dans
 `known_fingerprints`. C'est le mécanisme qui fait tendre le coût marginal vers zéro.
 Un chemin de résolution qui n'écrit pas dans cette table est un bug.
 
 ## 8. Métrique à surveiller
 
-La répartition `own_history / catalog / llm / manual` est la métrique économique
-principale du projet. Elle devrait descendre côté LLM avec le temps, jamais monter.
+La répartition `own_history / catalog / manual` est la métrique économique principale
+du projet. La part `manual` devrait descendre avec le temps, jamais monter : c'est le
+seul coût marginal par carte qui reste. Il n'y a pas de fallback automatique en
+dessous — voir `docs/02-ingest-and-matching.md` §5.
 
 Si elle monte, les causes par ordre de probabilité : nouveau set absent de `cards`,
 réglages du scanner modifiés, seuils touchés sans passer le golden set.

@@ -28,7 +28,8 @@ Si une tâche semble en demander, arrête-toi et demande.
 - **Next.js 15** App Router, TypeScript strict, React 19
 - **Supabase** Postgres 15+ avec `pgvector`, `pg_trgm`, `unaccent`
 - **Worker** process Node séparé, longue durée, draine `jobs` en Postgres
-- **Anthropic SDK** pour le fallback vision, via la Message Batches API
+- **Aucun appel Claude API.** Le niveau 3 de résolution est la review manuelle.
+  Voir `PROMPTS.md` étape 8.
 - **sharp** pour tout le traitement d'image
 - **Playwright** pour l'automation TCGplayer
 - **Vitest** pour les tests, **Playwright Test** pour l'e2e
@@ -45,8 +46,12 @@ Pas de Redis, pas de Kafka, pas de microservices. Un Postgres et deux process.
    republier une annonce. Clé d'idempotence sur chaque effet de bord externe.
 4. **Aucun appel API externe dans une requête HTTP.** Tout passe par la queue.
 5. **Les prix ne sont jamais lus en direct** pendant un scan ou une review. Toujours
-   depuis `price_snapshots`, rafraîchi par cron.
+   depuis `price_current`, rafraîchi par cron.
 6. **Aucun secret dans le repo.** `.env.local` en dev, variables d'env en prod.
+7. **Une ligne `inventory` ne se supprime jamais.** Une quantité qui tombe à zéro reste
+   à zéro. Les empreintes et l'historique y font référence.
+8. **Un seul constructeur de SKU.** `buildSku({ card_id, variant, condition, language })`
+   dans `lib/sku.ts`. Aucune concaténation de SKU ailleurs dans le codebase.
 
 ## Conventions de code
 

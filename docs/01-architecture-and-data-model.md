@@ -183,7 +183,7 @@ create table scans (
   match_source   match_source,
   confidence     numeric(4,3),
   candidates     jsonb,                          -- top 5 {sku, card_id, score}
-  resolved_sku   text references inventory(sku),
+  resolved_sku   text references inventory(sku) on delete restrict,
 
   variant_conflict boolean not null default false,
   llm_raw        jsonb,
@@ -201,26 +201,45 @@ create index scans_review  on scans (created_at)
 create index scans_phash   on scans (phash_front);
 
 -- Bibliothèque d'empreintes confirmées. C'est l'actif qui rend le système gratuit.
+-- Une empreinte est une IDENTITÉ DE CARTE, pas une ligne de stock. Aucune référence
+-- à inventory : le stock va et vient, l'identité reste. Voir la note ci-dessous.
 create table known_fingerprints (
   id           bigserial primary key,
-  sku          text not null references inventory(sku) on delete cascade,
+  card_id      text not null references cards(id),
+  variant      card_variant   not null,
+  condition    card_condition not null,
+  language     text not null default 'en',
   phash        bit(64) not null,
   dhash        bit(64) not null,
   embedding    vector(512) not null,
-  source_scan  uuid references scans(id),
+  source_scan  uuid,                            -- pas de FK, purement informatif
   confirmed_by match_source not null,
   created_at   timestamptz not null default now()
 );
-create index known_fp_sku   on known_fingerprints (sku);
+create index known_fp_card  on known_fingerprints (card_id);
 create index known_fp_phash on known_fingerprints (phash);
 create index known_fp_hnsw  on known_fingerprints
   using hnsw (embedding vector_cosine_ops) with (m = 16, ef_construction = 200);
 ```
 
+**Pourquoi l'empreinte ne référence pas `inventory`.** Une bibliothèque d'empreintes
+est l'actif le plus irremplaçable du système : elle se reconstitue seulement en
+rescannant physiquement des milliers de cartes. La coupler au stock la rendait
+destructible par une opération d'inventaire. Elle porte donc les composantes
+(`card_id`, `variant`, `condition`, `language`), pas le SKU.
+
+**Conséquence sur le niveau 1 de résolution.** Un match retourne les composantes.
+Le worker dérive le SKU avec `buildSku()`, upsert la ligne `inventory` si elle
+n'existe pas, puis appelle `apply_qty_delta`. Ça règle proprement le cas « carte
+connue, stock à zéro ».
+
 ## Migration 004 — prix
 
 ```sql
-create table price_snapshots (
+-- État courant des prix externes, un enregistrement par (sku, source).
+-- Écrasé à chaque refresh — ce n'est pas un historique. L'historique de NOS prix
+-- de vente est dans price_history.
+create table price_current (
   sku         text not null references inventory(sku) on delete cascade,
   source      text not null,                    -- tcgplayer | ebay_sold | cardmarket
   low         numeric(10,2),
@@ -249,7 +268,28 @@ create table pricing_rules (
   config     jsonb not null,
   updated_at timestamptz not null default now()
 );
+
+-- Seed dans la migration elle-même. Le système ne doit jamais démarrer sans règles
+-- de prix : un pricing_rules vide est un bug silencieux qui produit des prix nuls.
+insert into pricing_rules (id, config) values (1, '{
+  "hard_floor": 1.75,
+  "bands": [
+    { "up_to": 2.00,  "mode": "floor", "value": 1.75 },
+    { "up_to": 5.00,  "mode": "mult",  "value": 1.15, "round": "psych" },
+    { "up_to": 20.00, "mode": "mult",  "value": 1.10, "round": "psych" },
+    { "up_to": 75.00, "mode": "mult",  "value": 1.05, "round": "psych" },
+    { "up_to": null,  "mode": "mult",  "value": 1.00, "round": "whole", "flag_review": true }
+  ],
+  "condition_mult": { "NM": 1.0, "LP": 0.85, "MP": 0.70, "HP": 0.50, "DMG": 0.30 },
+  "graded_bypass": true,
+  "review_threshold": 75.00,
+  "reprice_delta_pct": 0.05,
+  "channel_offsets": { "ebay": 1.0, "tcgplayer": 0.97 }
+}'::jsonb)
+on conflict (id) do nothing;
 ```
+
+Voir `docs/03-pricing.md` §3 pour la sémantique de chaque champ.
 
 ## Migration 005 — jobs et événements
 
@@ -323,21 +363,30 @@ Ne fais **jamais** `qty_on_hand = $new`. Toujours un delta atomique :
 create or replace function apply_qty_delta(
   p_sku text, p_delta int, p_reason text
 ) returns int language plpgsql as $$
-declare new_qty int;
+declare
+  new_qty      int;
+  new_reserved int;
 begin
   update inventory
-     set qty_on_hand = qty_on_hand + p_delta,
-         updated_at  = now(),
-         tcg_dirty   = true
+     set qty_on_hand      = qty_on_hand + p_delta,
+         -- Clamp de la réservation TCG dans le MÊME update. Les deux colonnes
+         -- bougent atomiquement, la contrainte qty_alloc_sane ne peut pas être
+         -- violée par une vente eBay légitime. Voir la note ci-dessous.
+         qty_reserved_tcg = least(qty_reserved_tcg, greatest(qty_on_hand + p_delta, 0)),
+         updated_at       = now(),
+         -- Une vente TCG vient de TCGplayer : le repousser serait un aller-retour
+         -- inutile. Tout autre mouvement rend la ligne sale.
+         tcg_dirty        = case when p_reason = 'tcg_sale' then tcg_dirty else true end
    where sku = p_sku
-  returning qty_on_hand into new_qty;
+  returning qty_on_hand, qty_reserved_tcg into new_qty, new_reserved;
 
   if not found then
     raise exception 'sku % introuvable', p_sku;
   end if;
 
   insert into channel_events (channel, sku, event, qty_delta, payload)
-  values ('internal', p_sku, p_reason, p_delta, jsonb_build_object('new_qty', new_qty));
+  values ('internal', p_sku, p_reason, p_delta,
+          jsonb_build_object('new_qty', new_qty, 'new_reserved_tcg', new_reserved));
 
   return new_qty;
 end $$;
@@ -345,3 +394,11 @@ end $$;
 
 La contrainte `check (qty_on_hand >= 0)` fait le reste : une vente concurrente qui
 ferait passer sous zéro échoue au niveau base, pas au niveau applicatif.
+
+**Pourquoi le clamp.** `qty_alloc_sane` (`qty_reserved_tcg <= qty_on_hand`) est correcte
+comme invariant mais fausse comme garde : qty 7, on réserve 2 pour TCGplayer, 5 ventes
+eBay passent — on est à qty 2 / reserved 2, et la 6e vente eBay légitime viole la
+contrainte et échoue. Un vrai encaissement de vente ne doit jamais être refusé par la
+base. Le clamp abaisse la réservation en même temps que le stock ; le job d'export
+TCGplayer voit la nouvelle réservation au prochain passage et repousse la quantité.
+Une réservation est une intention, pas une promesse.

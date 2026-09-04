@@ -100,8 +100,11 @@ Deux lignes de code, ça attrape une classe entière d'erreurs d'alimentation.
 ```
 
 ```sql
--- Recherche par Hamming, exacte et rapide sur bit(64)
-select sku, bit_count(phash # $1) as d_p, bit_count(dhash # $2) as d_d
+-- Recherche par Hamming, exacte et rapide sur bit(64).
+-- Retourne les COMPOSANTES d'identité, pas un SKU : known_fingerprints ne connaît
+-- pas l'inventaire. Le worker dérive le SKU avec buildSku(). Voir docs/01.
+select card_id, variant, condition, language,
+       bit_count(phash # $1) as d_p, bit_count(dhash # $2) as d_d
   from known_fingerprints
  where bit_count(phash # $1) <= 12
  order by d_p + d_d
@@ -138,13 +141,13 @@ scan → hash + embed (0 $, local, ~80 ms)
   │    c) 1 candidat ET cos_dist < 0.15 ET pas de variant_conflict
   │       → résolu, match_source = catalog
   │
-  └─ NIVEAU 3 — Claude vision (payant, asynchrone)
-       enqueue vers un batch. Voir §5.
-       Résultat confirmé → écrit dans known_fingerprints.
+  └─ NIVEAU 3 — review manuelle
+       status = needs_review, avec les candidats du niveau 2 pré-affichés.
+       Résolution confirmée → écrit dans known_fingerprints.
 ```
 
 Chaque carte confirmée renforce le niveau 1. Après quelques milliers de cartes, ton taux
-de fallback LLM devrait tomber sous 5 %.
+de non-résolu devrait tomber sous 5 %.
 
 **Le seed compte plus que tout.** Passe tes 2 000 premières cartes en review manuelle
 complète, et écris chaque confirmation dans `known_fingerprints`. C'est l'investissement
@@ -170,73 +173,44 @@ les cartes qui se ressemblent (mêmes artwork réimprimés, promos).
 
 ---
 
-## 5. Fallback Claude vision
+## 5. Niveau 3 — la review manuelle
 
-Les cartes ne sont pas urgentes. Utilise la **Message Batches API** : le traitement est
-asynchrone, la plupart des lots terminent en moins d'une heure, la fenêtre est de 24 h,
-on peut soumettre jusqu'à 10 000 requêtes par lot, et **toute l'utilisation est facturée
-à 50 % du prix standard**. Pour un pipeline de bulk, il n'y a aucune raison d'appeler
-l'API synchrone.
+**Il n'y a pas de fallback automatique.** Aucun appel Claude API n'est autorisé dans ce
+projet (voir `CLAUDE.md`). Un scan qui sort du niveau 2 sans candidat unique part en
+`needs_review`.
 
-Pattern : un job `llm_batch_flush` s'exécute aux 30 minutes, ramasse tous les scans en
-attente de LLM, soumet un lot, stocke le `batch_id`. Un job `llm_batch_poll` sonde et
-draine les résultats. `custom_id` = le `scan_id`, ce qui rend le rattachement trivial.
+### Pourquoi pas un LLM
 
-> Comme les lots peuvent dépasser 5 minutes, utilise le cache de prompt à durée 1 heure
-> pour le contexte partagé entre requêtes.
+Un LLM ne donnerait pas de capacité ici, seulement du temps. Ce qu'il ferait, c'est
+départager 1 à 4 candidats **déjà filtrés par le niveau 2** — soit environ 3 secondes
+de travail pour un humain qui regarde la carte qu'il a dans les mains. À 5 % de 1 700
+cartes par jour, l'automatisation sauverait 4 minutes par jour.
 
-### Le prompt d'identification
+Et le calcul est pire qu'il n'en a l'air : pendant la phase où le taux de fallback est
+élevé — les premiers milliers de cartes, avant que `known_fingerprints` soit seedé —
+tout passe en review manuelle de toute façon, précisément pour seeder les empreintes.
+Le LLM n'apporterait donc rien exactement là où il aiderait le plus.
 
-```
-Tu es un identificateur de cartes Pokémon. Tu reçois le recto et parfois le verso d'une
-carte scannée à plat. Réponds UNIQUEMENT avec du JSON valide. Aucun préambule, aucun
-markdown, aucun commentaire.
+`PROMPTS.md` étape 8 est le point où on relit cette décision avec des chiffres réels.
 
-CONTEXTE FOURNI
-Cette carte vient d'une session dont le variant par défaut est: {default_variant}
-Les candidats du matching local, du plus proche au plus lointain: {candidates_json}
+### Ce que le niveau 3 doit fournir à la place
 
-SCHÉMA DE SORTIE
-{
-  "name": string,
-  "number": string,
-  "printed_total": number | null,
-  "language": "en" | "ja" | "other",
-  "variant_observed": string | null,
-  "variant_agrees_with_default": boolean,
-  "is_graded": boolean,
-  "grader": "PSA"|"CGC"|"BGS"|"TAG"|"ACE"|null,
-  "grade": number | null,
-  "cert_number": string | null,
-  "condition_observations": {
-    "corners": "sharp"|"light_wear"|"heavy_wear",
-    "edges": "clean"|"whitening"|"heavy_whitening",
-    "surface": "clean"|"light_scratches"|"scratched"|"creased",
-    "centering": "good"|"off"|"very_off"
-  },
-  "chosen_candidate_id": string | null,
-  "confidence": number
-}
+Le levier n'est pas l'automatisation, c'est le **temps par carte en review**. L'UI de
+review (étape 6) est donc un composant du chemin critique, pas un accessoire :
 
-RÈGLES
-- Le dénominateur ("165" dans "025/165") est l'indice le plus fiable. Lis-le en priorité.
-- Si un candidat de la liste correspond, retourne son id dans chosen_candidate_id.
-  Ne propose une carte hors liste que si aucun candidat ne correspond.
-- Ne devine JAMAIS un numéro. Si illisible, mets null et baisse confidence.
-- Le scan à plat écrase le reflet du foil. Si tu ne peux pas juger le variant, mets
-  variant_observed à null. Ne devine pas.
-- Un slab ne devrait pas apparaître ici. Si tu en vois un, mets is_graded à true et
-  confidence à 0.
-- Grade la condition sur le VERSO en priorité: le whitening de la bordure bleue est le
-  signal le plus fiable.
-```
+- Les candidats du niveau 2 pré-affichés, image officielle côte à côte avec le scan.
+- Résolution au clavier seul, sans souris. Un chiffre pour choisir un candidat.
+- La recherche plein texte n'est ouverte que si aucun candidat ne convient.
+- Toute résolution écrit dans `known_fingerprints` avec `confirmed_by = 'manual'`.
 
-Force le JSON par tool use plutôt que par instruction seule : définis un outil avec le
-schéma en `input_schema` et lis `tool_use.input`. Tu élimines le parsing de markdown et
-les préambules.
+La valeur `'llm'` reste dans l'enum `match_source` et la colonne `scans.llm_raw`
+existe : coût zéro, porte ouverte si la décision de l'étape 8 change un jour.
 
-**Toujours valider avec Zod à la sortie.** Un LLM qui retourne un `printed_total` de
-`"165"` en string au lieu de number va casser ton filtre SQL silencieusement.
+### Ce que le niveau 2 doit garantir
+
+Puisqu'il n'y a plus de filet payant en dessous, la qualité de l'OCR du numéro devient
+critique — un échec OCR n'envoie plus vers un fallback, il envoie directement en review
+manuelle. D'où l'expérience 1bis de `PROMPTS.md`, à faire **avant** l'étape 3.
 
 ---
 

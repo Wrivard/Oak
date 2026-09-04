@@ -17,10 +17,18 @@ référencées sont dans `docs/`.
 2. Ouvre-les côte à côte à 100 %. Peux-tu distinguer les deux à l'œil sur le scan ?
 3. Calcule la variance de luminance sur la zone d'artwork des deux groupes. Y a-t-il une
    séparation nette ?
+4. **Double-feed.** Pendant ces 100 passages, note le nombre de double-alimentations
+   (deux cartes entraînées ensemble) et le nombre détectées par l'ultrason du fi-7160.
+   Une double-feed non détectée est une carte physique qui n'a pas de scan : elle
+   décale le comptage de session et devient un écart d'inventaire silencieux.
 
-**Décision.** Séparation nette → tu pourras détecter le variant automatiquement plus tard.
-Pas de séparation → le pré-tri physique et `sessions.default_variant` sont définitifs, et
-tu n'essaies jamais de classifier le foil. Note le résultat dans `docs/experiments.md`.
+**Décision (foil).** Séparation nette → tu pourras détecter le variant automatiquement
+plus tard. Pas de séparation → le pré-tri physique et `sessions.default_variant` sont
+définitifs, et tu n'essaies jamais de classifier le foil.
+
+**Décision (double-feed).** Taux non détecté au-dessus de 0,5 % → la réconciliation
+`sessions.expected_count` vs `scanned_count` est obligatoire dès l'étape 4, pas
+reportée à l'étape 11. Note les deux résultats dans `docs/experiments.md`.
 
 ---
 
@@ -39,6 +47,41 @@ tourne sur TCGplayer market seul et tu ajustes les poids dans `docs/03-pricing.m
 
 ---
 
+## Étape 1bis — Expérience OCR du numéro (PAS DE CODE) — PRIORITÉ MAXIMALE
+
+> C'est l'expérience la plus importante de la liste. Tout le niveau 2 de résolution
+> repose sur la lecture du `X/Y` par tesseract. Si elle rate, le niveau 2 ne filtre
+> plus rien et tout part en review manuelle — et depuis qu'on a coupé le LLM
+> (étape 8), un échec OCR n'a plus aucun filet.
+
+1. Prends 100 scans réels, répartis ainsi :
+   - 30 modernes (SV / SWSH)
+   - 30 milieu (BW / XY / SM)
+   - 20 vintage (Base / Neo / e-Card)
+   - 20 promos
+2. Passe tesseract sur la zone du numéro.
+3. Mesure le taux de lecture correcte du `X/Y`, **ventilé par ère**.
+
+**Attention : la position du bloc numéro varie selon l'ère.** Un crop fixe en bas à
+gauche marche sur du moderne et rate le vintage. Teste d'abord un **crop large**, puis
+affine par ère seulement si nécessaire.
+
+**Décision.** Sous 85 % global → le niveau 2 change de design **avant l'étape 3**.
+Ventilation sous 60 % sur une ère → crop era-aware obligatoire.
+
+---
+
+## Étape 1ter — Expérience distribution de valeur (PAS DE CODE)
+
+1. Tire 200 cartes au hasard d'un vrai bac de bulk (pas une sélection).
+2. Relève le prix TCGplayer market de chacune.
+3. Trace l'histogramme. Note les trois pourcentages : sous 1,75 $, sous 2,49 $, sous 5 $.
+
+**Décision.** Si plus de 60 % est sous 2,49 $, il faut une lane « lot » dans le design
+initial, pas greffée après 15 000 annonces. Dis-le et on redessine **avant l'étape 4**.
+
+---
+
 ## Étape 2 — Fondations et catalogue
 
 ```
@@ -49,12 +92,20 @@ Initialise le projet:
 - Supabase local (supabase init + supabase start)
 - Applique les migrations 001 à 006 telles qu'écrites dans le doc, une par fichier
   numéroté dans supabase/migrations/
-- Un process worker séparé dans worker/, avec un tsconfig distinct
+- Un process worker séparé dans worker/, avec un tsconfig distinct (structure
+  seulement — aucun handler)
+
+Écris les quatre modules de base, rien de plus:
+- lib/env.ts    validation Zod des variables d'env, échoue au démarrage si incomplet
+- lib/db.ts     pool pg
+- lib/log.ts    logger JSON structuré (champs de docs/05 §1.1)
+- lib/sku.ts    buildSku({ card_id, variant, condition, language }) — le SEUL
+                constructeur de SKU du codebase
 
 Puis écris scripts/seed-catalog.ts:
 - Télécharge les dumps JSON de github.com/PokemonTCG/pokemon-tcg-data
 - Upsert dans `cards`. Attends ~20-31k cartes anglaises.
-- Idempotent: relançable sans doublons.
+- Idempotent: relançable sans doublons. Reprenable s'il coupe en cours.
 - Log le compte final par set, et échoue si le total est sous 15000.
 
 Vérifie ensuite que ces requêtes retournent le bon résultat, et écris-les comme tests:
@@ -62,7 +113,10 @@ Vérifie ensuite que ces requêtes retournent le bon résultat, et écris-les co
 - Un secret rare moderne où number > printed_total → trouvé via `total`
 - Une promo type SWSH284 → trouvée sans dénominateur
 
-Ne code rien d'autre. Pas d'UI, pas de worker, pas d'API.
+Ne code rien d'autre. Pas d'UI (app/page.tsx reste un placeholder nu, sans branding),
+pas de handler de job, pas de route API, aucun appel externe.
+
+Arrête-toi avec les trois tests verts.
 ```
 
 ---
@@ -132,15 +186,19 @@ Les seuils viennent de lib/config/thresholds.ts, jamais en dur ailleurs.
 Points d'attention:
 - Le niveau 2 exige la marge minimum entre 1er et 2e candidat, pas juste le seuil absolu
 - variant_conflict force needs_review peu importe la confiance
+- Le niveau 1 retourne des composantes (card_id, variant, condition, language), pas un
+  SKU. Dérive-le avec buildSku() de lib/sku.ts — aucune concaténation ailleurs.
 - Un match résolu vers un SKU existant appelle apply_qty_delta(+1), il ne fait pas
   d'UPDATE direct sur qty_on_hand
-- Un nouveau SKU est créé avec qty 0 puis apply_qty_delta(+1)
+- Un SKU inconnu est upserté avec qty 0 puis apply_qty_delta(+1). Ça couvre le cas
+  « carte déjà connue par empreinte, mais stock retombé à zéro ».
 
-N'implémente PAS encore le niveau 3 (LLM). Les scans qui l'atteindraient vont en
-needs_review avec match_source null. On veut mesurer le taux avant de payer pour lui.
+Le niveau 3 est la review manuelle, il n'y a rien d'automatique à implémenter. Les
+scans qui l'atteignent vont en needs_review avec match_source null et les candidats
+du niveau 2 conservés dans scans.candidates pour l'UI de l'étape 6.
 
 Écris le harnais golden set: tests/golden.test.ts qui charge
-tests/fixtures/golden/labels.json et vérifie précision + taux de fallback.
+tests/fixtures/golden/labels.json et vérifie précision + taux de review manuelle.
 Le fichier de fixtures peut être vide au début, le test doit passer quand même.
 ```
 
@@ -149,7 +207,14 @@ Le fichier de fixtures peut être vide au début, le test doit passer quand mêm
 ## Étape 6 — UI de review
 
 ```
-Lis docs/02-ingest-and-matching.md section 4 et docs/03-pricing.md section 4.
+Lis docs/02-ingest-and-matching.md sections 4 et 5, et docs/03-pricing.md section 4.
+
+Écris d'abord docs/06-ui.md: le système visuel, avant les composants. Branding type
+Supabase — vert, noir #1b1b1b, gris foncé. Tokens de couleur, échelle typographique,
+densité. Les composants suivent le doc, pas l'inverse.
+
+Cette page est le niveau 3 de résolution (voir docs/02 §5). Il n'y a pas de fallback
+automatique en dessous : le temps par carte ici EST le coût marginal du système.
 
 Une seule page: /review
 
@@ -202,25 +267,27 @@ Ces tests bloquent le merge.
 
 ---
 
-## Étape 8 — Fallback LLM
+## Étape 8 — Point de décision : le niveau 3 (PAS DE CODE PAR DÉFAUT)
 
-```
-Lis docs/02-ingest-and-matching.md section 5.
+> **Ce n'est pas une étape d'implémentation.** Le niveau 3 de résolution est la review
+> manuelle, et le reste par défaut. Aucun appel Claude API n'est autorisé dans ce
+> projet — voir `CLAUDE.md`.
 
-Maintenant qu'on connaît le vrai taux de fallback (regarde la métrique de l'étape 5),
-implémente le niveau 3 avec la Message Batches API — pas l'API synchrone.
+Le raisonnement : le LLM ne donne pas de capacité, seulement du temps. Il départage
+1 à 4 candidats déjà filtrés — 3 secondes pour un humain. À 5 % de 1 700 cartes/jour,
+ça sauve 4 minutes par jour. Et pendant la phase à fort taux de fallback (les premiers
+milliers de cartes), tout est reviewé à la main de toute façon, pour seeder
+`known_fingerprints`. Le LLM n'apporte rien là où il aiderait le plus.
 
-- Job `llm_batch_flush` aux 30 min: ramasse les scans en attente, soumet un lot
-  (max 10000 requêtes), stocke le batch_id. custom_id = scan_id.
-- Job `llm_batch_poll`: sonde, draine les résultats, applique.
-- Utilise tool use pour forcer le JSON, pas une instruction dans le prompt.
-- Valide chaque réponse avec Zod. Un échec de validation → needs_review, jamais
-  d'application partielle.
-- Prompt caching 1 heure sur le contexte partagé.
-- Tout résultat confirmé écrit dans known_fingerprints avec confirmed_by='llm'.
+**Ce que tu fais à cette étape :** regarde le taux de non-résolu après 5 000 cartes
+seedées (la métrique de l'étape 5).
 
-Ajoute au dashboard: coût cumulé du mois, taux de fallback sur 7 jours glissants.
-```
+- **Sous 10 %** → ferme la question définitivement. Supprime cette étape.
+- **Au-dessus** → on rediscute. Mais la cause sera probablement l'**OCR** (étape 1bis)
+  ou les **seuils** (`lib/config/thresholds.ts`), pas l'absence de LLM. Vérifie ces
+  deux-là avant de rouvrir quoi que ce soit.
+
+La valeur `'llm'` reste dans l'enum `match_source`. Coût zéro, porte ouverte.
 
 ---
 
@@ -313,7 +380,7 @@ que les futures sessions ne dérivent pas.
 | 5 | **répartition own_history / catalog / non-résolu** |
 | 6 | secondes par carte en review |
 | 7 | écart entre prix suggéré et ton jugement sur 50 cartes |
-| 8 | taux de fallback LLM, coût réel du mois |
+| 8 | taux de non-résolu sur 5 000 cartes, secondes/carte en review |
 | 9 | temps de publication bout en bout, taux d'échec |
 | 10 | SKUs mappés vers TCGplayer, écarts détectés |
 

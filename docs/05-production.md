@@ -31,19 +31,21 @@ Une seule page, cinq métriques. Si elle est verte, tu peux aller dormir.
 
 | Métrique | Seuil d'alarme |
 |---|---|
-| Taux de résolution par niveau (own_history / catalog / llm / manual) | `llm > 15 %` |
+| Taux de résolution par niveau (own_history / catalog / manual) | `manual > 15 %` |
 | Profondeur de queue par type de job | `> 5 000` ou croissance monotone 1 h |
 | Jobs `dead` dernières 24 h | `> 0` |
 | Écart de réconciliation eBay | `> 0` |
 | Cartes en `needs_review` | `> capacité quotidienne` |
 
-Le **taux LLM** est ta métrique économique principale. S'il remonte, quelque chose a
-changé : nouveaux sets non seedés, réglages scanner modifiés, seuils dérivés. Il devrait
-descendre avec le temps, jamais monter.
+Le **taux de review manuelle** est ta métrique économique principale : c'est le seul
+poste de coût marginal par carte qui reste, et il se paie en minutes de ton temps.
+S'il remonte, quelque chose a changé : nouveaux sets non seedés, réglages scanner
+modifiés, OCR qui décroche sur une ère, seuils dérivés. Il devrait descendre avec le
+temps, jamais monter.
 
 ### 1.3 Traces sur les appels externes
 
-Chaque appel eBay, tcgapi, Anthropic : durée, statut, taille de payload, et pour eBay
+Chaque appel eBay et tcgapi : durée, statut, taille de payload, et pour eBay
 les headers de rate limit. Stocke-les dans `channel_events`. Quand eBay renvoie une
 erreur cryptique dans six mois, tu veux le payload exact qui l'a causée.
 
@@ -125,8 +127,8 @@ tests/fixtures/golden/
   └── labels.json     { scan_id: { sku, variant, condition } }
 ```
 
-Le test échoue si la précision descend sous la ligne de base ou si le taux de fallback
-LLM monte de plus de 2 points. **Aucun changement de seuil ne se merge sans passer ce
+Le test échoue si la précision descend sous la ligne de base ou si le taux de review
+manuelle monte de plus de 2 points. **Aucun changement de seuil ne se merge sans passer ce
 test.** C'est la seule protection contre l'optimisation d'un seuil qui améliore un cas
 et en casse cinquante.
 
@@ -135,7 +137,6 @@ et en casse cinquante.
 - eBay a un **sandbox**. Utilise-le pour tout le développement du flux de publication.
 - Le sandbox ne reproduit pas fidèlement les aspects par catégorie. Prévois une phase
   de validation en production sur 10 cartes réelles avant d'ouvrir les vannes.
-- Anthropic : mets des fixtures enregistrées en test, jamais d'appel réel en CI.
 
 ### 3.4 Test de charge minimal
 
@@ -151,7 +152,10 @@ Un leak dans le traitement d'image ne se voit pas sur 50 cartes.
 - Les tokens eBay (access + refresh) chiffrés au repos en base, jamais loggés, jamais
   dans un message d'erreur. Écris un redacteur de logs qui masque tout ce qui ressemble
   à un token.
-- La `service_role` key Supabase ne sort jamais du worker. Le front n'y touche pas.
+- La `service_role` key Supabase ne touche jamais le navigateur. Les route handlers
+  et les server actions Next l'utilisent côté serveur, au même titre que le worker.
+  Acceptable en mono-utilisateur. **Ne pas ajouter de RLS** — c'est un non-objectif
+  explicite (voir `CLAUDE.md`).
 - Rotation planifiée du refresh token eBay avec alerte à J-30 avant expiration.
 - `.gitignore` : `.env*`, `inbox/`, `processed/`, `*.csv`, `tests/fixtures/golden/scans/`
   (des milliers d'images n'ont rien à faire dans git — utilise git-lfs ou un bucket).
@@ -168,7 +172,7 @@ Ce qui est irremplaçable, par ordre de douleur si tu le perds :
 3. `price_history`, `channel_events` — utile, pas vital.
 
 Ce qui est reconstructible et ne mérite pas de backup : `cards`, `card_embeddings`
-(reseedables), les images (chez eBay), `price_snapshots` (refetchables).
+(reseedables), les images (chez eBay), `price_current` (refetchable).
 
 **Teste ta restauration.** Un backup jamais restauré n'est pas un backup.
 
@@ -205,10 +209,11 @@ commande non honorable.
 C'est pour ça que `price_history` garde le `breakdown` complet. Sans lui, ce runbook est
 impossible à exécuter.
 
-### 6.4 « Le taux LLM a doublé »
+### 6.4 « Le taux de review manuelle a doublé »
 
 Causes par ordre de probabilité : un nouveau set est sorti et n'est pas dans `cards` ;
-les réglages du scanner ont changé ; les seuils ont été touchés sans passer le golden set.
+les réglages du scanner ont changé ; l'OCR du numéro échoue sur une ère donnée ;
+les seuils ont été touchés sans passer le golden set.
 
 1. `select date_trunc('day',created_at), match_source, count(*) from scans group by 1,2`
 2. Vérifier la date du dernier seed catalogue
