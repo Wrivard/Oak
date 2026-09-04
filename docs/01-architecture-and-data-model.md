@@ -383,6 +383,26 @@ bloquer. N'utilise jamais `SELECT` puis `UPDATE` séparés — tu vas doubler de
 Au-delà de `max_attempts`, `status='dead'` et une alerte. Les jobs morts ne sont jamais
 rejoués automatiquement.
 
+### Le trou de cette requête : les jobs abandonnés
+
+La réclamation ne regarde que `queued` et `failed`. Un worker tué en plein job laisse sa
+ligne en `running` — et **rien ne l'en sort jamais**. `locked_at` existe mais personne ne
+le lit. Le job, donc le scan, est perdu en silence.
+
+Il faut un reaper de baux expirés, appelé au démarrage du worker puis périodiquement :
+
+```sql
+update jobs
+   set status = 'queued', locked_by = null, locked_at = null,
+       last_error = coalesce(last_error, 'bail expiré, worker présumé mort')
+ where status = 'running'
+   and locked_at < now() - interval '10 minutes';
+```
+
+Le bail doit dépasser la durée du job le plus lent, sinon un worker vivant se fait voler
+son travail. Dix minutes couvrent largement un `fingerprint` (~2 s) ; à réévaluer quand
+`ebay_publish` arrivera. `reclaimStale()` dans `worker/queue/queue.ts`.
+
 ## Migration 006 — mouvements de quantité
 
 Ne fais **jamais** `qty_on_hand = $new`. Toujours un delta atomique :

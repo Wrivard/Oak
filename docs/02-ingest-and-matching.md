@@ -46,6 +46,24 @@ Le watcher fait trois choses et rien d'autre : parse le nom de fichier, insère 
 Redémarrage : `ignoreInitial: false` plus `unique (session_id, seq)` sur `scans` rend le
 rattrapage idempotent gratuitement.
 
+**Piège d'ordonnancement, coûté en dur.** Le watcher insère la ligne puis déplace le
+fichier. Si la ligne enregistre le chemin d'`inbox/`, elle pointe sur un fichier qui
+n'existe déjà plus quand le handler `fingerprint` le lit : **tous les jobs meurent sur
+« image illisible »**. Écris le chemin FINAL (`processed/{session}/…`) dans `scans`,
+avant de déplacer. Corollaire : un fichier manquant côté handler doit être traité comme
+une erreur *ambiguë*, pas permanente — il existe une fenêtre entre le commit et le
+`rename` où le chemin final n'est pas encore en place, et deux tentatives avec backoff
+la couvrent.
+
+**La session n'est jamais créée à la volée.** Le watcher résout `{session}` en UUID par
+son nom ; si elle n'existe pas ou est fermée, le fichier part en `rejected/`, jamais
+supprimé. Créer la session impliquerait de deviner `default_variant`, qui encode la
+décision de pré-tri physique du foil (§2) — mal la deviner mal-étiquette un lot entier.
+
+**Le compteur de session s'incrémente à l'insertion, pas à chaque fichier vu.** Sans ça,
+un rattrapage au redémarrage sur-compterait `scanned_count` et masquerait précisément
+l'écart de double-feed qu'on cherche à détecter.
+
 ---
 
 ## 2. Le problème du foil — à régler avant de coder

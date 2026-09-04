@@ -23,6 +23,11 @@ update jobs set status='running', locked_at=now(), locked_by=$w, attempts=attemp
  ) returning *;
 ```
 
+**La réclamation ne suffit pas.** Elle ne regarde que `queued` et `failed` : un worker
+mort laisse sa ligne en `running` pour toujours. Appelle `reclaimStale()` au démarrage et
+périodiquement, sinon tu perds des jobs en silence. Voir `docs/01` §« Le trou de cette
+requête ».
+
 ## 2. Idempotence — la règle qui compte le plus
 
 Tout job qui produit un effet de bord externe porte une `idempotency_key`
