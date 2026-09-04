@@ -141,10 +141,19 @@ Puis scripts/seed-embeddings.ts: calcule l'embedding de card.image_small pour to
 les cartes, écrit dans card_embeddings avec model='clip-vit-base-patch32'.
 Reprend où il s'est arrêté si interrompu. Traite par lots de 100.
 
+ATTENTION avant d'installer: @xenova/transformers 2.17 dépend de sharp ^0.32 et le
+projet utilise sharp 0.35. Charger les deux binaires libvips dans le même process fait
+segfaulter Node. Le pnpm.overrides sur sharp dans package.json règle ça — ne le retire
+pas, le worker a besoin des deux bibliothèques ensemble.
+
 Tests obligatoires:
 - La même image donne le même hash de façon déterministe
 - Une image redimensionnée à 80% garde une distance de Hamming ≤ 4
-- Deux cartes différentes ont une distance de Hamming ≥ 20
+  (mesuré: 0 en pHash, 1 en dHash)
+- Deux cartes différentes: c'est la SOMME des deux hachages qui sépare, pas un seul.
+  Mesuré sur 741 paires: pHash seul descend à 10 (3,4% des paires sous 20), dHash à 10
+  aussi (8,4% sous 20), la somme n'est jamais descendue sous 29. Un test qui exige
+  >= 20 sur un hachage isolé sera rouge sur des cartes légitimement différentes.
 - Un embedding a bien une norme de 1.0
 
 Vérifie que l'index HNSW est utilisé: EXPLAIN ANALYZE sur une requête de similarité
@@ -380,7 +389,7 @@ que les futures sessions ne dérivent pas.
 | Après | Chiffre à noter |
 |---|---|
 | 2 | cartes seedées, **distribution du nombre de candidats du filtre déterministe** |
-| 3 | temps d'embedding par carte, taille de l'index HNSW |
+| 3 | temps d'embedding par carte, taille de l'index HNSW, cartes sans image |
 | 4 | débit du pipeline en cartes/minute |
 | 5 | **répartition own_history / catalog / non-résolu** |
 | 6 | secondes par carte en review |

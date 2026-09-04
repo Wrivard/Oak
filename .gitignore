@@ -28,3 +28,6 @@ tests/fixtures/golden/scans/
 .DS_Store
 coverage/
 *.log
+
+# fixtures de cartes: renders officiels sous copyright, cache local seulement
+tests/fixtures/cards/

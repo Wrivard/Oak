@@ -111,6 +111,29 @@ select card_id, variant, condition, language,
  limit 5;
 ```
 
+### Séparation mesurée, pas supposée
+
+Sur **741 paires de cartes distinctes** (39 cartes réelles, hachées avec
+l'implémentation de `lib/fingerprint/hash.ts`) :
+
+| | min | p1 | p5 | médiane | max |
+|---|---|---|---|---|---|
+| pHash seul | 10 | 16 | 20 | 30 | 48 |
+| dHash seul | 10 | 14 | 18 | 28 | 47 |
+| **somme** | **29** | 35 | 41 | 58 | 89 |
+
+L'intuition « deux cartes différentes sont à 20 ou plus » est **fausse hachage par
+hachage** : 3,4 % des paires passent sous 20 en pHash, 8,4 % en dHash. Elle n'est vraie
+que sur la somme, jamais descendue sous 29.
+
+C'est la justification chiffrée du `order by d_p + d_d` ci-dessus, et la marge du
+niveau 1 est confortable : le seuil d'acceptation est `phashMax 8 + dhashMax 10 = 18`,
+soit onze points sous le pire cas observé entre deux cartes différentes.
+
+Côté stabilité, une même image redimensionnée à 80 % donne une distance de 0 (pHash)
+et 1 (dHash) — le hachage est robuste au rééchantillonnage, ce qui est exactement le
+régime « ton scan vs tes scans passés ».
+
 **Embedding CLIP.** `Xenova/clip-vit-base-patch32` via `@xenova/transformers`, 512
 dimensions, tourne en ONNX sur CPU. Pas de GPU nécessaire, pas d'appel réseau, pas de
 coût par carte. Normalise en L2 avant de stocker pour que la distance cosinus soit
@@ -119,6 +142,17 @@ propre.
 **Ne change jamais de modèle sans reconstruire toute la table.** Un embedding d'un modèle
 n'est pas comparable à celui d'un autre. `card_embeddings.model` existe pour t'empêcher
 de mélanger.
+
+**Piège d'installation, vérifié en dur.** `@xenova/transformers` 2.17 dépend de
+`sharp@^0.32`, alors que le projet utilise `sharp` 0.35. Les deux chargent un binaire
+libvips natif, et charger les deux dans le même process fait **segfaulter Node** — sans
+message d'erreur exploitable, juste des `GLib-GObject-CRITICAL` puis un crash. Le
+`pnpm.overrides` sur `sharp` dans `package.json` force une version unique. Ne le
+retire pas : le worker a besoin des deux bibliothèques dans le même process.
+
+Mesures sur cette machine, CPU seul : **~25 ms par embedding** une fois le modèle
+chargé (~2 s au premier appel), soit ~20 cartes/s bout en bout avec le téléchargement
+des images.
 
 ---
 
@@ -169,6 +203,35 @@ La qualité des embeddings (étape 3) et la marge minimum entre 1er et 2e candid
 (`THRESHOLDS.catalog.minMargin`, étape 5) déterminent à eux seuls le taux de review
 manuelle. Le test `tests/catalog.test.ts` garde ce chiffre : il échoue si un refresh du
 catalogue fait passer la part 1-4 candidats sous 98 %.
+
+### Ce que le rerank CLIP rattrape, mesuré
+
+Embeddings calculés pour 20 392 des 20 444 cartes (52 images mortes chez l'hébergeur).
+Sur les **19 106 paires de cartes qui partagent le même `(printed_total, number)`** —
+donc celles que le filtre déterministe présente ensemble :
+
+| | paires | part |
+|---|---|---|
+| séparées proprement par CLIP (`d ≥ 0,15`) | 18 126 | 94,9 % |
+| dans la zone d'acceptation (`d < 0,15`) | 980 | 5,1 % |
+| indissociables (`d < 0,06`, sous `minMargin`) | 18 | 0,09 % |
+
+Distance minimale observée : 0,0178.
+
+**Les 18 paires indissociables sont toutes des Énergies de base** rééditées à l'identique
+entre Gym Heroes et Gym Challenge. Des cartes à 0,10 $. L'ambiguïté résiduelle se
+concentre exactement là où elle n'a aucune valeur marchande — ne les envoie pas en review
+manuelle, prends le premier candidat et passe à la suivante.
+
+**Contre-exemple utile : les rééditions ne sont pas le problème qu'on croit.** Le
+Charizard Base est à 0,048 de celui de Base Set 2 et 0,054 de celui de Legendary
+Collection — CLIP seul ne les séparerait jamais. Mais leurs dénominateurs diffèrent
+(102, 130, 110), donc le filtre déterministe les a déjà écartés avant le rerank. Les
+deux étages se couvrent l'un l'autre : le filtre sépare ce que CLIP confond, CLIP sépare
+ce que le filtre regroupe.
+
+**Index HNSW.** 53 Mo pour 20 392 vecteurs. `EXPLAIN ANALYZE` sur une requête de
+similarité montre bien `Index Scan using card_embeddings_hnsw`, jamais de Seq Scan.
 
 Chaque carte confirmée renforce le niveau 1. Après quelques milliers de cartes, ton taux
 de non-résolu devrait tomber sous 5 %.
