@@ -1,5 +1,6 @@
 import { log } from '../lib/log.js';
 import { enqueue } from './queue/queue.js';
+import { pruneTraces } from './queue/trace.js';
 
 /**
  * Planificateur interne. Voir docs/03-pricing.md §5.
@@ -18,6 +19,10 @@ function hourKey(now = new Date()): string {
 export async function tick(): Promise<void> {
   const id = await enqueue('price_refresh', { limit: 500 }, { idempotencyKey: hourKey() });
   if (id !== null) log.info('batch de repricing enfilé', { job_id: id });
+
+  // Les traces d'appels sont de la télémétrie, pas de l'historique : leur
+  // intérêt décroît avec l'âge et la table gonflerait sans fin.
+  await pruneTraces();
 }
 
 export function startCron(): NodeJS.Timeout {

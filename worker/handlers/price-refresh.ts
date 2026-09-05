@@ -32,6 +32,7 @@ import { parseSku, type CardCondition, type CardVariant } from '../../lib/sku.js
 import { PermanentError } from '../queue/errors.js';
 import type { Job } from '../queue/queue.js';
 import { withBreaker } from '../queue/breaker.js';
+import { trace } from '../queue/trace.js';
 
 /**
  * Rafraîchissement des prix. Voir docs/03-pricing.md §5.
@@ -87,8 +88,12 @@ export async function handlePriceRefresh(job: Job): Promise<void> {
   // séparés n'aboutiraient jamais.
   let cards: Map<string, ApiCard>;
   try {
-    cards = await withBreaker('pokemontcg', () =>
-      fetchPricesBatch(rows.map((r) => r.card_id), apiKey),
+    const ids = rows.map((r) => r.card_id);
+    cards = await trace(
+      'pokemontcg',
+      'cards_batch',
+      () => withBreaker('pokemontcg', () => fetchPricesBatch(ids, apiKey)),
+      (res) => ({ ok: true, context: { demandes: ids.length, recues: res.size } }),
     );
   } catch (err) {
     log.warn('source de prix indisponible, batch abandonné', {
@@ -220,7 +225,12 @@ async function fetchEbayBoth(
 
   let active: CompsSummary | null = null;
   try {
-    active = await withBreaker('ebay', () => fetchActiveListings(ebay, q));
+    active = await trace(
+      'ebay',
+      'browse_active',
+      () => withBreaker('ebay', () => fetchActiveListings(ebay, q)),
+      (res) => ({ ok: true, context: { sku: row.sku, requete: q, retenues: res.count } }),
+    );
   } catch (err) {
     if (!(err instanceof EbayUnavailable)) throw err;
     log.warn('annonces actives indisponibles', { sku: row.sku, err });
@@ -232,10 +242,16 @@ async function fetchEbayBoth(
       // Un refus de whitelisting n'est PAS une panne du service : il ne doit
       // pas ouvrir le circuit, sinon un compte non autorisé couperait aussi les
       // annonces actives, qui elles fonctionnent.
-      sold = await withBreaker(
+      sold = await trace(
         'ebay',
-        () => fetchSoldListings(ebay, q),
-        (e) => !(e instanceof EbayNotEntitled),
+        'insights_sold',
+        () =>
+          withBreaker(
+            'ebay',
+            () => fetchSoldListings(ebay, q),
+            (e) => !(e instanceof EbayNotEntitled),
+          ),
+        (res) => ({ ok: true, context: { sku: row.sku, requete: q, ventes: res.count } }),
       );
     } catch (err) {
       if (err instanceof EbayNotEntitled) {
