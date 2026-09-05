@@ -450,3 +450,32 @@ contrainte et échoue. Un vrai encaissement de vente ne doit jamais être refus�
 base. Le clamp abaisse la réservation en même temps que le stock ; le job d'export
 TCGplayer voit la nouvelle réservation au prochain passage et repousse la quantité.
 Une réservation est une intention, pas une promesse.
+
+---
+
+## Les migrations, dans l'ordre
+
+Numérotées, appliquées une fois, **jamais éditées après application**. Une
+correction se fait par une migration de plus, pas par une retouche.
+
+| | Ce qu'elle apporte |
+|---|---|
+| `001_extensions_and_catalog` | `pgvector`, `pg_trgm`, `unaccent`, `pgcrypto`, `cards`, `card_embeddings`, `immutable_unaccent` |
+| `002_inventory` | `inventory` — le stock, clé `sku` |
+| `003_scans_and_sessions` | `sessions`, `scans`, `known_fingerprints` |
+| `004_pricing` | `price_current`, `price_history`, `pricing_rules` (seedée dans la migration) |
+| `005_jobs_and_events` | `jobs`, `channel_events` |
+| `006_qty_movements` | `apply_qty_delta()` — toute quantité bouge par là |
+| `007_ocr_diagnostics` | `scans.ocr_read`, `ocr_confidence`, `ocr_band` |
+| `008_channel_events_event_idx` | index sur `(event, created_at desc)` |
+| `009_drop_known_fp_hnsw` | retire un index HNSW qu'aucune requête n'interrogeait et qui coûtait 2,7 ko par empreinte |
+| `010_sessions_page_counter` | `sessions.page_count` — allocation **atomique** du rang de fichier |
+| `011_sessions_unique_open_name` | un seul lot **ouvert** par nom, index partiel |
+
+Les trois dernières ont été appliquées directement en `psql` le 5 septembre 2026.
+Elles sont toutes **idempotentes** (`if not exists`, `drop … if exists`), donc les
+rejouer par un autre chemin ne casse rien. Les migrations 002 à 005, elles, ne le
+sont pas : elles créent des tables sans `if not exists`, et c'est volontaire —
+une migration de structure qu'on peut rejouer par accident est une migration qui
+masque une erreur d'ordre.
+
