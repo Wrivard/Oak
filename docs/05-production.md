@@ -44,6 +44,17 @@ Une seule page, cinq métriques. Si elle est verte, tu peux aller dormir.
 > qui était faux.
 | Profondeur de queue par type de job | `> 5 000` ou croissance monotone 1 h |
 | Jobs `dead` dernières 24 h | `> 0` |
+
+> **Un job mort ne doit pas emporter le lot.** Le job, lui, est visible : cette
+> métrique alarme dès le premier. Mais le **scan** restait dans son état de
+> traitement pour toujours, et la clôture d'un lot refuse tant qu'une carte est
+> en traitement — un seul job mort rendait donc la réconciliation d'un lot entier
+> impossible. `reapStrandedScans()` tourne avec le cron horaire et récupère les
+> scans abandonnés : **écarté** si l'empreinte a échoué (sans empreinte la review
+> ne peut rien en faire, `confirmScan` la refuse — la carte est à repasser au
+> scanner), **en review** si c'est le matching qui a échoué, puisque le scan
+> porte alors son image et ses empreintes et que c'est exactement ce que le
+> niveau 3 est censé recevoir.
 | Écart de réconciliation eBay | `> 0` |
 
 > **Mesuré le 5 septembre 2026 :** cette métrique affichait « toutes les sessions

@@ -2,6 +2,7 @@ import { log } from '../lib/log.js';
 import { enqueue } from './queue/queue.js';
 import { pruneTraces } from './queue/trace.js';
 import { pruneThumbs } from '../lib/images/thumb-cache.js';
+import { reapStrandedScans } from './reap-scans.js';
 
 /**
  * Planificateur interne. Voir docs/03-pricing.md §5.
@@ -40,6 +41,12 @@ export async function tick(): Promise<void> {
   // indéfiniment. Elles ne servent qu'à la review et à l'audit, et se
   // régénèrent à la demande.
   await pruneThumbs();
+
+  // Un job mort laissait son scan dans son état de traitement pour toujours, ce
+  // qui rendait la clôture du lot impossible. On le récupère : écarté si
+  // l'empreinte a échoué (rien d'exploitable), en review si c'est le matching
+  // (l'humain tranche, c'est le niveau 3).
+  await reapStrandedScans();
 }
 
 export function startCron(): NodeJS.Timeout {
