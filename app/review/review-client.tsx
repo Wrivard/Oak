@@ -30,6 +30,14 @@ function tierOf(valueCents: number | null, t: Props['thresholds']): Tier {
   return 'bulk';
 }
 
+/** Noms lisibles des sources. `ebay_active` n'est pas un prix obtenu. */
+const SOURCE_LABEL: Record<string, string> = {
+  ebay_active: 'eBay — annonces actives',
+  ebay_sold: 'eBay — ventes passées',
+  tcgplayer: 'TCGplayer',
+  cardmarket: 'Cardmarket (EUR)',
+};
+
 const TIER_COLOR: Record<Tier, string> = {
   bulk: 'var(--border)',
   watch: 'var(--amber)',
@@ -210,6 +218,7 @@ export default function ReviewClient({
   }
 
   const priceCents = priceText === '' ? null : parseAmount(priceText);
+  const soldSales = scan?.prices.find((p) => p.source === 'ebay_sold')?.sales ?? [];
 
   return (
     <div style={{ display: 'grid', gridTemplateRows: '1fr auto', height: '100vh' }}>
@@ -431,24 +440,72 @@ export default function ReviewClient({
             </section>
 
             <section>
-              <div className="label">Sources de prix</div>
+              <div className="label">Sources de prix — totaux prix + port</div>
               {scan?.prices.length === 0 ? (
                 <div className="faint" style={{ padding: 'var(--s2) 0', fontSize: 13 }}>
-                  Aucune donnée de prix. <span className="mono">price_current</span> se
-                  remplit à l&apos;étape 7 — le système ne devine jamais un prix qu&apos;il
-                  n&apos;a pas mesuré.
+                  Aucune donnée de prix pour cette carte. Le système ne devine jamais un
+                  prix qu&apos;il n&apos;a pas mesuré.
                 </div>
               ) : (
-                <div style={{ display: 'flex', gap: 'var(--s4)' }}>
-                  {scan?.prices.map((p) => (
-                    <div key={p.source}>
-                      <div className="label">{p.source}</div>
-                      <div className="mono">{p.market ?? '—'}</div>
-                      <div className="faint mono" style={{ fontSize: 11 }}>
-                        n={p.n_sales ?? 0}
-                      </div>
-                    </div>
-                  ))}
+                <table className="mono" style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr className="label" style={{ textAlign: 'right' }}>
+                      <th style={{ textAlign: 'left', padding: '2px var(--s2)' }}>Source</th>
+                      <th style={{ padding: '2px var(--s2)' }}>Moyenne</th>
+                      <th style={{ padding: '2px var(--s2)' }}>Médiane</th>
+                      <th style={{ padding: '2px var(--s2)' }}>Min</th>
+                      <th style={{ padding: '2px var(--s2)' }}>Max</th>
+                      <th style={{ padding: '2px var(--s2)' }}>n</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scan?.prices.map((p) => (
+                      <tr key={p.source} style={{ borderTop: '1px solid var(--border)' }}>
+                        <td style={{ padding: '2px var(--s2)' }}>
+                          {SOURCE_LABEL[p.source] ?? p.source}
+                          {p.window_days !== null && (
+                            <span className="faint"> · {p.window_days} j</span>
+                          )}
+                        </td>
+                        {/* La MOYENNE est le chiffre demandé. La MÉDIANE est à
+                            côté parce qu'un écart entre les deux signale du bruit
+                            dans la recherche : un lot, une carte gradée. */}
+                        <td style={{ textAlign: 'right', padding: '2px var(--s2)', fontWeight: 600 }}>
+                          {p.mid ?? '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', padding: '2px var(--s2)' }} className="dim">
+                          {p.market ?? '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', padding: '2px var(--s2)' }} className="faint">
+                          {p.low ?? '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', padding: '2px var(--s2)' }} className="faint">
+                          {p.high ?? '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', padding: '2px var(--s2)' }} className="faint">
+                          {p.n_sales ?? '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {/* Les ventes passées, avec leurs dates : c'est ce qui dit si le
+                  prix tient encore ou s'il date de trois mois. */}
+              {soldSales.length > 0 && (
+                <div style={{ marginTop: 'var(--s2)' }}>
+                  <div className="label">Ventes récentes</div>
+                  <div className="mono faint" style={{ fontSize: 11, display: 'flex', flexWrap: 'wrap', gap: 'var(--s2)' }}>
+                    {soldSales.map((v, i) => (
+                      <span key={i}>
+                        {formatCents(v.total_cents)}
+                        {v.vendu_le && (
+                          <span className="faint"> ({v.vendu_le.slice(0, 10)})</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </section>

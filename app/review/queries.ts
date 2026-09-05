@@ -15,12 +15,23 @@ export interface Candidate {
   distance: number;
 }
 
+export interface SoldObservation {
+  total_cents: number;
+  vendu_le: string | null;
+}
+
 export interface PriceSource {
   source: string;
+  /** Médiane des totaux pour les sources eBay, market TCGplayer sinon. */
   market: string | null;
+  /** MOYENNE des totaux (prix + port) pour les sources eBay. */
+  mid: string | null;
   low: string | null;
   high: string | null;
   n_sales: number | null;
+  window_days: number | null;
+  /** Ventes individuelles avec leurs dates, pour la source ebay_sold. */
+  sales: SoldObservation[];
 }
 
 export interface ReviewScan {
@@ -116,17 +127,35 @@ async function loadPrices(cardIds: readonly string[]): Promise<Map<string, CardP
   const out = new Map<string, CardPrices>();
   if (cardIds.length === 0) return out;
 
-  const { rows } = await query<PriceSource & { card_id: string }>(
-    `select i.card_id, p.source, p.market::text, p.low::text, p.high::text, p.n_sales
+  const { rows } = await query<
+    Omit<PriceSource, 'sales'> & { card_id: string; raw: { observations?: SoldObservation[] } | null }
+  >(
+    `select i.card_id, p.source, p.market::text, p.mid::text, p.low::text,
+            p.high::text, p.n_sales, p.window_days, p.raw
        from price_current p
        join inventory i on i.sku = p.sku
-      where i.card_id = any($1::text[])`,
+      where i.card_id = any($1::text[])
+      order by p.source`,
     [cardIds],
   );
 
   for (const row of rows) {
     const entry = out.get(row.card_id) ?? { valueCents: null, sources: [] };
-    entry.sources.push(row);
+    entry.sources.push({
+      source: row.source,
+      market: row.market,
+      mid: row.mid,
+      low: row.low,
+      high: row.high,
+      n_sales: row.n_sales,
+      window_days: row.window_days,
+      // Les dates ne servent que pour les ventes passées : une annonce active
+      // n'a pas de date de vente, par définition.
+      sales:
+        row.source === 'ebay_sold'
+          ? (row.raw?.observations ?? []).slice(0, 8)
+          : [],
+    });
     // La valeur de référence est le market TCGplayer quand il existe.
     if (row.source === 'tcgplayer' && row.market !== null) {
       entry.valueCents = Math.round(Number(row.market) * 100);

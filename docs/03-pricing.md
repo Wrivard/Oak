@@ -8,6 +8,30 @@
 | Average price | `tcgplayer.prices[variant].mid`, Cardmarket `trendPrice` | gratuit |
 | Ventes eBay récentes | tcgapi.net `/v1/comps` | tier gratuit ~1 000 req/jour |
 
+### Les deux moyennes prix + port
+
+Le chiffre utile pour décider d'un prix eBay n'est pas le prix affiché, c'est le
+**total prix + port**. Une carte à 0,99 $ avec 4,50 $ de port n'est pas une carte à
+0,99 $, et comparer des prix hors port fausse toute la grille.
+
+| Ce qu'on veut | API | Accès (vérifié 2026-09-05) |
+|---|---|---|
+| moyenne des totaux, annonces **actives** | Browse API `item_summary/search` | ✅ credentials applicatifs standards |
+| moyenne des totaux, **ventes passées** + dates | Marketplace Insights `item_sales/search` | ⚠️ Limited Release, 90 j, réservée aux partenaires |
+
+`lib/pricing/ebay-comps.ts` implémente les deux. Un 403 sur Insights lève
+`EbayNotEntitled` et **désactive la source pour tout le batch** — inutile de brûler
+500 appels voués au même refus. Le repli est alors la source tierce de l'expérience 1.
+
+**Moyenne ET médiane sont stockées toutes les deux** (`mid` et `market` de
+`price_current`). L'écart entre elles est un signal en soi : la recherche eBay est du
+plein texte et ramène des lots et des cartes gradées. Un rapport moyenne/médiane de 13
+veut dire qu'il faut croire la médiane.
+
+**Le moteur consomme les ventes passées, jamais les annonces actives.** Une annonce est
+un prix *demandé*, pas un prix *obtenu*. Les actives s'affichent en review pour l'œil
+humain et n'entrent pas dans `estimateValue`.
+
 **Ce qui ne marchera pas, ne perds pas de soirée dessus :** l'API officielle eBay. La
 Finding API est morte et les ventes complétées sont derrière Marketplace Insights, qui
 est en limited release, whitelistée par partenaire et même par catégorie. Les devs

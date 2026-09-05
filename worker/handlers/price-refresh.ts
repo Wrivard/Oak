@@ -17,6 +17,17 @@ import {
   type ApiCard,
   type FetchedPrices,
 } from '../../lib/pricing/sources.js';
+import {
+  buildQuery,
+  ebayEnvFromProcess,
+  EbayNotEntitled,
+  EbayUnavailable,
+  fetchActiveListings,
+  fetchSoldListings,
+  SOLD_WINDOW_DAYS,
+  type CompsSummary,
+  type EbayEnv,
+} from '../../lib/pricing/ebay-comps.js';
 import { parseSku, type CardCondition, type CardVariant } from '../../lib/sku.js';
 import { PermanentError } from '../queue/errors.js';
 import type { Job } from '../queue/queue.js';
@@ -35,16 +46,33 @@ interface SkuRow {
   variant: CardVariant;
   condition: CardCondition;
   current_price: string | null;
+  card_name: string;
+  card_number: string;
+  printed_total: number | null;
 }
+
+/**
+ * Marketplace Insights est en Limited Release. Un premier 403 suffit à savoir
+ * que le compte n'est pas whitelisté : on cesse d'essayer pour tout le batch
+ * plutôt que de brûler 500 appels voués au même refus.
+ */
+let insightsEntitled = true;
 
 export async function handlePriceRefresh(job: Job): Promise<void> {
   const cfg = await loadConfig();
   const limit = typeof job.payload['limit'] === 'number' ? job.payload['limit'] : BATCH;
   const apiKey = process.env['POKEMONTCG_API_KEY'];
+  const ebay = ebayEnvFromProcess();
+  if (!ebay) {
+    log.info('eBay non configuré : ni annonces actives ni ventes passées', {
+      manquant: 'EBAY_CLIENT_ID / EBAY_CLIENT_SECRET',
+    });
+  }
 
   const { rows } = await query<SkuRow>(
-    `select i.sku, i.card_id, i.variant, i.condition, i.current_price::text
-       from inventory i
+    `select i.sku, i.card_id, i.variant, i.condition, i.current_price::text,
+            c.name as card_name, c.number as card_number, c.printed_total
+       from inventory i join cards c on c.id = i.card_id
       where i.qty_on_hand > 0
         and (i.last_priced_at is null
              or i.last_priced_at < now() - interval '24 hours')
@@ -80,7 +108,7 @@ export async function handlePriceRefresh(job: Job): Promise<void> {
         noData++;
         continue;
       }
-      const outcome = await refreshOne(row, extractPrices(card, row.variant), cfg);
+      const outcome = await refreshOne(row, extractPrices(card, row.variant), cfg, ebay);
       if (outcome === 'priced') priced++;
       else if (outcome === 'no_data') noData++;
       else if (outcome === 'flagged') flagged++;
@@ -106,10 +134,19 @@ async function refreshOne(
   row: SkuRow,
   fetched: FetchedPrices,
   cfg: PricingConfig,
+  ebay: EbayEnv | null,
 ): Promise<Outcome> {
   await writePriceCurrent(row.sku, fetched);
 
-  const comps = await fetchEbayComps(row.card_id);
+  // Comparables eBay : annonces actives et ventes passées, en TOTAL prix + port.
+  const { active, sold } = await fetchEbayBoth(row, ebay);
+  if (active) await writeComps(row.sku, 'ebay_active', active, null);
+  if (sold) await writeComps(row.sku, 'ebay_sold', sold, SOLD_WINDOW_DAYS);
+
+  // Le moteur consomme les VENTES passées, pas les annonces actives : une
+  // annonce est un prix demandé, pas un prix obtenu. Les actives servent à
+  // l'oeil humain dans la review, pas au calcul.
+  const comps = sold ? sold.observations.map((o) => o.totalCents) : await fetchEbayComps(row.card_id);
   const estimate = estimateValue(toPriceSources(fetched, comps));
 
   // `no_data` ne produit JAMAIS de prix. Il envoie en review. Un système qui
@@ -163,6 +200,102 @@ async function refreshOne(
     suggestion: suggestion.breakdown,
   });
   return 'priced';
+}
+
+/**
+ * Récupère les deux jeux de comparables sans laisser eBay faire tomber le
+ * pricing : une indisponibilité côté eBay ne doit pas empêcher de prixer sur les
+ * données TCGplayer déjà en main.
+ */
+async function fetchEbayBoth(
+  row: SkuRow,
+  ebay: EbayEnv | null,
+): Promise<{ active: CompsSummary | null; sold: CompsSummary | null }> {
+  if (!ebay) return { active: null, sold: null };
+
+  const q = buildQuery(row.card_name, row.card_number, row.printed_total);
+
+  let active: CompsSummary | null = null;
+  try {
+    active = await fetchActiveListings(ebay, q);
+  } catch (err) {
+    if (!(err instanceof EbayUnavailable)) throw err;
+    log.warn('annonces actives indisponibles', { sku: row.sku, err });
+  }
+
+  let sold: CompsSummary | null = null;
+  if (insightsEntitled) {
+    try {
+      sold = await fetchSoldListings(ebay, q);
+    } catch (err) {
+      if (err instanceof EbayNotEntitled) {
+        // Inutile de réessayer 499 fois : le compte n'est pas whitelisté.
+        insightsEntitled = false;
+        log.warn('Marketplace Insights non accordé, ventes passées désactivées', { err });
+      } else if (err instanceof EbayUnavailable) {
+        log.warn('ventes passées indisponibles', { sku: row.sku, err });
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  return { active, sold };
+}
+
+/**
+ * Écrit un jeu de comparables dans `price_current`.
+ *
+ *   market  médiane des totaux — c'est ce que le moteur utilise
+ *   mid     MOYENNE des totaux — c'est le chiffre demandé à l'écran
+ *   low/high min et max
+ *   raw     les observations individuelles, dates comprises
+ *
+ * Les deux sont stockées volontairement : l'écart entre moyenne et médiane est
+ * lui-même un signal. Quand il est grand, la recherche plein texte a ramené du
+ * bruit — un lot, une carte gradée — et le chiffre est à regarder de près.
+ */
+async function writeComps(
+  sku: string,
+  source: 'ebay_active' | 'ebay_sold',
+  c: CompsSummary,
+  windowDays: number | null,
+): Promise<void> {
+  if (c.count === 0) return;
+  const d = (cents: number | null) => (cents === null ? null : (cents / 100).toFixed(2));
+
+  await query(
+    `insert into price_current
+       (sku, source, low, mid, high, market, n_sales, window_days, raw, fetched_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+     on conflict (sku, source) do update
+        set low = excluded.low, mid = excluded.mid, high = excluded.high,
+            market = excluded.market, n_sales = excluded.n_sales,
+            window_days = excluded.window_days, raw = excluded.raw,
+            fetched_at = excluded.fetched_at`,
+    [
+      sku,
+      source,
+      d(c.lowCents),
+      d(c.averageCents),
+      d(c.highCents),
+      d(c.medianCents),
+      c.count,
+      windowDays,
+      {
+        moyenne_cents: c.averageCents,
+        mediane_cents: c.medianCents,
+        // Bornées : on veut la traçabilité, pas un dump de 50 annonces par SKU.
+        observations: c.observations.slice(0, 20).map((o) => ({
+          total_cents: o.totalCents,
+          prix_cents: o.priceCents,
+          port_cents: o.shippingCents,
+          vendu_le: o.soldAt ?? null,
+          titre: o.title.slice(0, 120),
+        })),
+      },
+    ],
+  );
 }
 
 async function loadConfig(): Promise<PricingConfig> {
