@@ -3,7 +3,7 @@
 Suite de `docs/08-nuit-du-5-septembre.md`, à lire après lui.
 
 **Départ :** 196 tests, l'application telle que tu l'as vue en te levant.
-**Arrivée :** 305 tests, 16 commits, et **huit pannes trouvées en exécutant**.
+**Arrivée :** 323 tests, 19 commits, et **dix pannes trouvées en exécutant**.
 
 Aucune n'est venue d'une relecture. Toutes sont venues de faire tourner le
 système contre de vraies données, à volume réel.
@@ -49,7 +49,7 @@ Quand tu t'en approcheras, la décision sera de passer au plan Pro.
 
 ---
 
-## Les huit pannes
+## Les dix pannes
 
 **1. Glisser le dossier du scanner rendait zéro photo.** Un scanner ne produit
 pas des fichiers, il produit un dossier. `dataTransfer.files` est vide quand on
@@ -101,6 +101,27 @@ totalité de l'inventaire faute de `tcg_sku_id`, le note dans `channel_events`, 
 rien à l'écran ne le disait. On pouvait téléverser un fichier sans lignes des
 jours durant en croyant pousser son stock.
 
+**9. Un printing absent était remplacé par un autre.** `extractPrices` retombait
+sur le premier printing disponible quand celui demandé manquait dans la réponse
+de pokemontcg.io. Un SKU `reverseHolofoil` dont l'API n'a que `normal` était donc
+prixé au prix du normal, publié, vendu — alors que tout le reste du système
+refuse de deviner le variant. Mesuré sur une vraie carte, `base6-57`, les deux
+printings prixés côte à côte par le pipeline :
+
+```
+normal            marché 2,31 $   ->  publié 2,49 $
+reverseHolofoil   marché 77,80 $  ->  publié 162,00 $
+```
+
+**65x.** Un printing absent ne donne plus aucun prix : la carte part en review
+avec la liste des printings que l'API avait réellement.
+
+**10. Un SKU signalé restait dans le batch horaire pour toujours.** Tout SKU
+traité est repoussé de 24 h par `last_priced_at` — sauf ceux signalés pour
+mouvement de prix anormal, que `flagSwing` oubliait d'estampiller. Ils étaient
+re-sélectionnés toutes les heures, re-cherchés auprès de l'API, re-signalés, un
+événement par heure et une place du batch de 500 occupée en permanence.
+
 ---
 
 ## Ce qui a changé à l'écran
@@ -110,7 +131,7 @@ jours durant en croyant pousser son stock.
 | **Envoyer** | glisser un **dossier**, deux boutons explicites, « Cartes comptées », avertissement si le lot contient déjà des pages, et le nombre exact de pages arrivées quand un envoi casse |
 | **Review** | trois colonnes — le scan, **la décision**, les réglages. Les vignettes des candidats voisins sont préchargées |
 | **Prix** | l'éditeur JSON est devenu de **vrais champs** : plancher, bandes, condition, canal, garde-fous. Le JSON reste en bas, replié |
-| **Santé** | trois métriques de plus (export TCGplayer, taille de la base), et deux qui ne mentent plus |
+| **Santé** | deux métriques de plus (export TCGplayer, taille de la base), et deux qui ne mentent plus |
 
 ---
 
@@ -124,6 +145,7 @@ sauvegarde de 30 000 lignes                         1,6 s
 restauration de 15 000 lignes                       2,4 s   (8 min avant)
 répétition complète, 40 cartes                      réconciliation exacte
 dix formats de scanner (TIFF, CMJN, gris, 600 dpi)  8 acceptés, 2 écartés
+deux printings de la MÊME carte, base6-57            2,49 $ contre 162,00 $
 ```
 
 **L'architecture tient.** Rien dans les écrans ne s'effondre au volume cible, et

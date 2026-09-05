@@ -73,6 +73,17 @@ effectivement fermé. Passe par pokemontcg.io, qui expose les points de prix TCG
 > sur Cardmarket seul — non publiable — et la carte part en review avec la liste
 > des printings que l'API avait réellement, pour qu'on voie si c'est le lot qui
 > a été envoyé au mauvais variant.
+>
+> **Mesuré sur une vraie carte le 5 septembre 2026.** `base6-57`, les deux
+> printings du même identifiant, prixés côte à côte par le pipeline :
+>
+> ```
+> normal            marché 2,31 $   ->  publié 2,49 $
+> reverseHolofoil   marché 77,80 $  ->  publié 162,00 $
+> ```
+>
+> **65x.** L'écart annoncé de 5 à 20x était prudent. Si l'API n'avait pas eu le
+> printing reverse, l'ancien code aurait listé cette carte à 2,49 $.
 
 **`market` peut être `null`** quand aucune annonce TCGplayer active n'existe pour ce
 printing. Trois causes fréquentes : carte sans listing actif, mauvais printing demandé,
