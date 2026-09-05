@@ -98,6 +98,21 @@ une erreur *ambiguë*, pas permanente — il existe une fenêtre entre le commit
 `rename` où le chemin final n'est pas encore en place, et deux tentatives avec backoff
 la couvrent.
 
+**L'OCR est sérialisé, et il ne croise pas ses résultats.** `readCardNumbers`
+partage un seul worker tesseract ; le handler `match` tourne à deux voies. Deux
+cartes sont donc lues en même temps par le même worker, sur chaque lot, en
+permanence. Si les résultats pouvaient se croiser, deux cartes échangeraient leur
+numéro et le filtre déterministe les résoudrait **toutes les deux vers la
+mauvaise carte, avec une confiance élevée** — une erreur qui ne passerait jamais
+par la review. Vérifié plutôt que supposé : `tests/ocr-concurrence.test.ts` lit
+six images différentes en parallèle et exige que chacune rende son propre numéro.
+
+Conséquence de la sérialisation : les deux voies de `match` ne parallélisent que
+le reste — recherche vectorielle, requêtes, écritures. Monter la concurrence
+n'accélérera pas l'OCR sans un pool de workers tesseract, et chacun coûte
+plusieurs dizaines de mégaoctets sur un process qui tourne déjà entre 500 et
+800 Mo.
+
 **Le taux de lecture OCR se mesure sur les scans qui ont ATTEINT l'OCR.** Trouvé
 le 5 septembre 2026 : `/diagnostics` divisait par tous les scans. Or un scan
 résolu au niveau 1 n'exécute jamais l'OCR — `recordOcr` n'est appelé qu'après la

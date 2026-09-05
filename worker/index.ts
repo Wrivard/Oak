@@ -25,6 +25,14 @@ const REJECTED = process.env['REJECTED_DIR'] ?? './rejected';
 const worker = new Worker(env.WORKER_ID, {
   fingerprint: { handler: handleFingerprint, concurrency: 4 },
   // OCR + rerank : du CPU local, mais tesseract est plus lourd que les hachages.
+  //
+  // L'OCR lui-même reste SÉRIALISÉ quoi qu'on mette ici : `readCardNumbers`
+  // partage un seul worker tesseract, qui met les lectures en file. Les deux
+  // voies ne parallélisent donc que le reste — recherche vectorielle, requêtes,
+  // écritures. Vérifié au passage que la file de tesseract ne croise pas les
+  // résultats entre lectures simultanées (tests/ocr-concurrence.test.ts) : deux
+  // cartes qui échangeraient leur numéro se résoudraient toutes les deux vers la
+  // mauvaise carte, avec une confiance élevée, sans jamais passer par la review.
   match: { handler: handleMatch, concurrency: 2 },
   // Hachage d'un lot entier : du CPU, une seule voie pour ne pas concurrencer
   // le matching qui est déjà le goulot.
