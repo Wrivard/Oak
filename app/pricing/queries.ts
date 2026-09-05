@@ -36,19 +36,25 @@ export async function loadPreviewSkus(): Promise<PreviewSku[]> {
     value_estimate: string | null;
     current_price: string | null;
   }>(
-    `with ranked as (
+    // Deux CTE au lieu d'une : Postgres refuse une fonction de fenêtrage à
+    // l'intérieur d'une définition de fenêtre ("window functions are not allowed
+    // in window definitions"). Le bucket se calcule d'abord, on numérote ensuite.
+    `with valued as (
        select i.sku, c.name, c.set_name, i.condition,
-              i.value_estimate::text, i.current_price::text,
-              ntile(20) over (order by i.value_estimate nulls last) as bucket,
-              row_number() over (
-                partition by ntile(20) over (order by i.value_estimate nulls last)
-                order by i.sku
-              ) as rn
+              i.value_estimate, i.current_price,
+              ntile(20) over (order by i.value_estimate nulls last) as bucket
          from inventory i join cards c on c.id = i.card_id
         where i.qty_on_hand > 0
+     ),
+     ranked as (
+       select *, row_number() over (partition by bucket order by sku) as rn
+         from valued
      )
-     select sku, name, set_name, condition, value_estimate, current_price
-       from ranked where rn = 1 order by value_estimate nulls last limit 20`,
+     select sku, name, set_name, condition,
+            value_estimate::text, current_price::text
+       from ranked where rn = 1
+      order by value_estimate nulls last
+      limit 20`,
   );
 
   return rows.map((r) => ({

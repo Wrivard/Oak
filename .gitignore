@@ -46,3 +46,6 @@ backups/
 
 # exports CSV générés
 exports/
+
+# vignettes générées à la volée
+.thumb-cache/

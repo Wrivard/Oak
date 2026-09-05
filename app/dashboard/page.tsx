@@ -8,6 +8,15 @@ import { loadMetrics, type Health } from './queries.js';
  */
 export const dynamic = 'force-dynamic';
 
+/**
+ * Rafraîchissement automatique côté serveur, toutes les 15 secondes.
+ *
+ * Un dashboard de santé qu'il faut recharger à la main n'est pas un dashboard :
+ * on le laisse ouvert sur un second écran pendant que le worker draine, et il
+ * doit bouger tout seul.
+ */
+export const revalidate = 0;
+
 const COLOR: Record<Health, string> = {
   ok: 'var(--green)',
   warn: 'var(--amber)',
@@ -24,6 +33,9 @@ export default async function DashboardPage() {
 
   return (
     <main style={{ padding: 'var(--s5)', maxWidth: 900 }}>
+      {/* Rechargement complet plutôt qu'un polling client : la page est
+          entièrement serveur, sans état à préserver. */}
+      <meta httpEquiv="refresh" content="15" />
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--s3)' }}>
         <h1 style={{ fontSize: 18, margin: 0 }}>Santé du pipeline</h1>
         <span className="mono" style={{ color: COLOR[worst], fontSize: 12, fontWeight: 600 }}>

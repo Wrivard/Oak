@@ -80,9 +80,14 @@ export default function ReviewClient({
   const [editing, setEditing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [hits, setHits] = useState<SearchHit[]>([]);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sound, setSound] = useState(false);
+  /** Cartes parties en optimiste, gardées pour pouvoir les remettre. */
+  const [undoStack, setUndoStack] = useState<{ scan: ReviewScan; at: number }[]>([]);
+  const [treated, setTreated] = useState(0);
+  const startedAt = useRef(Date.now());
+  /** Confirmations en vol : elles ne bloquent pas l'écran, mais on les compte. */
+  const [inFlight, setInFlight] = useState(0);
 
   const priceRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -112,6 +117,59 @@ export default function ReviewClient({
 
   const tier = useMemo(() => tierOf(scan?.valueCents ?? null, thresholds), [scan, thresholds]);
 
+  /**
+   * Préchargement des voisines.
+   *
+   * Sans ça, chaque flèche déclenche un téléchargement à froid et l'image
+   * apparaît après coup. Les deux suivantes et la précédente suffisent : on ne
+   * navigue jamais plus vite que ça, et précharger toute la file gaspillerait la
+   * bande passante sur des cartes qu'on ne verra pas.
+   */
+  useEffect(() => {
+    for (const offset of [1, 2, -1]) {
+      const neighbour = queue[cursor + offset];
+      if (!neighbour) continue;
+      const img = new Image();
+      img.src = `/api/scan/${neighbour.id}/image`;
+    }
+  }, [cursor, queue]);
+
+  /**
+   * Garde la ligne focalisée visible.
+   *
+   * `block: 'nearest'` volontairement : la liste ne saute que quand le curseur
+   * sort du cadre. Recentrer à chaque flèche donnerait un écran qui bouge sous
+   * les yeux, ce que docs/06 §1 interdit explicitement.
+   */
+  const rowRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  useEffect(() => {
+    const id = queue[cursor]?.id;
+    if (id) rowRefs.current.get(id)?.scrollIntoView({ block: 'nearest' });
+  }, [cursor, queue]);
+
+  /** Confirmation visuelle brève : on doit SAVOIR que l'appui a été pris. */
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(false), 160);
+    return () => clearTimeout(t);
+  }, [flash]);
+
+  /** Annule la dernière confirmation en la remettant à sa place. */
+  const undo = useCallback(() => {
+    setUndoStack((u) => {
+      const [last, ...rest] = u;
+      if (!last) return u;
+      setQueue((q) => [...q.slice(0, last.at), last.scan, ...q.slice(last.at)]);
+      setCursor(last.at);
+      setTreated((n) => Math.max(0, n - 1));
+      setError(
+        'Carte remise en file. La confirmation déjà partie n’est PAS annulée en base — corrige-la à la main si besoin.',
+      );
+      return rest;
+    });
+  }, []);
+
   useEffect(() => {
     if (sound && (tier === 'watch' || tier === 'hard')) beep(tier);
   }, [scan?.id, tier, sound]);
@@ -125,31 +183,75 @@ export default function ReviewClient({
     [queue.length],
   );
 
-  const accept = useCallback(async () => {
-    if (!scan || !candidate || busy) return;
-    setBusy(true);
-    setError(null);
-    const res = await confirmScan({
+  /**
+   * Accept OPTIMISTE.
+   *
+   * L'écriture prend un aller-retour vers la base — quelques centaines de
+   * millisecondes sur un pooler distant. Sur un budget de 3 secondes par carte,
+   * attendre cette réponse avant de passer à la suivante gaspille un dixième du
+   * budget ET fige l'écran, ce qui est pire que la lenteur elle-même.
+   *
+   * La carte quitte donc la file IMMÉDIATEMENT et l'écriture part en arrière-
+   * plan. Si elle échoue, la carte revient à sa place avec l'erreur affichée :
+   * rien n'est perdu, on est juste interrompu — ce qui est le bon compromis,
+   * puisque l'échec est rare et l'attente permanente.
+   */
+  const accept = useCallback(() => {
+    if (!scan || !candidate) return;
+    const position = cursor;
+    const payload = {
       scanId: scan.id,
       cardId: candidate.card_id,
       variant: effVariant,
       condition: effCondition,
       language: scan.default_language,
       priceCents: priceText === '' ? null : parseAmount(priceText),
-    });
-    setBusy(false);
-    if (!res.ok) {
-      setError(res.error ?? 'échec');
-      return;
-    }
-    // La carte quitte la file. On ne bouge pas le curseur : la suivante prend sa
-    // place, ce qui évite un saut visuel.
-    setQueue((q) => q.filter((s) => s.id !== scan.id));
-    setCursor((c) => Math.min(c, Math.max(queue.length - 2, 0)));
-  }, [scan, candidate, busy, effVariant, effCondition, priceText, queue.length]);
+    };
 
-  const runSearch = useCallback(async (term: string) => {
-    setHits(await searchCatalog(term));
+    setError(null);
+    setFlash(true);
+    setQueue((q) => q.filter((s) => s.id !== scan.id));
+    setUndoStack((u) => [{ scan, at: position }, ...u].slice(0, 10));
+    setTreated((n) => n + 1);
+    setInFlight((n) => n + 1);
+
+    void confirmScan(payload)
+      .then((res) => {
+        if (res.ok) return;
+        setError(`${scan.candidates[chosen]?.name ?? scan.id} : ${res.error ?? 'échec'}`);
+        // Remise à sa place, pas en fin de file : on la retrouve où on l'a
+        // laissée plutôt que de devoir la rechercher.
+        setQueue((q) => [...q.slice(0, position), scan, ...q.slice(position)]);
+        setTreated((n) => Math.max(0, n - 1));
+      })
+      .catch((err: unknown) => {
+        setError(String(err));
+        setQueue((q) => [...q.slice(0, position), scan, ...q.slice(position)]);
+        setTreated((n) => Math.max(0, n - 1));
+      })
+      .finally(() => setInFlight((n) => Math.max(0, n - 1)));
+  }, [scan, candidate, cursor, chosen, effVariant, effCondition, priceText]);
+
+  /**
+   * Recherche débouncée.
+   *
+   * Sans ça, taper « charizard » lance neuf requêtes serveur dont huit sont
+   * jetées, et les réponses peuvent revenir dans le désordre — l'utilisateur
+   * voit alors les résultats de « chariz » après ceux de « charizard ».
+   * Le compteur de génération règle aussi ce second problème.
+   */
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const searchGen = useRef(0);
+
+  const runSearch = useCallback((term: string) => {
+    clearTimeout(searchTimer.current);
+    const gen = ++searchGen.current;
+    searchTimer.current = setTimeout(() => {
+      void searchCatalog(term).then((r) => {
+        // Réponse périmée : une frappe plus récente est déjà partie.
+        if (gen === searchGen.current) setHits(r);
+      });
+    }, 180);
   }, []);
 
   useEffect(() => {
@@ -189,11 +291,16 @@ export default function ReviewClient({
         e.preventDefault();
         setSearching(true);
         setTimeout(() => searchRef.current?.focus(), 0);
+        return;
+      }
+      if (k === 'u') {
+        e.preventDefault();
+        undo();
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [accept, move, scan]);
+  }, [accept, move, scan, undo]);
 
   function toggleSound() {
     const next = !sound;
@@ -218,6 +325,7 @@ export default function ReviewClient({
   }
 
   const priceCents = priceText === '' ? null : parseAmount(priceText);
+  const secPerCard = treated === 0 ? 0 : (Date.now() - startedAt.current) / 1000 / treated;
   const soldSales = scan?.prices.find((p) => p.source === 'ebay_sold')?.sales ?? [];
 
   return (
@@ -237,6 +345,10 @@ export default function ReviewClient({
           {queue.map((s, i) => (
             <button
               key={s.id}
+              ref={(el) => {
+                if (el) rowRefs.current.set(s.id, el);
+                else rowRefs.current.delete(s.id);
+              }}
               onClick={() => setCursor(i)}
               style={{
                 display: 'flex',
@@ -284,8 +396,12 @@ export default function ReviewClient({
               style={{
                 width: '100%',
                 borderRadius: 'var(--s2)',
-                border: `2px solid ${TIER_COLOR[tier]}`,
+                border: `2px solid ${flash ? 'var(--green)' : TIER_COLOR[tier]}`,
                 background: 'var(--surface)',
+                // Assez rapide pour ne pas retarder la carte suivante, assez
+                // visible pour confirmer l'appui.
+                transition: 'border-color 120ms ease-out, opacity 120ms ease-out',
+                opacity: flash ? 0.55 : 1,
               }}
             />
             <div className="label mono" style={{ marginTop: 'var(--s2) ' }}>
@@ -569,10 +685,32 @@ export default function ReviewClient({
         <span>
           <kbd>S</kbd> rechercher
         </span>
-        <span style={{ marginLeft: 'auto' }}>
-          <button onClick={toggleSound}>son {sound ? 'on' : 'off'}</button>
+        <span>
+          <kbd>U</kbd> annuler
         </span>
-        {busy && <span style={{ color: 'var(--green)' }}>…</span>}
+
+        {/* La cadence réelle, en direct. C'est le seul chiffre qui dit si le
+            budget de 3 secondes par carte est tenu — et le voir bouger rend la
+            session mesurable au lieu d'interminable. */}
+        <span style={{ marginLeft: 'auto' }} className="mono">
+          {treated > 0 && (
+            <>
+              {treated} traitées ·{' '}
+              <span style={{ color: secPerCard <= 3 ? 'var(--green)' : 'var(--amber)' }}>
+                {secPerCard.toFixed(1)} s/carte
+              </span>
+              {' · '}
+            </>
+          )}
+          {queue.length} restantes
+        </span>
+
+        <button onClick={toggleSound}>son {sound ? 'on' : 'off'}</button>
+        {inFlight > 0 && (
+          <span className="mono faint" title="écritures en cours">
+            ⟳{inFlight}
+          </span>
+        )}
       </footer>
     </div>
   );

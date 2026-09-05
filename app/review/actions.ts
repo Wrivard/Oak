@@ -1,6 +1,5 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { query } from '../../lib/db.js';
 import { log } from '../../lib/log.js';
 import { applyResolution } from '../../lib/resolution.js';
@@ -89,7 +88,9 @@ export async function confirmScan(input: ConfirmInput): Promise<ActionResult> {
       sku,
       card_id: input.cardId,
     });
-    revalidatePath('/review');
+    // Pas de revalidatePath : la file est gérée côté client et se met à jour
+    // sans aller-retour. Revalider forcerait un re-render serveur complet à
+    // chaque carte — 3 secondes par carte ne le supportent pas.
     return { ok: true, sku };
   } catch (err) {
     log.error('confirmation impossible', { scan_id: input.scanId, err });

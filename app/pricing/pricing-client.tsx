@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { savePricingConfig } from './actions.js';
 import type { PreviewSku } from './queries.js';
 import { formatCents, netAfterFees } from '../../lib/pricing/net.js';
@@ -42,15 +42,35 @@ export default function PricingClient({
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // La preview se recalcule à chaque frappe. Si le JSON est cassé, on montre
-  // l'erreur et on garde la dernière preview valide plutôt que de vider l'écran.
+  /**
+   * Texte débouncé pour la preview.
+   *
+   * Le champ reste évidemment instantané ; c'est le RECALCUL qui attend. Sans
+   * ça, chaque frappe reparse le JSON, revalide le schéma et recalcule vingt
+   * lignes de prix — et surtout, une accolade à moitié tapée fait clignoter une
+   * erreur rouge en permanence pendant qu'on édite.
+   */
+  const [debounced, setDebounced] = useState(initialConfig);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(text), 200);
+    return () => clearTimeout(t);
+  }, [text]);
+
   const parsed = useMemo(() => {
     try {
-      return { cfg: parsePricingConfig(JSON.parse(text)), error: null as string | null };
+      return {
+        cfg: parsePricingConfig(JSON.parse(debounced)),
+        error: null as string | null,
+      };
     } catch (err) {
       return { cfg: null, error: err instanceof Error ? err.message : String(err) };
     }
-  }, [text]);
+  }, [debounced]);
+
+  /** La dernière config VALIDE, pour ne pas vider le tableau pendant l'édition. */
+  const lastGood = useRef(parsed.cfg);
+  if (parsed.cfg) lastGood.current = parsed.cfg;
+  const previewCfg = parsed.cfg ?? lastGood.current;
 
   const rows: Row[] = useMemo(() => {
     const real = skus
@@ -143,6 +163,9 @@ export default function PricingClient({
       <section style={{ minHeight: 0, overflow: 'auto' }}>
         <div className="label" style={{ marginBottom: 'var(--s2)' }}>
           Preview{' '}
+          {parsed.error && previewCfg && (
+            <span style={{ color: 'var(--amber)' }}>— dernière config valide · </span>
+          )}
           {synthetic ? (
             <span style={{ color: 'var(--amber)' }}>
               — aucun SKU en stock, échelle synthétique
@@ -165,9 +188,9 @@ export default function PricingClient({
           </thead>
           <tbody>
             {rows.map((r, i) => {
-              if (!parsed.cfg) return null;
-              const ebay = suggestPrice(r.valueCents, r.condition, parsed.cfg, 'ebay');
-              const tcg = suggestPrice(r.valueCents, r.condition, parsed.cfg, 'tcgplayer');
+              if (!previewCfg) return null;
+              const ebay = suggestPrice(r.valueCents, r.condition, previewCfg, 'ebay');
+              const tcg = suggestPrice(r.valueCents, r.condition, previewCfg, 'tcgplayer');
               const net = netAfterFees(ebay.priceCents, shippingCents, 'ebay').netCents;
 
               return (
