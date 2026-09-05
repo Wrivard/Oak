@@ -49,3 +49,7 @@ exports/
 
 # vignettes générées à la volée
 .thumb-cache/
+
+# le golden set lui-même est commité (labels), seules les images ne le sont pas
+!tests/fixtures/golden/labels.json
+!tests/fixtures/golden/baseline.json

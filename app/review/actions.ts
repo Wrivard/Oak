@@ -116,6 +116,23 @@ async function setPrice(sku: string, priceCents: number): Promise<void> {
 }
 
 /**
+ * Charge la suite de la file.
+ *
+ * La page n'en rend que 200 d'un coup — au-delà le DOM et le temps de rendu
+ * deviennent perceptibles. Mais il peut y en avoir des milliers en attente, et
+ * annoncer « file vide » après 200 cartes serait un mensonge.
+ *
+ * `exclude` évite de recharger celles déjà à l'écran, y compris celles dont la
+ * confirmation est encore en vol.
+ */
+export async function loadMore(exclude: readonly string[], limit = 200) {
+  const { loadReviewQueue } = await import('./queries.js');
+  const next = await loadReviewQueue(limit + exclude.length);
+  const seen = new Set(exclude);
+  return next.filter((s) => !seen.has(s.id)).slice(0, limit);
+}
+
+/**
  * Recherche plein texte dans le catalogue, pour les cas où aucun candidat ne
  * convient. Ouverte seulement à la demande (touche S) — le chemin nominal reste
  * le choix d'un candidat au clavier.

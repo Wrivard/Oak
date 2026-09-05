@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { confirmScan, searchCatalog, type SearchHit } from './actions.js';
+import { confirmScan, loadMore, searchCatalog, type SearchHit } from './actions.js';
 import type { ReviewScan } from './queries.js';
 import { formatCents, netAfterFees, parseAmount } from '../../lib/pricing/net.js';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
@@ -154,6 +154,27 @@ export default function ReviewClient({
     const t = setTimeout(() => setFlash(false), 160);
     return () => clearTimeout(t);
   }, [flash]);
+
+  /**
+   * Réapprovisionnement automatique.
+   *
+   * On recharge quand il reste moins de 40 cartes, pas quand la file est vide :
+   * le chargement doit être fini AVANT qu'on en ait besoin, sinon on attend, et
+   * attendre est précisément ce qu'on cherche à supprimer.
+   */
+  const refilling = useRef(false);
+  useEffect(() => {
+    if (refilling.current || queue.length >= 40) return;
+    refilling.current = true;
+    void loadMore(queue.map((s) => s.id))
+      .then((more) => {
+        if (more.length > 0) setQueue((q) => [...q, ...more]);
+      })
+      .catch((err: unknown) => setError(`chargement de la suite : ${String(err)}`))
+      .finally(() => {
+        refilling.current = false;
+      });
+  }, [queue]);
 
   /** Annule la dernière confirmation en la remettant à sa place. */
   const undo = useCallback(() => {
@@ -312,20 +333,29 @@ export default function ReviewClient({
     }
   }
 
+  const secPerCard = treated === 0 ? 0 : (Date.now() - startedAt.current) / 1000 / treated;
+
   if (queue.length === 0) {
     return (
       <main style={{ padding: 'var(--s6)' }}>
-        <h1 style={{ fontSize: 18, margin: 0 }}>File de review vide</h1>
+        <h1 style={{ fontSize: 18, margin: 0 }}>
+          {refilling.current ? 'Chargement…' : 'File de review vide'}
+        </h1>
         <p className="dim" style={{ marginTop: 'var(--s2)' }}>
-          Aucun scan en <span className="mono">needs_review</span>. Tout ce qui est entré
-          a été résolu par les niveaux 1 et 2.
+          {refilling.current
+            ? 'Récupération des scans suivants.'
+            : 'Aucun scan en needs_review. Tout ce qui est entré a été résolu par les niveaux 1 et 2.'}
         </p>
+        {treated > 0 && (
+          <p className="mono dim" style={{ marginTop: 'var(--s3)' }}>
+            {treated} traitées cette session · {secPerCard.toFixed(1)} s/carte
+          </p>
+        )}
       </main>
     );
   }
 
   const priceCents = priceText === '' ? null : parseAmount(priceText);
-  const secPerCard = treated === 0 ? 0 : (Date.now() - startedAt.current) / 1000 / treated;
   const soldSales = scan?.prices.find((p) => p.source === 'ebay_sold')?.sales ?? [];
 
   return (

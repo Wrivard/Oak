@@ -20,7 +20,9 @@
     "worker": "tsx worker/index.ts",
     "backup": "tsx scripts/backup.ts",
     "backup:verify": "tsx scripts/backup.ts verify",
-    "loadtest": "tsx scripts/loadtest.ts"
+    "loadtest": "tsx scripts/loadtest.ts",
+    "golden:export": "tsx scripts/golden-export.ts",
+    "golden:baseline": "tsx scripts/golden-export.ts baseline"
   },
   "dependencies": {
     "@xenova/transformers": "^2.17.2",
