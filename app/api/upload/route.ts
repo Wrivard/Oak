@@ -186,9 +186,14 @@ export async function PUT(req: Request): Promise<NextResponse> {
   const body = (await req.json().catch(() => ({}))) as {
     session?: string;
     mode?: string;
+    expected?: number | null;
   };
   const sessionName = String(body.session ?? '').trim();
   const mode = body.mode === 'front_only' ? 'front_only' : 'duplex';
+  const expected =
+    typeof body.expected === 'number' && Number.isInteger(body.expected) && body.expected >= 0
+      ? body.expected
+      : null;
 
   if (sessionName.length === 0) {
     return NextResponse.json({ error: 'nom de session requis' }, { status: 400 });
@@ -201,6 +206,21 @@ export async function PUT(req: Request): Promise<NextResponse> {
   const sessionId = rows[0]?.id;
   if (!sessionId) {
     return NextResponse.json({ error: 'session introuvable' }, { status: 404 });
+  }
+
+  // Le comptage attendu, s'il a été saisi. Sans lui la réconciliation ne peut
+  // rien vérifier, et l'écart de comptage est le SEUL signal d'une carte
+  // physiquement scannée qui n'a pas de ligne d'inventaire (docs/02 §1).
+  //
+  // On ajoute au lieu d'écraser : un lot peut être envoyé en plusieurs fois,
+  // et remplacer le total ferait basculer un lot correct en écart.
+  if (expected !== null) {
+    await query(
+      `update sessions
+          set expected_count = coalesce(expected_count, 0) + $2
+        where id = $1`,
+      [sessionId, expected],
+    );
   }
 
   const dir = join(STORE, sessionName);
@@ -222,5 +242,5 @@ export async function PUT(req: Request): Promise<NextResponse> {
     enfile: job.length > 0,
   });
 
-  return NextResponse.json({ sessionId, mode, queued: job.length > 0 });
+  return NextResponse.json({ sessionId, mode, queued: job.length > 0, expected });
 }

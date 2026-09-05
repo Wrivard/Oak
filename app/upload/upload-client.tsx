@@ -36,6 +36,8 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
   const [variant, setVariant] = useState<CardVariant>('normal');
   const [condition, setCondition] = useState<CardCondition>('NM');
   const [duplex, setDuplex] = useState(true);
+  /** Nombre de cartes réellement mises dans le scanner. Texte : le champ peut être vide. */
+  const [attendues, setAttendues] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [sent, setSent] = useState(0);
   const [rejected, setRejected] = useState<Rejected[]>([]);
@@ -162,6 +164,7 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
         body: JSON.stringify({
           session: session.trim(),
           mode: duplex ? 'duplex' : 'front_only',
+          expected: attenduesNombre,
         }),
       });
       if (!fin.ok) {
@@ -171,6 +174,7 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
 
       setDone(ordered.length);
       setFiles([]);
+      setAttendues('');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       // Le chiffre qui compte quand un envoi casse : combien de pages sont
@@ -185,6 +189,11 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
   // Le même contrôle que la route, pour ne pas envoyer 2000 pages avant de se
   // faire refuser. Le client n'est pas la sécurité : la route refuse aussi.
   const nomInvalide = nomDeLotInvalide(session.trim());
+
+  const attenduesNombre =
+    attendues.trim() === '' || !/^\d+$/.test(attendues.trim())
+      ? null
+      : Number(attendues.trim());
 
   const pct = files.length === 0 ? 0 : Math.round((100 * sent) / files.length);
   const cartes = duplex ? Math.ceil(files.length / 2) : files.length;
@@ -220,7 +229,7 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 190px 110px',
+                gridTemplateColumns: '1fr 170px 100px 120px',
                 gap: 'var(--s3)',
               }}
             >
@@ -269,7 +278,47 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
                   ))}
                 </select>
               </label>
+
+              {/* Le seul contrôle qui rattrape une double-alimentation de
+                  l'ADF. Sans lui, une carte physiquement scannée sans ligne
+                  d'inventaire ne se signale JAMAIS. */}
+              <label className="field">
+                <span className="label">Cartes comptées</span>
+                <input
+                  className="input mono"
+                  inputMode="numeric"
+                  placeholder="optionnel"
+                  value={attendues}
+                  onChange={(e) => setAttendues(e.target.value.replace(/[^0-9]/g, ''))}
+                />
+              </label>
             </div>
+
+            <p
+              className={attenduesNombre === null ? 'faint' : 'dim'}
+              style={{ fontSize: 12, margin: 'var(--s3) 0 0' }}
+            >
+              {attenduesNombre === null ? (
+                <>
+                  Sans <strong>cartes comptées</strong>, la réconciliation ne peut rien
+                  vérifier : deux feuilles passées collées font une carte sans ligne
+                  d&apos;inventaire, et l&apos;écart de comptage est le seul signal
+                  qu&apos;elle a existé.
+                </>
+              ) : (
+                <>
+                  Le lot ne se fermera que si {attenduesNombre} carte
+                  {attenduesNombre > 1 ? 's' : ''} en sortent
+                  {cartes > 0 && attenduesNombre !== cartes ? (
+                    <>
+                      {' '}
+                      — les photos sélectionnées en annoncent {cartes}
+                    </>
+                  ) : null}
+                  .
+                </>
+              )}
+            </p>
 
             {nomInvalide !== null && session.trim() !== '' && (
               <p style={{ color: 'var(--red)', fontSize: 12, margin: 'var(--s3) 0 0' }}>
