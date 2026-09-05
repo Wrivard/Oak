@@ -199,8 +199,34 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
                   </td>
                   <td className="num">
                     {r.priceCents === null ? (
-                      <span className="faint" style={{ fontWeight: 400 }}>
-                        non prixé
+                      // « non prixé » sans raison envoie relire les journaux du
+                      // worker. Le pipeline écrit déjà le pourquoi dans
+                      // price_breakdown — un printing absent de la source, une
+                      // devise non convertie, aucune donnée du tout.
+                      <span
+                        className="faint"
+                        style={{ fontWeight: 400, cursor: r.priceReason ? 'help' : undefined }}
+                        title={r.priceReason ?? undefined}
+                      >
+                        non prixé{r.priceReason ? ' ⓘ' : ''}
+                        {/* Dans la vue « Sans prix », la raison est le sujet de
+                            la page : survoler cinquante lignes une par une pour
+                            la lire n'est pas une lecture. */}
+                        {filter === 'unpriced' && r.priceReason && (
+                          <span
+                            style={{
+                              display: 'block',
+                              fontWeight: 400,
+                              fontSize: 10,
+                              lineHeight: 1.3,
+                              maxWidth: 220,
+                              whiteSpace: 'normal',
+                              textAlign: 'right',
+                            }}
+                          >
+                            {r.priceReason}
+                          </span>
+                        )}
                       </span>
                     ) : (
                       formatCents(r.priceCents)

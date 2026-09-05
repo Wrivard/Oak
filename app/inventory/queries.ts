@@ -28,6 +28,8 @@ export interface InventoryRow {
   listedEbay: boolean;
   tcgDirty: boolean;
   lastPricedAt: string | null;
+  /** Pourquoi il n'y a pas de prix, quand il n'y en a pas. */
+  priceReason: string | null;
 }
 
 export interface InventoryPage {
@@ -82,6 +84,8 @@ interface Row {
   ebay_listing_id: string | null;
   tcg_dirty: boolean;
   last_priced_at: string | null;
+  price_reason: string | null;
+  price_method: string | null;
   total: string;
 }
 
@@ -102,6 +106,11 @@ export async function loadInventory(params: InventoryParams = {}): Promise<Inven
             i.value_estimate::text, i.current_price::text, c.image_small,
             i.ebay_listing_id, i.tcg_dirty,
             to_char(i.last_priced_at, 'YYYY-MM-DD') as last_priced_at,
+            -- POURQUOI cette carte n'a pas de prix. Le pipeline l'écrit déjà
+            -- dans price_breakdown ; il ne restait qu'à l'afficher. « non
+            -- prixé » sans raison envoie relire les journaux du worker.
+            i.price_breakdown->'details'->>'raison' as price_reason,
+            i.price_breakdown->>'method' as price_method,
             count(*) over ()::text as total
        from inventory i
        join cards c on c.id = i.card_id
@@ -131,6 +140,12 @@ export async function loadInventory(params: InventoryParams = {}): Promise<Inven
       listedEbay: r.ebay_listing_id !== null,
       tcgDirty: r.tcg_dirty,
       lastPricedAt: r.last_priced_at,
+      // La méthode seule ne dit rien d'actionnable ; c'est la raison qui dit
+      // quoi corriger. On retombe dessus quand il n'y a pas de raison détaillée.
+      priceReason:
+        r.current_price === null
+          ? (r.price_reason ?? (r.price_method === 'no_data' ? 'aucune donnée de prix' : null))
+          : null,
     })),
     total,
     page,
