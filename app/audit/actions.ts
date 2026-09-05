@@ -1,8 +1,8 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { query, withTransaction } from '../../lib/db.js';
 import { log } from '../../lib/log.js';
+import { revalidateQuietly } from '../revalidate.js';
 
 /**
  * Défaire une résolution automatique erronée.
@@ -19,20 +19,6 @@ import { log } from '../../lib/log.js';
  *
  * Tout se fait dans une transaction : à moitié fait serait pire que pas fait.
  */
-/**
- * Revalidation qui ne peut pas faire échouer l'appelant.
- *
- * `revalidatePath` lève hors d'un contexte de requête Next — en test, par
- * exemple. Ce n'est jamais une raison de dire qu'une écriture en base a raté.
- */
-function revalidateQuietly(path: string): void {
-  try {
-    revalidatePath(path);
-  } catch (err) {
-    log.debug('revalidation ignorée hors contexte de requête', { path, err });
-  }
-}
-
 export interface ReopenResult {
   ok: boolean;
   error?: string;

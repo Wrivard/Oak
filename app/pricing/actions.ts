@@ -1,8 +1,8 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { query } from '../../lib/db.js';
 import { log } from '../../lib/log.js';
+import { revalidateQuietly } from '../revalidate.js';
 import { parsePricingConfig } from '../../lib/pricing/rules.js';
 
 /**
@@ -43,11 +43,7 @@ export async function savePricingConfig(json: string): Promise<SaveResult> {
     // Hors du try qui décide du succès : une revalidation ratée ferait croire
     // que la config n'a pas été enregistrée alors qu'elle l'est, et on la
     // réenregistrerait en boucle.
-    try {
-      revalidatePath('/pricing');
-    } catch (err) {
-      log.debug('revalidation ignorée hors contexte de requête', { err });
-    }
+    revalidateQuietly('/pricing');
     return { ok: true };
   } catch (err) {
     log.warn('config de prix rejetée', { err });

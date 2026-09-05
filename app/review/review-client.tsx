@@ -131,14 +131,36 @@ export default function ReviewClient({
    * apparaît après coup. Les deux suivantes et la précédente suffisent : on ne
    * navigue jamais plus vite que ça, et précharger toute la file gaspillerait la
    * bande passante sur des cartes qu'on ne verra pas.
+   *
+   * On précharge AUSSI les images des candidats. Ce sont elles qui coûtent : le
+   * scan vient du disque local, les candidats viennent de pokemontcg.io. Et ce
+   * sont précisément celles qu'il faut comparer pour décider — arriver sur une
+   * carte dont les cinq vignettes se chargent encore, c'est le budget de trois
+   * secondes dépensé à attendre.
+   *
+   * Les objets Image sont retenus dans une ref : un `new Image()` laissé sans
+   * référence peut être ramassé avant la fin du téléchargement, et le
+   * préchargement ne sert alors à rien.
    */
+  const prefetched = useRef<HTMLImageElement[]>([]);
   useEffect(() => {
+    const held: HTMLImageElement[] = [];
+    const charger = (src: string): void => {
+      const img = new Image();
+      img.src = src;
+      held.push(img);
+    };
+
     for (const offset of [1, 2, -1]) {
       const neighbour = queue[cursor + offset];
       if (!neighbour) continue;
-      const img = new Image();
-      img.src = `/api/scan/${neighbour.id}/image`;
+      charger(`/api/scan/${neighbour.id}/image`);
+      // Deux candidats suffisent : au-delà, on ouvre la recherche de toute façon.
+      for (const c of neighbour.candidates.slice(0, 2)) {
+        if (c.image) charger(c.image);
+      }
     }
+    prefetched.current = held;
   }, [cursor, queue]);
 
   /**
@@ -625,7 +647,12 @@ export default function ReviewClient({
                       <img
                         src={c.image}
                         alt=""
-                        loading="lazy"
+                        /* PAS `lazy` : ces vignettes sont la décision. `lazy`
+                           attend un passage de layout avant même de lancer la
+                           requête, sur exactement les images qu'on doit
+                           comparer tout de suite. */
+                        loading="eager"
+                        decoding="async"
                         style={{
                           width: 42,
                           height: 58,

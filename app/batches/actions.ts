@@ -1,8 +1,8 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { query } from '../../lib/db.js';
 import { log } from '../../lib/log.js';
+import { revalidateQuietly } from '../revalidate.js';
 
 /**
  * Clôture d'un lot. Voir docs/02-ingest-and-matching.md §1 et docs/05 §6.2.
@@ -89,7 +89,7 @@ export async function closeBatch(sessionId: string, force = false): Promise<Clos
     log.info('lot fermé', { session_id: sessionId, name: b.name, cartes: b.scanned });
   }
 
-  revalidatePath('/batches');
+  revalidateQuietly('/batches');
   return { ok: true, ecart };
 }
 
@@ -108,6 +108,6 @@ export async function setExpected(sessionId: string, expected: number): Promise<
     sessionId,
     expected,
   ]);
-  revalidatePath('/batches');
+  revalidateQuietly('/batches');
   return { ok: true };
 }

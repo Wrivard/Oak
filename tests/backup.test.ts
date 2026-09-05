@@ -18,6 +18,15 @@ import { runBackup, runRestore, verifyBackup } from '../scripts/backup.js';
 const CARD = 'base1-4';
 const SESSION = 'test-backup-session';
 
+/**
+ * Un tableau, pas un objet. C'est la forme qui cassait : node-pg sérialise un
+ * tableau JavaScript en littéral de tableau Postgres, jamais en JSON.
+ */
+const CANDIDATS = [
+  { card_id: 'base1-4', name: 'Charizard', score: 0.91 },
+  { card_id: 'base1-2', name: 'Blastoise', score: 0.44 },
+];
+
 let dir: string;
 let sessionId: string;
 let scanId: string;
@@ -49,6 +58,7 @@ async function wipe(): Promise<void> {
   );
   await query(`delete from price_history where sku like $1`, [`${CARD}-%`]);
   await query(`delete from channel_events where sku like $1`, [`${CARD}-%`]);
+  await query(`delete from channel_events where event = 'test_backup'`);
   await query(`delete from inventory where card_id = $1`, [CARD]);
   await query(`delete from sessions where name = $1`, [SESSION]);
 }
@@ -71,14 +81,33 @@ beforeAll(async () => {
     [`${CARD}-normal-NM-en`, CARD],
   );
 
+  // Le scan porte des CANDIDATS : un tableau jsonb, comme tout scan réel.
+  // Sans ça, la sauvegarde se restaurait en test et échouait en production —
+  // c'est exactement ce qui s'est passé.
   const sc = await query<{ id: string }>(
     `insert into scans (session_id, seq, front_path, phash_front, dhash_front,
-                        embedding, status, resolved_sku, match_source, confidence)
-     values ($1,1,'/x/1.jpg',$2::bit(64),$3::bit(64),$4::vector,'resolved',$5,'manual',1.0)
+                        embedding, status, resolved_sku, match_source, confidence,
+                        candidates)
+     values ($1,1,'/x/1.jpg',$2::bit(64),$3::bit(64),$4::vector,'resolved',$5,'manual',1.0,
+             $6::jsonb)
      returning id`,
-    [sessionId, bits(11), bits(22), vec(3), `${CARD}-normal-NM-en`],
+    [
+      sessionId,
+      bits(11),
+      bits(22),
+      vec(3),
+      `${CARD}-normal-NM-en`,
+      JSON.stringify(CANDIDATS),
+    ],
   );
   scanId = sc.rows[0]!.id;
+
+  // Et un événement avec un OBJET jsonb : l'autre forme à restaurer.
+  await query(
+    `insert into channel_events (channel, event, sku, payload)
+     values ('internal', 'test_backup', $1, $2::jsonb)`,
+    [`${CARD}-normal-NM-en`, JSON.stringify({ note: 'aller-retour', n: 3 })],
+  );
 
   await query(
     `insert into known_fingerprints
@@ -128,6 +157,28 @@ describe('sauvegarde et restauration', () => {
     expect(after.scans).toBe(before.scans);
     expect(after.priceHistory).toBe(before.priceHistory);
   }, 120_000);
+
+  it('RESTAURE LE JSONB — un tableau jsonb cassait toute la restauration', async () => {
+    // node-pg sérialise un objet JavaScript en JSON mais un TABLEAU en littéral
+    // de tableau Postgres, `{"...","..."}`. Postgres répondait « invalid input
+    // syntax for type json » et la restauration s'arrêtait là.
+    //
+    // `scans.candidates` est un tableau et il est renseigné sur pratiquement
+    // tout scan réel : la sauvegarde était donc cassée dès qu'il y avait
+    // quelque chose à restaurer. Le test ne l'avait pas vu parce qu'il
+    // fabriquait des scans sans candidats.
+    const { rows } = await query<{ candidates: typeof CANDIDATS }>(
+      'select candidates from scans where id = $1',
+      [scanId],
+    );
+    expect(rows[0]?.candidates).toEqual(CANDIDATS);
+
+    const ev = await query<{ payload: { note: string; n: number } }>(
+      `select payload from channel_events where sku = $1 and event = 'test_backup'`,
+      [`${CARD}-normal-NM-en`],
+    );
+    expect(ev.rows[0]?.payload).toEqual({ note: 'aller-retour', n: 3 });
+  });
 
   it('restaure les empreintes À L’IDENTIQUE, bits et vecteur compris', async () => {
     // C'est le point qui casse dans la vraie vie : un bit(64) et un vector(512)

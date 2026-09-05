@@ -278,6 +278,15 @@ Ce qui est reconstructible et ne mérite pas de backup : `cards`, `card_embeddin
 
 **Teste ta restauration.** Un backup jamais restauré n'est pas un backup.
 
+> **Mesuré le 5 septembre 2026 :** la restauration échouait sur `invalid input
+> syntax for type json` dès qu'un scan portait des candidats — c'est-à-dire sur
+> toute donnée réelle. node-pg sérialise un objet JavaScript en JSON, mais un
+> **tableau** en littéral de tableau Postgres. Le test de restauration ne
+> l'avait pas vu parce qu'il fabriquait des scans sans candidats : il vérifiait
+> l'aller-retour sur la seule forme qui marchait. Les colonnes `jsonb` sont
+> maintenant listées explicitement dans `scripts/backup.ts` et ré-sérialisées à
+> la main, et le test porte un tableau *et* un objet.
+
 ---
 
 ## 6. Runbooks

@@ -173,7 +173,39 @@ const CASTS: Record<string, string> = {
   dhash_front: '::bit(64)',
   phash_back: '::bit(64)',
   embedding: '::vector',
+  // jsonb : voir JSON_COLUMNS juste en dessous.
+  candidates: '::jsonb',
+  llm_raw: '::jsonb',
+  payload: '::jsonb',
+  price_breakdown: '::jsonb',
+  breakdown: '::jsonb',
 };
+
+/**
+ * Colonnes `jsonb` dont la valeur doit être RÉ-SÉRIALISÉE à la main.
+ *
+ * `JSON.parse` d'une ligne du dump rend un objet ou un TABLEAU JavaScript.
+ * node-pg sérialise un objet en JSON — ce qui marche — mais un tableau en
+ * littéral de tableau Postgres, `{"...","..."}`. Postgres répond alors
+ * « invalid input syntax for type json » et la restauration s'arrête.
+ *
+ * `scans.candidates` est justement un tableau, et il est renseigné sur
+ * pratiquement tout scan réel. La restauration était donc cassée dès qu'il y
+ * avait quelque chose à restaurer : le test ne l'avait pas vu parce qu'il
+ * fabriquait des scans SANS candidats. Une sauvegarde qui ne se restaure pas
+ * n'est pas une sauvegarde.
+ *
+ * La liste est explicite plutôt que devinée du type JavaScript : deviner
+ * casserait le jour où une vraie colonne tableau Postgres entrerait dans la
+ * sauvegarde.
+ */
+const JSON_COLUMNS = new Set([
+  'candidates',
+  'llm_raw',
+  'payload',
+  'price_breakdown',
+  'breakdown',
+]);
 
 /**
  * Restaure une table depuis son JSONL.
@@ -205,7 +237,12 @@ export async function restoreTable(table: BackupTable, dir: string): Promise<num
       `insert into ${table} (${cols.map((c) => `"${c}"`).join(', ')})
        values (${placeholders})
        on conflict do nothing`,
-      cols.map((c) => row[c]),
+      cols.map((c) => {
+        const v = row[c];
+        return JSON_COLUMNS.has(c) && v !== null && v !== undefined
+          ? JSON.stringify(v)
+          : v;
+      }),
     );
     inserted += rowCount ?? 0;
   }
