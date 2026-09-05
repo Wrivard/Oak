@@ -111,6 +111,10 @@ echo   Sur cette machine   : http://localhost:3000
 powershell -NoProfile -Command ^
   "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch '^(127\.|169\.254\.)' } | ForEach-Object { '  Depuis le reseau    : http://{0}:3000' -f $_.IPAddress }" 
 echo.
+echo   L'application n'a pas de mot de passe : tout appareil du reseau peut
+echo   l'ouvrir, envoyer des lots et modifier l'inventaire. C'est voulu chez toi.
+echo   Sur un reseau que tu ne controles pas, ne lance pas ce fichier.
+echo.
 echo   Cette fenetre peut etre fermee. Les deux autres doivent rester ouvertes.
 ping -n 16 127.0.0.1 >nul
 exit /b 0

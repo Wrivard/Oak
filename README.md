@@ -16,6 +16,11 @@ Il affiche aussi une adresse réseau (`http://192.168.x.x:3000`) : l'app est acc
 depuis n'importe quel appareil de la maison — téléphone, tablette — pour reviewer
 ailleurs que devant le PC.
 
+> **Aucun mot de passe, et c'est un choix** (`CLAUDE.md` : pas d'auth
+> multi-utilisateur). Tout appareil du réseau peut ouvrir l'application, envoyer
+> des lots et modifier l'inventaire. Chez toi, c'est ce qu'on veut. Sur un réseau
+> que tu ne contrôles pas, ne lance pas `Demarrer.bat`.
+
 **Prérequis, une seule fois :** copier `.env.example` en `.env.local` et renseigner
 `DATABASE_URL`.
 
