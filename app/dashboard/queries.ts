@@ -1,9 +1,10 @@
 import { query } from '../../lib/db.js';
 import { computeMix, MANUAL_RATE_ALARM } from '../../lib/metrics/mix.js';
 import { computeReconciliation } from '../../lib/metrics/reconciliation.js';
+import { computeExport, type ExportRun } from '../../lib/metrics/export.js';
 
 /**
- * Les cinq métriques de docs/05-production.md §1.2.
+ * Les métriques de docs/05-production.md §1.2.
  *
  * Une seule page. Si elle est verte, on peut aller dormir.
  */
@@ -25,17 +26,66 @@ const DAILY_REVIEW_CAPACITY = 2400;
 const QUEUE_DEPTH_ALARM = 5000;
 
 export async function loadMetrics(): Promise<Metric[]> {
-  const [worker, resolution, queue, dead, review, reconcile] = await Promise.all([
-    workerAlive(),
-    resolutionMix(),
-    queueDepth(),
-    deadJobs(),
-    needsReview(),
-    reconciliationGap(),
-  ]);
-  // Le worker en premier : si lui ne tourne pas, les cinq autres métriques
-  // décrivent un système figé et n'apprennent rien.
-  return [worker, resolution, queue, dead, review, reconcile];
+  const [worker, resolution, queue, dead, review, reconcile, exportTcg] =
+    await Promise.all([
+      workerAlive(),
+      resolutionMix(),
+      queueDepth(),
+      deadJobs(),
+      needsReview(),
+      reconciliationGap(),
+      dernierExport(),
+    ]);
+  // Le worker en premier : si lui ne tourne pas, les autres métriques décrivent
+  // un système figé et n'apprennent rien.
+  return [worker, resolution, queue, dead, review, reconcile, exportTcg];
+}
+
+/**
+ * Le dernier export TCGplayer a-t-il exporté quelque chose ?
+ *
+ * L'export tourne par cron et écrit un CSV. Quand il écarte tout — aujourd'hui
+ * parce que `tcg_sku_id` est vide sur tout l'inventaire — il produit un fichier
+ * VIDE et rien à l'écran ne le dit. On peut donc téléverser un fichier sans
+ * lignes des jours durant en croyant pousser son stock.
+ */
+async function dernierExport(): Promise<Metric> {
+  // `payload.ecartees` est le RÉSUMÉ PAR RAISON, pas un nombre : c'est un objet
+  // `{ raison: compte }` écrit par `summarizeSkips`. Le total s'en déduit.
+  // Le journal, lui, aplatit différemment — s'en inspirer donnait `NaN`.
+  const { rows } = await query<{
+    at: string;
+    lignes: string | null;
+    ecartees: Record<string, number> | null;
+  }>(
+    `select to_char(created_at, 'YYYY-MM-DD HH24:MI') as at,
+            payload->>'lignes' as lignes,
+            payload->'ecartees' as ecartees
+       from channel_events
+      where event = 'export_generated'
+      order by created_at desc
+      limit 1`,
+  );
+
+  const row = rows[0];
+  const detail = row?.ecartees ?? {};
+  const run: ExportRun | null = row
+    ? {
+        at: row.at,
+        lignes: Number(row.lignes ?? 0),
+        ecartees: Object.values(detail).reduce((s, n) => s + Number(n), 0),
+        detail,
+      }
+    : null;
+
+  const m = computeExport(run);
+  return {
+    label: 'Dernier export TCGplayer',
+    value: m.value,
+    detail: m.detail,
+    health: m.health,
+    threshold: 'fichier vide alors qu’il y avait du stock à exporter',
+  };
 }
 
 /**

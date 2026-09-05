@@ -55,6 +55,15 @@ Une seule page, cinq métriques. Si elle est verte, tu peux aller dormir.
 > deux donne une fausse assurance sur exactement le point qu'on ne peut pas
 > rattraper plus tard. Voir `lib/metrics/reconciliation.ts`.
 | Cartes en `needs_review` | `> capacité quotidienne` |
+| Dernier export TCGplayer | fichier vide alors qu'il restait du stock à exporter |
+
+> **Ajouté le 5 septembre 2026.** L'export tourne par cron et écrit un CSV.
+> Quand il écarte tout — aujourd'hui parce que `tcg_sku_id` est vide sur tout
+> l'inventaire — il produit un fichier **vide**, note le détail dans
+> `channel_events`, et rien à l'écran ne le disait. On pouvait donc téléverser
+> un fichier sans lignes des jours durant en croyant pousser son stock. L'écart
+> n'est pas une erreur en soi : une carte sans `tcg_sku_id` ne peut pas être
+> exportée, et l'inventer serait pire. Ce qui manquait, c'était de le voir.
 
 Le **taux de review manuelle** est ta métrique économique principale : c'est le seul
 poste de coût marginal par carte qui reste, et il se paie en minutes de ton temps.
