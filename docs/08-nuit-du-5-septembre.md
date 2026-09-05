@@ -3,6 +3,11 @@
 Résumé de la session autonome. À lire avant de commencer les tests — surtout les
 sections **Bugs trouvés** et **Ce qui ne marchera pas**.
 
+> **Il y a une suite : `docs/09-matinee-du-5-septembre.md`.** Elle contient huit
+> pannes de plus, dont deux qui te concernent directement — le lanceur ne
+> démarrait pas le worker, et ta base Supabase a une limite de trois à cinq
+> mois. Lis-la après celle-ci.
+
 **Départ :** 164 tests, 4 écrans, pas de coquille d'application.
 **Arrivée :** 196 tests, 8 écrans, une vraie app.
 

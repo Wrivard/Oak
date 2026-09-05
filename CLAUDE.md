@@ -72,6 +72,8 @@ Pas de Redis, pas de Kafka, pas de microservices. Un Postgres et deux process.
 4. `docs/04-channels.md` — eBay + TCGplayer
 5. `docs/05-production.md` — observabilité, tests, runbooks
 6. `PROMPTS.md` — l'ordre de build
+7. `docs/08-nuit-du-5-septembre.md` puis `docs/09-matinee-du-5-septembre.md` —
+   ce qui a été trouvé en exécutant, et ce qui reste faux
 
 ## Avant de coder quoi que ce soit
 
