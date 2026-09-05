@@ -492,6 +492,7 @@ troisième ne l'était pas.
 |---|---|---|
 | `channel_events` (traces d'API) | une ligne par appel externe | `pruneTraces()`, 30 jours |
 | `.thumb-cache` | une vignette de ~60 ko **par scan** | `pruneThumbs()`, 30 jours |
+| `jobs` | 258 octets × **2 jobs par carte** | `pruneJobs()`, 14 jours, `done` seulement |
 | `known_fingerprints` | une ligne de ~2,9 ko **par scan résolu** | aucune — voir §1, le mur des 500 Mo |
 
 **Mesuré le 5 septembre 2026 :** rien n'effaçait les vignettes. À 25-50 000
@@ -500,6 +501,17 @@ indéfiniment — des dizaines de gigaoctets de vignettes de cartes vendues depu
 longtemps. Une vignette ne sert qu'à la review et à l'audit ; passé quelques
 jours elle se régénère à la demande en quelques dizaines de millisecondes. La
 purge ne perd rien, elle diffère un recalcul rare.
+
+**Mesuré aussi le 5 septembre 2026 :** un job pèse **258 octets**, index
+compris. À 1 700 cartes par jour et deux jobs par carte, ça fait 878 ko par jour
+et **320 Mo par an** — sur un quota de 500 Mo dont le catalogue occupe déjà 121.
+La file aurait fini par coûter plus cher que les empreintes qu'elle sert à
+produire, pour de l'historique que personne ne relit. Seuls les `done` sont
+purgés : les `dead` restent, ce sont eux la trace de ce qui a échoué et le
+tableau de santé les compte. Effacer une clé d'idempotence vieille de quatorze
+jours n'est pas un risque — un `fingerprint` ou un `match` rejoué trouve un scan
+déjà traité et sort en silence, un `pair_upload` rejoué ignore les fichiers déjà
+rattachés.
 
 `known_fingerprints` reste la seule croissance non bornée, et c'est délibéré :
 chaque empreinte est ce qui rend la prochaine occurrence gratuite. C'est aussi

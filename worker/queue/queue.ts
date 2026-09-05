@@ -167,3 +167,33 @@ export async function enqueue(
   );
   return (rows[0] as { id: number } | undefined)?.id ?? null;
 }
+
+/**
+ * Purge les jobs TERMINÉS.
+ *
+ * Mesuré le 5 septembre 2026 : **258 octets par ligne**, index compris. À
+ * 1 700 cartes par jour, chacune produisant un `fingerprint` et un `match`, ça
+ * fait 878 ko par jour et **320 Mo par an** — sur un quota de base de 500 Mo
+ * dont `cards` et `card_embeddings` occupent déjà 121. La file finirait par
+ * coûter plus cher que les empreintes qu'elle sert à produire, pour de
+ * l'historique que personne ne relit.
+ *
+ * Seuls les `done` partent. Les `dead` RESTENT : ce sont eux la trace de ce qui
+ * a échoué, et le tableau de santé les compte.
+ *
+ * Effacer une clé d'idempotence n'est pas un risque ici : à quatorze jours, un
+ * rejeu de `fingerprint` ou de `match` trouve un scan déjà traité et sort en
+ * silence, et un `pair_upload` rejoué ignore les fichiers déjà rattachés.
+ */
+export async function pruneJobs(days = 14): Promise<number> {
+  const { rowCount } = await query(
+    `delete from jobs
+      where status = 'done'
+        and coalesce(completed_at, created_at) < now() - ($1::int * interval '1 day')`,
+    [days],
+  );
+  if (rowCount && rowCount > 0) {
+    log.info('jobs terminés purgés', { supprimes: rowCount, plus_vieux_que_jours: days });
+  }
+  return rowCount ?? 0;
+}

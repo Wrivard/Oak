@@ -1,13 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { closePool, query } from '../lib/db.js';
-import {
-  claim,
-  complete,
-  enqueue,
-  fail,
-  reclaimStale,
-  type Job,
-} from '../worker/queue/queue.js';
+import { claim, complete, enqueue, fail, reclaimStale, type Job, pruneJobs } from '../worker/queue/queue.js';
 import { PermanentError, classifyError } from '../worker/queue/errors.js';
 
 const TYPE = 'test_job';
@@ -134,5 +127,76 @@ describe('classification des erreurs', () => {
     expect(classifyError(new PermanentError('nope')).class).toBe('permanent');
     expect(classifyError(new Error('boum')).class).toBe('ambiguous');
     expect(classifyError(Object.assign(new Error(), { status: 500 })).class).toBe('ambiguous');
+  });
+});
+
+describe('pruneJobs', () => {
+  /**
+   * 258 octets par ligne, index compris. À 1 700 cartes par jour et deux jobs
+   * par carte, ça fait 320 Mo par an — sur un quota de base de 500 Mo dont le
+   * catalogue occupe déjà 121. La file finirait par coûter plus cher que les
+   * empreintes qu'elle sert à produire, pour de l'historique que personne ne
+   * relit.
+   */
+  const MARQUEUR = 'test-prune-jobs';
+
+  async function poser(status: string, ageJours: number, i: number): Promise<void> {
+    await query(
+      `insert into jobs (type, payload, idempotency_key, status, completed_at, created_at)
+       values ('fingerprint', '{}'::jsonb, $1, $2,
+               now() - ($3::int * interval '1 day'),
+               now() - ($3::int * interval '1 day'))`,
+      [`${MARQUEUR}:${status}:${i}`, status, ageJours],
+    );
+  }
+
+  async function reste(status: string): Promise<number> {
+    const { rows } = await query<{ n: string }>(
+      `select count(*)::text as n from jobs
+        where idempotency_key like $1 and status = $2`,
+      [`${MARQUEUR}:%`, status],
+    );
+    return Number(rows[0]?.n);
+  }
+
+  beforeEach(async () => {
+    await query(`delete from jobs where idempotency_key like $1`, [`${MARQUEUR}:%`]);
+  });
+
+  it('efface les terminés anciens, garde les récents', async () => {
+    await poser('done', 30, 1);
+    await poser('done', 2, 2);
+
+    await pruneJobs(14);
+    expect(await reste('done')).toBe(1);
+  });
+
+  it('GARDE LES MORTS — c’est la trace de ce qui a raté', async () => {
+    // Le tableau de santé les compte, et un job mort est la seule trace d'un
+    // scan que le pipeline n'a pas su traiter.
+    await poser('dead', 90, 3);
+    await pruneJobs(14);
+    expect(await reste('dead')).toBe(1);
+  });
+
+  it('ne touche ni la file ni ce qui tourne', async () => {
+    await poser('queued', 90, 4);
+    await poser('running', 90, 5);
+    await poser('failed', 90, 6);
+
+    await pruneJobs(14);
+    expect(await reste('queued')).toBe(1);
+    expect(await reste('running')).toBe(1);
+    expect(await reste('failed')).toBe(1);
+  });
+
+  it('respecte le délai qu’on lui donne', async () => {
+    // On compte NOS lignes, pas le retour de la fonction : la purge est globale
+    // par nature, et d'autres jobs terminés peuvent traîner dans la base.
+    await poser('done', 10, 7);
+    await pruneJobs(30);
+    expect(await reste('done')).toBe(1);
+    await pruneJobs(5);
+    expect(await reste('done')).toBe(0);
   });
 });

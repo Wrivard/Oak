@@ -1,5 +1,5 @@
 import { log } from '../lib/log.js';
-import { enqueue } from './queue/queue.js';
+import { enqueue, pruneJobs } from './queue/queue.js';
 import { pruneTraces } from './queue/trace.js';
 import { pruneThumbs } from '../lib/images/thumb-cache.js';
 import { reapStrandedScans } from './reap-scans.js';
@@ -47,6 +47,11 @@ export async function tick(): Promise<void> {
   // l'empreinte a échoué (rien d'exploitable), en review si c'est le matching
   // (l'humain tranche, c'est le niveau 3).
   await reapStrandedScans();
+
+  // Et la file elle-même : 258 octets par job, deux jobs par carte, 1 700
+  // cartes par jour. 320 Mo par an d'historique que personne ne relit, sur un
+  // quota de base de 500. Les `dead` restent — c'est la trace de ce qui a raté.
+  await pruneJobs();
 }
 
 export function startCron(): NodeJS.Timeout {
