@@ -1,29 +1,8 @@
-import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 /**
- * Il n'y a qu'une page qui compte. Celle-ci n'existe que pour y mener.
+ * Il n'y a pas d'accueil à faire lire : le flux commence par l'envoi de photos.
  */
 export default function Home() {
-  return (
-    <main style={{ padding: 'var(--s6)' }}>
-      <h1 style={{ fontSize: 18, margin: 0 }}>pokelister</h1>
-      <p className="dim" style={{ marginTop: 'var(--s2)' }}>
-        <Link href="/upload" style={{ color: 'var(--green)' }}>
-          Envoyer des photos
-        </Link>
-        {' · '}
-        <Link href="/dashboard" style={{ color: 'var(--green)' }}>
-          Santé du pipeline
-        </Link>
-        {' · '}
-        <Link href="/review" style={{ color: 'var(--green)' }}>
-          File de review
-        </Link>
-        {' · '}
-        <Link href="/pricing" style={{ color: 'var(--green)' }}>
-          Règles de prix
-        </Link>
-      </p>
-    </main>
-  );
+  redirect('/upload');
 }

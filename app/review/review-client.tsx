@@ -337,39 +337,76 @@ export default function ReviewClient({
 
   if (queue.length === 0) {
     return (
-      <main style={{ padding: 'var(--s6)' }}>
-        <h1 style={{ fontSize: 18, margin: 0 }}>
-          {refilling.current ? 'Chargement…' : 'File de review vide'}
-        </h1>
-        <p className="dim" style={{ marginTop: 'var(--s2)' }}>
-          {refilling.current
-            ? 'Récupération des scans suivants.'
-            : 'Aucun scan en needs_review. Tout ce qui est entré a été résolu par les niveaux 1 et 2.'}
-        </p>
-        {treated > 0 && (
-          <p className="mono dim" style={{ marginTop: 'var(--s3)' }}>
-            {treated} traitées cette session · {secPerCard.toFixed(1)} s/carte
-          </p>
-        )}
-      </main>
+      <>
+        <header className="page-head">
+          <h1 className="page-title">Review</h1>
+        </header>
+        <div className="page-body">
+          <div className="empty">
+            <div style={{ fontSize: 15, fontWeight: 600 }}>
+              {refilling.current ? 'Chargement…' : 'Rien à reviewer'}
+            </div>
+            <div className="dim">
+              {refilling.current
+                ? 'Récupération des scans suivants.'
+                : 'Tout ce qui est entré a été résolu par les niveaux 1 et 2.'}
+            </div>
+            {treated > 0 && (
+              <div className="mono faint" style={{ marginTop: 'var(--s2)' }}>
+                {treated} traitées cette session · {secPerCard.toFixed(1)} s/carte
+              </div>
+            )}
+          </div>
+        </div>
+      </>
     );
   }
 
   const priceCents = priceText === '' ? null : parseAmount(priceText);
   const soldSales = scan?.prices.find((p) => p.source === 'ebay_sold')?.sales ?? [];
+  const variantDiverge = effVariant !== scan?.default_variant;
 
   return (
-    <div style={{ display: 'grid', gridTemplateRows: '1fr auto', height: '100vh' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: 0 }}>
-        {/* File compacte : 32 px par ligne (docs/06 §4). */}
+    <>
+      <header className="page-head">
+        <h1 className="page-title">Review</h1>
+        <span className="page-sub">
+          {scan?.session_name} · #{scan?.seq}
+        </span>
+        <div className="page-actions">
+          {treated > 0 && (
+            <span className="mono faint" style={{ fontSize: 12 }}>
+              {treated} traitées ·{' '}
+              <span style={{ color: secPerCard <= 3 ? 'var(--green)' : 'var(--amber)' }}>
+                {secPerCard.toFixed(1)} s/carte
+              </span>
+            </span>
+          )}
+          {inFlight > 0 && (
+            <span className="mono faint" title="écritures en cours">
+              ⟳ {inFlight}
+            </span>
+          )}
+          <button className="btn btn--ghost" onClick={toggleSound} title="Alerte sonore">
+            {sound ? 'son on' : 'son off'}
+          </button>
+        </div>
+      </header>
+
+      <div
+        className="page-body page-body--flush"
+        style={{ display: 'grid', gridTemplateColumns: '200px 1fr', minHeight: 0 }}
+      >
+        {/* File compacte : 30 px par ligne. On en voit le plus possible sans que
+            les cibles deviennent difficiles à viser. */}
         <aside
           style={{
-            borderRight: '1px solid var(--border)',
             overflowY: 'auto',
+            borderRight: '1px solid var(--border)',
             background: 'var(--surface)',
           }}
         >
-          <div className="label" style={{ padding: 'var(--s2) var(--s3)' }}>
+          <div className="label" style={{ padding: 'var(--s3) var(--s3) var(--s2)' }}>
             {queue.length} en attente
           </div>
           {queue.map((s, i) => (
@@ -382,36 +419,43 @@ export default function ReviewClient({
               onClick={() => setCursor(i)}
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
+                alignItems: 'center',
                 gap: 'var(--s2)',
                 width: '100%',
-                height: 32,
-                alignItems: 'center',
+                height: 30,
                 padding: '0 var(--s3)',
                 border: 'none',
                 borderLeft: `2px solid ${i === cursor ? 'var(--green)' : 'transparent'}`,
-                borderRadius: 0,
                 background: i === cursor ? 'var(--surface-2)' : 'transparent',
+                color: i === cursor ? 'var(--text)' : 'var(--text-dim)',
                 textAlign: 'left',
+                cursor: 'pointer',
+                font: 'inherit',
+                fontSize: 12,
               }}
             >
-              <span className="mono" style={{ fontSize: 12 }}>
-                #{s.seq}
+              <span className="mono faint" style={{ fontSize: 11 }}>
+                {s.seq}
               </span>
-              <span className="faint" style={{ fontSize: 11, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              <span
+                style={{
+                  flex: 1,
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                }}
+              >
                 {s.candidates[0]?.name ?? 'inconnue'}
               </span>
-              {s.variant_conflict && <span style={{ color: 'var(--red)', fontSize: 11 }}>!</span>}
+              {s.variant_conflict && <span className="dot dot--alarm" />}
             </button>
           ))}
         </aside>
 
-        {/* La carte en cours reste à une position fixe : c'est la file qui
-            défile derrière, pas la carte qui saute (docs/06 §5). */}
         <main
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(240px, 340px) 1fr',
+            gridTemplateColumns: 'minmax(220px, 300px) 1fr',
             gap: 'var(--s4)',
             padding: 'var(--s4)',
             minHeight: 0,
@@ -422,130 +466,138 @@ export default function ReviewClient({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/api/scan/${scan?.id}/image`}
-              alt={`scan #${scan?.seq}`}
+              alt={`scan ${scan?.seq}`}
               style={{
                 width: '100%',
-                borderRadius: 'var(--s2)',
+                borderRadius: 'var(--r3)',
                 border: `2px solid ${flash ? 'var(--green)' : TIER_COLOR[tier]}`,
                 background: 'var(--surface)',
-                // Assez rapide pour ne pas retarder la carte suivante, assez
-                // visible pour confirmer l'appui.
                 transition: 'border-color 120ms ease-out, opacity 120ms ease-out',
-                opacity: flash ? 0.55 : 1,
+                opacity: flash ? 0.5 : 1,
               }}
             />
-            <div className="label mono" style={{ marginTop: 'var(--s2) ' }}>
-              {scan?.session_name} · #{scan?.seq}
-            </div>
+            <a
+              href={`/api/scan/${scan?.id}/image?full=1`}
+              target="_blank"
+              rel="noreferrer"
+              className="faint"
+              style={{ fontSize: 11, display: 'block', marginTop: 6 }}
+            >
+              voir en pleine résolution
+            </a>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)', minWidth: 0 }}>
             {scan?.variant_conflict && (
-              <div
-                style={{
-                  border: '1px solid var(--red)',
-                  borderRadius: 'var(--s2)',
-                  padding: 'var(--s2) var(--s3)',
-                  color: 'var(--red)',
-                  fontSize: 13,
-                }}
-              >
-                Conflit de variant — une empreinte connue de cette carte a un variant
+              <div className="note note--alarm">
+                Conflit de variant — une empreinte connue de cette carte porte un variant
                 différent du défaut de session. Vérifie avant d&apos;accepter.
               </div>
             )}
 
             <section>
-              <div className="label">Candidats</div>
+              <div className="label" style={{ marginBottom: 'var(--s2)' }}>
+                Candidats
+              </div>
               {scan?.candidates.length === 0 && (
-                <div className="faint" style={{ padding: 'var(--s2) 0' }}>
+                <div className="faint" style={{ fontSize: 13 }}>
                   Aucun candidat. Ouvre la recherche avec <kbd>S</kbd>.
                 </div>
               )}
-              {scan?.candidates.map((c, i) => (
-                <button
-                  key={c.card_id}
-                  onClick={() => setChosen(i)}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '20px 1fr auto',
-                    gap: 'var(--s2)',
-                    alignItems: 'center',
-                    width: '100%',
-                    textAlign: 'left',
-                    marginTop: 'var(--s1)',
-                    padding: 'var(--s2)',
-                    background: i === chosen ? 'var(--green-bg)' : 'var(--surface)',
-                    borderColor: i === chosen ? 'var(--green)' : 'var(--border)',
-                  }}
-                >
-                  <kbd>{i + 1}</kbd>
-                  <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                    <strong>{c.name}</strong> <span className="dim">{c.set_name}</span>
-                  </span>
-                  <span className="mono faint" style={{ fontSize: 12 }}>
-                    {Number(c.distance).toFixed(3)}
-                  </span>
-                </button>
-              ))}
+              <div style={{ display: 'grid', gap: 4 }}>
+                {scan?.candidates.map((c, i) => (
+                  <button
+                    key={c.card_id}
+                    onClick={() => setChosen(i)}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '20px 1fr auto',
+                      gap: 'var(--s2)',
+                      alignItems: 'center',
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '6px var(--s2)',
+                      font: 'inherit',
+                      fontSize: 13,
+                      color: 'var(--text)',
+                      cursor: 'pointer',
+                      background: i === chosen ? 'var(--green-bg)' : 'var(--surface)',
+                      border: `1px solid ${i === chosen ? 'var(--green-border)' : 'var(--border)'}`,
+                      borderRadius: 'var(--r2)',
+                    }}
+                  >
+                    <kbd>{i + 1}</kbd>
+                    <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                      <strong>{c.name}</strong> <span className="dim">{c.set_name}</span>
+                    </span>
+                    <span className="mono faint" style={{ fontSize: 11 }}>
+                      {Number(c.distance).toFixed(3)}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </section>
 
             {searching && (
               <section>
-                <div className="label">Recherche catalogue</div>
+                <div className="label" style={{ marginBottom: 'var(--s2)' }}>
+                  Recherche catalogue
+                </div>
                 <input
                   ref={searchRef}
+                  className="input"
                   placeholder="nom de la carte…"
                   style={{ width: '100%' }}
-                  onChange={(e) => void runSearch(e.target.value)}
+                  onChange={(e) => runSearch(e.target.value)}
                 />
-                {hits.map((h) => (
-                  <button
-                    key={h.card_id}
-                    onClick={() => {
-                      // Remplace le candidat choisi par le résultat retenu.
-                      setQueue((q) =>
-                        q.map((s) =>
-                          s.id === scan?.id
-                            ? {
-                                ...s,
-                                candidates: [
-                                  { card_id: h.card_id, name: h.name, set_name: h.set_name, distance: 0 },
-                                  ...s.candidates,
-                                ],
-                              }
-                            : s,
-                        ),
-                      );
-                      setChosen(0);
-                      setSearching(false);
-                    }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', marginTop: 'var(--s1)' }}
-                  >
-                    {h.name} <span className="dim">{h.set_name}</span>{' '}
-                    <span className="mono faint">
-                      {h.number}/{h.printed_total ?? '—'}
-                    </span>
-                  </button>
-                ))}
+                <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
+                  {hits.map((h) => (
+                    <button
+                      key={h.card_id}
+                      className="btn"
+                      style={{ justifyContent: 'flex-start', height: 28 }}
+                      onClick={() => {
+                        setQueue((q) =>
+                          q.map((s) =>
+                            s.id === scan?.id
+                              ? {
+                                  ...s,
+                                  candidates: [
+                                    {
+                                      card_id: h.card_id,
+                                      name: h.name,
+                                      set_name: h.set_name,
+                                      distance: 0,
+                                    },
+                                    ...s.candidates,
+                                  ],
+                                }
+                              : s,
+                          ),
+                        );
+                        setChosen(0);
+                        setSearching(false);
+                      }}
+                    >
+                      {h.name} <span className="dim">{h.set_name}</span>{' '}
+                      <span className="mono faint">
+                        {h.number}/{h.printed_total ?? '—'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </section>
             )}
 
-            {/* Le variant est l'erreur la plus coûteuse : 5 à 20x d'écart de
-                prix. Il est en haut, en gras, et change de couleur s'il diverge
-                du défaut de session. */}
-            <section style={{ display: 'flex', gap: 'var(--s4)', flexWrap: 'wrap' }}>
-              <label style={{ display: 'grid', gap: 'var(--s1)' }}>
+            <section style={{ display: 'flex', gap: 'var(--s3)', flexWrap: 'wrap' }}>
+              {/* Le variant est l'erreur la plus coûteuse : il change de couleur
+                  dès qu'il diverge du défaut de session. */}
+              <label className="field">
                 <span className="label">Variant</span>
                 <select
+                  className={`select${variantDiverge ? ' select--warn' : ''}`}
                   value={effVariant}
                   onChange={(e) => setVariant(e.target.value as CardVariant)}
-                  style={{
-                    fontWeight: 600,
-                    borderColor:
-                      effVariant !== scan?.default_variant ? 'var(--amber)' : 'var(--border)',
-                    color: effVariant !== scan?.default_variant ? 'var(--amber)' : 'var(--text)',
-                  }}
                 >
                   {variants.map((v) => (
                     <option key={v} value={v}>
@@ -555,9 +607,10 @@ export default function ReviewClient({
                 </select>
               </label>
 
-              <label style={{ display: 'grid', gap: 'var(--s1)' }}>
+              <label className="field">
                 <span className="label">Condition</span>
                 <select
+                  className="select"
                   value={effCondition}
                   onChange={(e) => setCondition(e.target.value as CardCondition)}
                 >
@@ -569,86 +622,95 @@ export default function ReviewClient({
                 </select>
               </label>
 
-              <label style={{ display: 'grid', gap: 'var(--s1)' }}>
+              <label className="field">
                 <span className="label">
                   Prix final <kbd>E</kbd>
                 </span>
                 <input
                   ref={priceRef}
-                  className="mono"
+                  className="input mono"
                   value={priceText}
                   placeholder="—"
                   onChange={(e) => setPriceText(e.target.value)}
                   onBlur={() => setEditing(false)}
-                  style={{ width: 100, borderColor: editing ? 'var(--green)' : 'var(--border)' }}
+                  style={{ width: 100, borderColor: editing ? 'var(--green)' : undefined }}
                 />
               </label>
+
+              <div className="field" style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                <span className="label">Net après frais</span>
+                <span className="num" style={{ fontSize: 18, lineHeight: '32px' }}>
+                  {priceCents === null
+                    ? '—'
+                    : formatCents(netAfterFees(priceCents, 0, 'ebay').netCents)}
+                </span>
+              </div>
             </section>
 
-            <section>
-              <div className="label">Sources de prix — totaux prix + port</div>
+            <section className="panel" style={{ padding: 'var(--s3)' }}>
+              <div className="panel-head">
+                <span className="label">Prix — totaux port compris</span>
+                {!feesVerified && (
+                  <span className="faint" style={{ fontSize: 11 }}>
+                    taux de frais non vérifiés
+                  </span>
+                )}
+              </div>
+
               {scan?.prices.length === 0 ? (
-                <div className="faint" style={{ padding: 'var(--s2) 0', fontSize: 13 }}>
-                  Aucune donnée de prix pour cette carte. Le système ne devine jamais un
-                  prix qu&apos;il n&apos;a pas mesuré.
+                <div className="faint" style={{ fontSize: 13 }}>
+                  Aucune donnée pour cette carte. Le système ne devine jamais un prix
+                  qu&apos;il n&apos;a pas mesuré.
                 </div>
               ) : (
-                <table className="mono" style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                <table className="table">
                   <thead>
-                    <tr className="label" style={{ textAlign: 'right' }}>
-                      <th style={{ textAlign: 'left', padding: '2px var(--s2)' }}>Source</th>
-                      <th style={{ padding: '2px var(--s2)' }}>Moyenne</th>
-                      <th style={{ padding: '2px var(--s2)' }}>Médiane</th>
-                      <th style={{ padding: '2px var(--s2)' }}>Min</th>
-                      <th style={{ padding: '2px var(--s2)' }}>Max</th>
-                      <th style={{ padding: '2px var(--s2)' }}>n</th>
+                    <tr>
+                      <th>Source</th>
+                      <th>Moyenne</th>
+                      <th>Médiane</th>
+                      <th>Min</th>
+                      <th>Max</th>
+                      <th>n</th>
                     </tr>
                   </thead>
                   <tbody>
                     {scan?.prices.map((p) => (
-                      <tr key={p.source} style={{ borderTop: '1px solid var(--border)' }}>
-                        <td style={{ padding: '2px var(--s2)' }}>
+                      <tr key={p.source}>
+                        <td>
                           {SOURCE_LABEL[p.source] ?? p.source}
                           {p.window_days !== null && (
                             <span className="faint"> · {p.window_days} j</span>
                           )}
                         </td>
-                        {/* La MOYENNE est le chiffre demandé. La MÉDIANE est à
-                            côté parce qu'un écart entre les deux signale du bruit
-                            dans la recherche : un lot, une carte gradée. */}
-                        <td style={{ textAlign: 'right', padding: '2px var(--s2)', fontWeight: 600 }}>
-                          {p.mid ?? '—'}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '2px var(--s2)' }} className="dim">
-                          {p.market ?? '—'}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '2px var(--s2)' }} className="faint">
-                          {p.low ?? '—'}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '2px var(--s2)' }} className="faint">
-                          {p.high ?? '—'}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '2px var(--s2)' }} className="faint">
-                          {p.n_sales ?? '—'}
-                        </td>
+                        <td className="num">{p.mid ?? '—'}</td>
+                        <td className="mono dim">{p.market ?? '—'}</td>
+                        <td className="mono faint">{p.low ?? '—'}</td>
+                        <td className="mono faint">{p.high ?? '—'}</td>
+                        <td className="mono faint">{p.n_sales ?? '—'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
 
-              {/* Les ventes passées, avec leurs dates : c'est ce qui dit si le
-                  prix tient encore ou s'il date de trois mois. */}
               {soldSales.length > 0 && (
-                <div style={{ marginTop: 'var(--s2)' }}>
+                <div style={{ marginTop: 'var(--s3)' }}>
                   <div className="label">Ventes récentes</div>
-                  <div className="mono faint" style={{ fontSize: 11, display: 'flex', flexWrap: 'wrap', gap: 'var(--s2)' }}>
+                  <div
+                    className="mono faint"
+                    style={{
+                      fontSize: 11,
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 'var(--s2)',
+                      marginTop: 4,
+                    }}
+                  >
                     {soldSales.map((v, i) => (
                       <span key={i}>
                         {formatCents(v.total_cents)}
-                        {v.vendu_le && (
-                          <span className="faint"> ({v.vendu_le.slice(0, 10)})</span>
-                        )}
+                        {v.vendu_le && <span> ({v.vendu_le.slice(0, 10)})</span>}
                       </span>
                     ))}
                   </div>
@@ -656,44 +718,24 @@ export default function ReviewClient({
               )}
             </section>
 
-            {/* net_after_fees affiché en permanence (docs/03 §4). */}
-            <section
-              style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--s2)',
-                padding: 'var(--s3)',
-              }}
-            >
-              <div className="label">Net après frais eBay</div>
-              <div className="mono" style={{ fontSize: 18, fontWeight: 600 }}>
-                {priceCents === null
-                  ? '—'
-                  : formatCents(netAfterFees(priceCents, 0, 'ebay').netCents)}
-              </div>
-              {!feesVerified && (
-                <div className="faint" style={{ fontSize: 11, marginTop: 'var(--s1)' }}>
-                  Estimation : taux de frais non vérifiés auprès du Seller Hub.
-                </div>
-              )}
-            </section>
-
-            {error && <div style={{ color: 'var(--red)', fontSize: 13 }}>{error}</div>}
+            {error && <div className="note note--alarm">{error}</div>}
           </div>
         </main>
       </div>
 
-      {/* Les raccourcis restent affichés : un raccourci qu'il faut mémoriser sans
-          rappel visuel ne sera pas utilisé (docs/06 §6). */}
+      {/* Les raccourcis restent affichés : un raccourci qu'il faut mémoriser
+          sans rappel visuel ne sera pas utilisé. */}
       <footer
         style={{
           display: 'flex',
           gap: 'var(--s4)',
           alignItems: 'center',
+          height: 34,
+          padding: '0 var(--s4)',
           borderTop: '1px solid var(--border)',
           background: 'var(--surface)',
-          padding: 'var(--s2) var(--s4)',
-          fontSize: 12,
+          fontSize: 11,
+          flexShrink: 0,
         }}
         className="dim"
       >
@@ -718,30 +760,7 @@ export default function ReviewClient({
         <span>
           <kbd>U</kbd> annuler
         </span>
-
-        {/* La cadence réelle, en direct. C'est le seul chiffre qui dit si le
-            budget de 3 secondes par carte est tenu — et le voir bouger rend la
-            session mesurable au lieu d'interminable. */}
-        <span style={{ marginLeft: 'auto' }} className="mono">
-          {treated > 0 && (
-            <>
-              {treated} traitées ·{' '}
-              <span style={{ color: secPerCard <= 3 ? 'var(--green)' : 'var(--amber)' }}>
-                {secPerCard.toFixed(1)} s/carte
-              </span>
-              {' · '}
-            </>
-          )}
-          {queue.length} restantes
-        </span>
-
-        <button onClick={toggleSound}>son {sound ? 'on' : 'off'}</button>
-        {inFlight > 0 && (
-          <span className="mono faint" title="écritures en cours">
-            ⟳{inFlight}
-          </span>
-        )}
       </footer>
-    </div>
+    </>
   );
 }

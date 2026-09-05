@@ -106,142 +106,143 @@ export default function PricingClient({
   }
 
   return (
-    <main style={{ display: 'grid', gridTemplateColumns: '460px 1fr', gap: 'var(--s4)', padding: 'var(--s4)', height: '100vh' }}>
-      <section style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <h1 style={{ fontSize: 18, margin: 0 }}>Règles de prix</h1>
-        <p className="dim" style={{ fontSize: 12, marginTop: 'var(--s1)' }}>
-          Éditable sans redeploy. Validée avant écriture — une config malformée est
-          refusée, pas appliquée.
-        </p>
-
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          spellCheck={false}
-          className="mono"
-          style={{
-            flex: 1,
-            marginTop: 'var(--s3)',
-            minHeight: 0,
-            resize: 'none',
-            fontSize: 12,
-            lineHeight: 1.5,
-            color: 'var(--text)',
-            background: 'var(--bg)',
-            border: `1px solid ${parsed.error ? 'var(--red)' : 'var(--border)'}`,
-            borderRadius: 'var(--s1)',
-            padding: 'var(--s3)',
-          }}
-        />
-
-        {parsed.error && (
-          <pre
-            className="mono"
-            style={{ color: 'var(--red)', fontSize: 12, whiteSpace: 'pre-wrap', margin: 'var(--s2) 0 0' }}
-          >
-            {parsed.error}
-          </pre>
-        )}
-
-        <div style={{ display: 'flex', gap: 'var(--s3)', alignItems: 'center', marginTop: 'var(--s3)' }}>
+    <>
+      <header className="page-head">
+        <h1 className="page-title">Règles de prix</h1>
+        <span className="page-sub">
+          {synthetic ? 'échelle synthétique' : `${rows.length} SKUs réels`}
+        </span>
+        <div className="page-actions">
+          {saved && <span className="dim" style={{ fontSize: 12 }}>{saved}</span>}
           <button
+            className="btn btn--primary"
             onClick={() => void save()}
             disabled={busy || parsed.cfg === null}
-            style={{
-              background: parsed.cfg ? 'var(--green-bg)' : 'var(--surface-2)',
-              borderColor: parsed.cfg ? 'var(--green)' : 'var(--border)',
-              color: parsed.cfg ? 'var(--green)' : 'var(--text-faint)',
-              padding: 'var(--s2) var(--s4)',
-            }}
           >
             Enregistrer
           </button>
-          {saved && <span className="dim" style={{ fontSize: 12 }}>{saved}</span>}
         </div>
-      </section>
+      </header>
 
-      <section style={{ minHeight: 0, overflow: 'auto' }}>
-        <div className="label" style={{ marginBottom: 'var(--s2)' }}>
-          Preview{' '}
+      <div
+        className="page-body page-body--flush"
+        style={{ display: 'grid', gridTemplateColumns: '420px 1fr', minHeight: 0 }}
+      >
+        <section
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            padding: 'var(--s4)',
+            borderRight: '1px solid var(--border)',
+          }}
+        >
+          <span className="label">Configuration</span>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            spellCheck={false}
+            className="textarea"
+            style={{
+              flex: 1,
+              marginTop: 'var(--s2)',
+              minHeight: 0,
+              borderColor: parsed.error ? 'var(--red)' : 'var(--border)',
+            }}
+          />
+          {parsed.error && (
+            <pre
+              className="mono"
+              style={{
+                color: 'var(--red)',
+                fontSize: 11,
+                whiteSpace: 'pre-wrap',
+                margin: 'var(--s2) 0 0',
+                maxHeight: 90,
+                overflow: 'auto',
+              }}
+            >
+              {parsed.error}
+            </pre>
+          )}
+          <p className="faint" style={{ fontSize: 11, margin: 'var(--s2) 0 0' }}>
+            Validée avant écriture : une config malformée est refusée, pas appliquée.
+          </p>
+        </section>
+
+        <section style={{ minHeight: 0, overflow: 'auto', padding: 'var(--s4)' }}>
+          {synthetic && (
+            <div className="note note--warn" style={{ marginBottom: 'var(--s3)' }}>
+              Aucun SKU en stock — la preview tourne sur une échelle de valeurs
+              synthétiques qui reprend les frontières de bandes.
+            </div>
+          )}
           {parsed.error && previewCfg && (
-            <span style={{ color: 'var(--amber)' }}>— dernière config valide · </span>
+            <div className="note note--warn" style={{ marginBottom: 'var(--s3)' }}>
+              JSON invalide — la preview montre la dernière configuration valide.
+            </div>
           )}
-          {synthetic ? (
-            <span style={{ color: 'var(--amber)' }}>
-              — aucun SKU en stock, échelle synthétique
-            </span>
-          ) : (
-            <span>— {rows.length} SKUs réels</span>
-          )}
-        </div>
 
-        <table className="mono" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-          <thead>
-            <tr className="label" style={{ textAlign: 'right' }}>
-              <th style={{ textAlign: 'left', padding: 'var(--s1) var(--s2)' }}>Carte</th>
-              <th style={{ padding: 'var(--s1) var(--s2)' }}>Valeur</th>
-              <th style={{ padding: 'var(--s1) var(--s2)' }}>Bande</th>
-              <th style={{ padding: 'var(--s1) var(--s2)' }}>Prix eBay</th>
-              <th style={{ padding: 'var(--s1) var(--s2)' }}>Prix TCG</th>
-              <th style={{ padding: 'var(--s1) var(--s2)' }}>Net eBay</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => {
-              if (!previewCfg) return null;
-              const ebay = suggestPrice(r.valueCents, r.condition, previewCfg, 'ebay');
-              const tcg = suggestPrice(r.valueCents, r.condition, previewCfg, 'tcgplayer');
-              const net = netAfterFees(ebay.priceCents, shippingCents, 'ebay').netCents;
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Carte</th>
+                <th>Valeur</th>
+                <th>Bande</th>
+                <th>Prix eBay</th>
+                <th>Prix TCG</th>
+                <th>Net eBay</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                if (!previewCfg) return null;
+                const ebay = suggestPrice(r.valueCents, r.condition, previewCfg, 'ebay');
+                const tcg = suggestPrice(r.valueCents, r.condition, previewCfg, 'tcgplayer');
+                const net = netAfterFees(ebay.priceCents, shippingCents, 'ebay').netCents;
 
-              return (
-                <tr
-                  key={`${r.label}-${i}`}
-                  style={{
-                    borderTop: '1px solid var(--border)',
-                    background: i % 2 ? 'var(--surface)' : 'transparent',
-                  }}
-                >
-                  <td style={{ padding: 'var(--s1) var(--s2)' }}>
-                    <span style={{ fontFamily: 'var(--font)' }}>{r.label}</span>{' '}
-                    <span className="faint" style={{ fontSize: 11 }}>{r.sub}</span>
-                  </td>
-                  <td style={{ textAlign: 'right', padding: 'var(--s1) var(--s2)' }}>
-                    {formatCents(r.valueCents)}
-                  </td>
-                  <td className="faint" style={{ textAlign: 'right', padding: 'var(--s1) var(--s2)' }}>
-                    {ebay.band.mode === 'floor' ? 'plancher' : `×${ebay.band.value}`}
-                    {ebay.flagReview && <span style={{ color: 'var(--red)' }}> ⚑</span>}
-                  </td>
-                  <td style={{ textAlign: 'right', padding: 'var(--s1) var(--s2)' }}>
-                    {formatCents(ebay.priceCents)}
-                  </td>
-                  <td className="dim" style={{ textAlign: 'right', padding: 'var(--s1) var(--s2)' }}>
-                    {formatCents(tcg.priceCents)}
-                  </td>
-                  {/* Le net en direct pendant qu'on bouge le plancher : c'est
-                      exactement ce que docs/03 §4 demande de voir avant de
-                      décider, pas au payout. */}
-                  <td
-                    style={{
-                      textAlign: 'right',
-                      padding: 'var(--s1) var(--s2)',
-                      fontWeight: 600,
-                      color: net <= 0 ? 'var(--red)' : net < 50 ? 'var(--amber)' : 'var(--green)',
-                    }}
-                  >
-                    {formatCents(net)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                return (
+                  <tr key={`${r.label}-${i}`}>
+                    <td>
+                      {r.label}{' '}
+                      <span className="faint" style={{ fontSize: 11 }}>
+                        {r.sub}
+                      </span>
+                    </td>
+                    <td className="mono">{formatCents(r.valueCents)}</td>
+                    <td className="mono faint">
+                      {ebay.band.mode === 'floor' ? 'plancher' : `×${ebay.band.value}`}
+                      {ebay.flagReview && <span style={{ color: 'var(--red)' }}> ⚑</span>}
+                    </td>
+                    <td className="mono">{formatCents(ebay.priceCents)}</td>
+                    <td className="mono dim">{formatCents(tcg.priceCents)}</td>
+                    {/* Le net en direct pendant qu'on bouge le plancher :
+                        docs/03 §4 veut ce chiffre AVANT de décider. */}
+                    <td
+                      className="num"
+                      style={{
+                        color:
+                          net <= 0
+                            ? 'var(--red)'
+                            : net < 50
+                              ? 'var(--amber)'
+                              : 'var(--green)',
+                      }}
+                    >
+                      {formatCents(net)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
 
-        <p className="faint" style={{ fontSize: 11, marginTop: 'var(--s3)' }}>
-          Net calculé avec {formatCents(shippingCents)} d&apos;expédition.
-          {!feesVerified && ' Taux de frais NON VÉRIFIÉS auprès du Seller Hub — estimation.'}
-        </p>
-      </section>
-    </main>
+          <p className="faint" style={{ fontSize: 11, marginTop: 'var(--s3)' }}>
+            Net calculé avec {formatCents(shippingCents)} d&apos;expédition.
+            {!feesVerified && ' Taux de frais NON VÉRIFIÉS auprès du Seller Hub.'}
+          </p>
+        </section>
+      </div>
+    </>
   );
 }

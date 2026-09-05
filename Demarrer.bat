@@ -28,10 +28,11 @@ if not exist "node_modules" (
   call pnpm install || goto :erreur
 )
 
-if not exist ".next" (
-  echo   Construction de l'application...
-  call pnpm build || goto :erreur
-)
+rem On reconstruit A CHAQUE FOIS. Ne construire que si .next est absent servait
+rem un build perime apres chaque mise a jour du code, et on croyait que les
+rem changements n'avaient pas ete appliques. La construction prend ~7 secondes.
+echo   Construction de l'application...
+call pnpm build || goto :erreur
 
 echo   Demarrage du worker...
 start "pokelister - worker" /min cmd /c "node --import tsx worker/index.ts"
