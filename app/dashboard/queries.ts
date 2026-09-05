@@ -2,6 +2,7 @@ import { query } from '../../lib/db.js';
 import { computeMix, MANUAL_RATE_ALARM } from '../../lib/metrics/mix.js';
 import { computeReconciliation } from '../../lib/metrics/reconciliation.js';
 import { computeExport, type ExportRun } from '../../lib/metrics/export.js';
+import { computeDisk, QUOTA_DEFAUT_MO } from '../../lib/metrics/disk.js';
 
 /**
  * Les métriques de docs/05-production.md §1.2.
@@ -25,8 +26,11 @@ const DAILY_REVIEW_CAPACITY = 2400;
 /** Le taux de review manuelle est LA métrique économique du projet. */
 const QUEUE_DEPTH_ALARM = 5000;
 
+/** Quota de la base, en Mo. Surchargeable si le plan change. */
+const QUOTA_MO = Number(process.env['DB_QUOTA_MO'] ?? QUOTA_DEFAUT_MO);
+
 export async function loadMetrics(): Promise<Metric[]> {
-  const [worker, resolution, queue, dead, review, reconcile, exportTcg] =
+  const [worker, resolution, queue, dead, review, reconcile, exportTcg, disque] =
     await Promise.all([
       workerAlive(),
       resolutionMix(),
@@ -35,10 +39,37 @@ export async function loadMetrics(): Promise<Metric[]> {
       needsReview(),
       reconciliationGap(),
       dernierExport(),
+      tailleBase(),
     ]);
   // Le worker en premier : si lui ne tourne pas, les autres métriques décrivent
   // un système figé et n'apprennent rien.
-  return [worker, resolution, queue, dead, review, reconcile, exportTcg];
+  return [worker, resolution, queue, dead, review, reconcile, exportTcg, disque];
+}
+
+/**
+ * La base approche-t-elle du quota du plan ?
+ *
+ * Au-delà, Supabase passe la base en LECTURE SEULE : les uploads échouent,
+ * l'inventaire ne bouge plus, le worker meurt sur « cannot execute INSERT in a
+ * read-only transaction ». Le pipeline s'arrête net, et rien dans
+ * l'application ne le voyait venir.
+ *
+ * `known_fingerprints` gagne une ligne par scan résolu, ~2,9 ko chacune : à
+ * 25-50 000 cartes par mois, le quota gratuit tient trois à cinq mois.
+ */
+async function tailleBase(): Promise<Metric> {
+  const { rows } = await query<{ octets: string }>(
+    'select pg_database_size(current_database())::text as octets',
+  );
+  const d = computeDisk(Number(rows[0]?.octets ?? 0), QUOTA_MO);
+
+  return {
+    label: 'Taille de la base',
+    value: d.value,
+    detail: d.detail,
+    health: d.health,
+    threshold: `80 % du quota (${QUOTA_MO} Mo) · lecture seule au-delà`,
+  };
 }
 
 /**

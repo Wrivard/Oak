@@ -1,0 +1,37 @@
+-- Retire l'index HNSW de known_fingerprints.
+--
+-- AUCUNE REQUÊTE NE L'UTILISE. Les deux seules recherches vectorielles du
+-- système portent sur `card_embeddings` (worker/handlers/match.ts,
+-- `filterAndRerank` et `nearestFromCatalog`). Le niveau 1 compare des distances
+-- de Hamming sur `phash` et `dhash` : un index HNSW ne peut rien pour lui.
+--
+-- Ce qu'il coûtait, mesuré le 5 septembre 2026 sur 20 000 empreintes :
+--
+--   tas                2,4 Mo
+--   embeddings (TOAST) 52,6 Mo
+--   index HNSW         52,0 Mo     <- retiré ici
+--   btree phash        824 ko
+--   btree card_id      520 ko
+--   total              109 Mo,  soit 5,6 ko par empreinte
+--
+-- Le quota de base de données du plan gratuit est de 500 Mo, et `cards` plus
+-- `card_embeddings` en occupent déjà 121. Il reste donc ~379 Mo, et
+-- `known_fingerprints` gagne UNE LIGNE PAR SCAN RÉSOLU :
+--
+--   avec l'index HNSW    ~68 000 empreintes   ->  6 à 8 semaines
+--   sans                ~131 000 empreintes   ->  3 à 5 mois
+--
+-- Au-delà, Supabase passe la base en LECTURE SEULE : le pipeline s'arrête net,
+-- les uploads échouent, l'inventaire ne bouge plus. Ce n'est pas un
+-- ralentissement, c'est un mur. Doubler le délai avant ce mur en retirant un
+-- index que personne n'interroge n'a pas de contrepartie.
+--
+-- Il coûtait aussi une écriture d'index HNSW sur le chemin le plus chaud du
+-- système : chaque résolution confirmée écrit une empreinte.
+--
+-- LA COLONNE `embedding` EST CONSERVÉE. Elle n'est lue par aucune requête
+-- aujourd'hui, mais docs/02 prévoit qu'un changement de modèle impose de
+-- reconstruire `known_fingerprints` : la donnée reste, et l'index se recrée en
+-- une commande le jour où une recherche vectorielle sur l'historique existera.
+
+drop index if exists known_fp_hnsw;

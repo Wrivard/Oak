@@ -56,6 +56,50 @@ Une seule page, cinq métriques. Si elle est verte, tu peux aller dormir.
 > rattraper plus tard. Voir `lib/metrics/reconciliation.ts`.
 | Cartes en `needs_review` | `> capacité quotidienne` |
 | Dernier export TCGplayer | fichier vide alors qu'il restait du stock à exporter |
+| Taille de la base contre le quota du plan | `> 80 %` — **lecture seule au quota** |
+
+> **Incident du 5 septembre 2026.** En écrivant 200 000 empreintes synthétiques
+> pour mesurer le niveau 1, la base est passée de 138 Mo à 850 Mo et Supabase a
+> mis le projet en **lecture seule**. Plus aucune écriture : ni scan, ni
+> inventaire, ni vente. Le `reset:data` de nettoyage a lui-même échoué sur
+> `cannot execute DELETE in a read-only transaction`.
+>
+> Sortie de secours documentée par Supabase, et elle marche — mais il faut les
+> deux commandes **dans la même session**, ce qui n'est pas évident :
+>
+> ```sql
+> set session characteristics as transaction read write;
+> delete from …;  vacuum full …;
+> ```
+>
+> Ce que l'incident a révélé compte plus que l'incident. Le quota gratuit est de
+> **500 Mo de base de données**, dont `cards` et `card_embeddings` occupent déjà
+> 121. Il reste ~379 Mo, et `known_fingerprints` gagne **une ligne par scan
+> résolu**. Mesuré sur 20 000 empreintes :
+>
+> ```
+> tas                 2,4 Mo
+> embeddings (TOAST) 52,6 Mo
+> index HNSW         52,0 Mo   ← inutilisé, retiré par la migration 009
+> btree phash + card  1,3 Mo
+> total             109 Mo,  soit 5,6 ko par empreinte
+> ```
+>
+> Aucune requête n'interrogeait cet index HNSW : les deux recherches
+> vectorielles du système portent sur `card_embeddings`, et le niveau 1 compare
+> des distances de Hamming, qu'aucun index HNSW ne peut accélérer. Il coûtait
+> 2,7 ko par empreinte **et** une écriture d'index sur le chemin le plus chaud
+> du système.
+>
+> ```
+> avec l'index HNSW    ~68 000 empreintes   ->  6 à 8 semaines
+> sans                ~131 000 empreintes   ->  3 à 5 mois
+> ```
+>
+> Le mur n'est pas supprimé, il est repoussé — et il est maintenant **visible** :
+> le tableau de santé avertit à 80 % et alarme à 95 %, en disant ce qu'on perd
+> au passage du quota. Un seuil dont on ignore la conséquence finit par être
+> ignoré.
 
 > **Ajouté le 5 septembre 2026.** L'export tourne par cron et écrit un CSV.
 > Quand il écarte tout — aujourd'hui parce que `tcg_sku_id` est vide sur tout
