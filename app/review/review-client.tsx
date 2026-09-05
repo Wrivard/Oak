@@ -195,25 +195,54 @@ export default function ReviewClient({
   }, [flash]);
 
   /**
-   * Réapprovisionnement automatique.
+   * Réapprovisionnement automatique, sur une horloge.
    *
    * On recharge quand il reste moins de 40 cartes, pas quand la file est vide :
    * le chargement doit être fini AVANT qu'on en ait besoin, sinon on attend, et
-   * attendre est précisément ce qu'on cherche à supprimer.
+   * attendre est précisément ce qu'on cherche à supprimer. À 3 s par carte,
+   * 40 cartes laissent deux minutes de marge.
+   *
+   * SUR UNE HORLOGE, et pas en réaction à `queue`, pour deux raisons :
+   *
+   *   - déclenché par `queue`, il repartait à CHAQUE carte confirmée dès que la
+   *     file passait sous 40. Sur un petit arriéré, chaque appui sur A lançait
+   *     une requête qui rapportait zéro ligne — et `loadMore` en demande 200 de
+   *     plus que ce qu'on exclut.
+   *   - et surtout : file vide, `queue` ne change plus, donc l'effet ne se
+   *     relançait JAMAIS. On restait sur « Rien à reviewer » pendant que le
+   *     worker résolvait la suite du lot juste derrière. Il fallait recharger la
+   *     page pour s'en apercevoir.
    */
   const refilling = useRef(false);
+  const queueRef = useRef(queue);
+  queueRef.current = queue;
+
   useEffect(() => {
-    if (refilling.current || queue.length >= 40) return;
-    refilling.current = true;
-    void loadMore(queue.map((s) => s.id))
-      .then((more) => {
-        if (more.length > 0) setQueue((q) => [...q, ...more]);
-      })
-      .catch((err: unknown) => setError(`chargement de la suite : ${String(err)}`))
-      .finally(() => {
+    let vivant = true;
+
+    const remplir = async (): Promise<void> => {
+      if (!vivant || refilling.current) return;
+      const courante = queueRef.current;
+      if (courante.length >= 40) return;
+
+      refilling.current = true;
+      try {
+        const more = await loadMore(courante.map((s) => s.id));
+        if (vivant && more.length > 0) setQueue((q) => [...q, ...more]);
+      } catch (err) {
+        if (vivant) setError(`chargement de la suite : ${String(err)}`);
+      } finally {
         refilling.current = false;
-      });
-  }, [queue]);
+      }
+    };
+
+    void remplir();
+    const t = setInterval(() => void remplir(), 5000);
+    return () => {
+      vivant = false;
+      clearInterval(t);
+    };
+  }, []);
 
   /**
    * Écarte la carte courante. Optimiste comme l'accept : l'écriture part
@@ -414,6 +443,14 @@ export default function ReviewClient({
                 ? 'Récupération des scans suivants.'
                 : 'Tout ce qui est entré a été résolu par les niveaux 1 et 2.'}
             </div>
+            {/* Sans cette ligne, on recharge la page à la main pendant que le
+                worker travaille juste derrière. La file se remplit seule. */}
+            {!refilling.current && (
+              <div className="faint" style={{ fontSize: 12, marginTop: 'var(--s2)' }}>
+                Cette page se remplit d&apos;elle-même : inutile de recharger si le
+                worker traite encore un lot.
+              </div>
+            )}
             {treated > 0 && (
               <div className="mono faint" style={{ marginTop: 'var(--s2)' }}>
                 {treated} traitées cette session · {secPerCard.toFixed(1)} s/carte
