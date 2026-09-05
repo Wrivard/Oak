@@ -15,6 +15,8 @@
  * voit pas à la relecture, seulement à l'exécution.
  */
 
+import { EXTENSIONS_IMAGE } from '../images/extensions.js';
+
 /** La partie de FileSystemEntry qu'on utilise, écrite à la main pour rester testable. */
 export interface FsEntry {
   isFile: boolean;
@@ -92,8 +94,6 @@ export async function filesFromDrop(dt: DropSource): Promise<File[]> {
  * navigateur devine par extension et ne connaît pas toujours celle-là. Se fier
  * au seul type MIME jetterait des pages réellement scannées.
  */
-const EXTENSIONS = /\.(jpe?g|png|webp|tiff?|bmp)$/i;
-
 export function estImage(f: { name: string; type: string }): boolean {
-  return f.type.startsWith('image/') || EXTENSIONS.test(f.name);
+  return f.type.startsWith('image/') || EXTENSIONS_IMAGE.test(f.name);
 }

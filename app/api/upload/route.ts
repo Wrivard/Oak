@@ -7,6 +7,7 @@ import { openSession } from '../../../lib/ingest/register.js';
 import type { CardCondition, CardVariant } from '../../../lib/sku.js';
 import { estImage } from '../../../lib/upload/drop.js';
 import { nomDeLotInvalide } from '../../../lib/upload/nom-de-lot.js';
+import { extensionSure } from '../../../lib/images/extensions.js';
 
 /**
  * Dépôt d'un lot de photos.
@@ -33,8 +34,7 @@ const MAX_BYTES = 25 * 1024 * 1024;
  * sortir du répertoire.
  */
 function safeName(rank: number, original: string): string {
-  const ext = /\.(jpe?g|png|webp|tiff?)$/i.exec(original)?.[0]?.toLowerCase() ?? '.jpg';
-  return `${String(rank).padStart(6, '0')}${ext}`;
+  return `${String(rank).padStart(6, '0')}${extensionSure(original)}`;
 }
 
 /**

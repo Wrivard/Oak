@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { query } from '../../lib/db.js';
 import { phash } from '../../lib/fingerprint/hash.js';
 import { registerScan, registerUnreadablePage } from '../../lib/ingest/register.js';
+import { EXTENSIONS_IMAGE } from '../../lib/images/extensions.js';
 import { pairPages, type PairMode, type Page } from '../../lib/ingest/pairing.js';
 import { log } from '../../lib/log.js';
 import { PermanentError } from '../queue/errors.js';
@@ -16,7 +17,7 @@ import type { Job } from '../queue/queue.js';
  * largement le temps d'une requête HTTP. L'upload écrit les fichiers, ce job les
  * organise — c'est la même séparation que partout ailleurs.
  */
-const IMAGE = /\.(jpe?g|png|webp|tiff?)$/i;
+const IMAGE = EXTENSIONS_IMAGE;
 
 export async function handlePairUpload(job: Job): Promise<void> {
   const sessionId = job.payload['session_id'];

@@ -1,6 +1,7 @@
 import { log } from '../lib/log.js';
 import { enqueue } from './queue/queue.js';
 import { pruneTraces } from './queue/trace.js';
+import { pruneThumbs } from '../lib/images/thumb-cache.js';
 
 /**
  * Planificateur interne. Voir docs/03-pricing.md §5.
@@ -33,6 +34,12 @@ export async function tick(): Promise<void> {
   // Les traces d'appels sont de la télémétrie, pas de l'historique : leur
   // intérêt décroît avec l'âge et la table gonflerait sans fin.
   await pruneTraces();
+
+  // Même raisonnement sur le disque : une vignette par scan, ~60 ko, et rien ne
+  // les effaçait. À 25-50 000 cartes par mois ça fait 1,5 à 3 Go par mois,
+  // indéfiniment. Elles ne servent qu'à la review et à l'audit, et se
+  // régénèrent à la demande.
+  await pruneThumbs();
 }
 
 export function startCron(): NodeJS.Timeout {
