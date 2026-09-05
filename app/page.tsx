@@ -11,6 +11,10 @@ export default function Home() {
         <Link href="/review" style={{ color: 'var(--green)' }}>
           File de review
         </Link>
+        {' · '}
+        <Link href="/pricing" style={{ color: 'var(--green)' }}>
+          Règles de prix
+        </Link>
       </p>
     </main>
   );

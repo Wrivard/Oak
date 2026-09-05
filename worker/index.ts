@@ -3,8 +3,10 @@ import { loadEnv } from '../lib/env.js';
 import { log } from '../lib/log.js';
 import { handleFingerprint } from './handlers/fingerprint.js';
 import { handleMatch } from './handlers/match.js';
+import { handlePriceRefresh } from './handlers/price-refresh.js';
 import { startWatcher } from './ingest/watcher.js';
 import { Worker } from './queue/loop.js';
+import { startCron } from './cron.js';
 
 /**
  * Point d'entrée du worker. Un process long, séparé de Next.
@@ -22,9 +24,12 @@ const worker = new Worker(env.WORKER_ID, {
   fingerprint: { handler: handleFingerprint, concurrency: 4 },
   // OCR + rerank : du CPU local, mais tesseract est plus lourd que les hachages.
   match: { handler: handleMatch, concurrency: 2 },
+  // Source externe avec quota : une seule voie, jamais de parallélisme.
+  price_refresh: { handler: handlePriceRefresh, concurrency: 1 },
 });
 
 const watcher = startWatcher({ inbox: INBOX, processed: PROCESSED, rejected: REJECTED });
+const cron = startCron();
 
 let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {
@@ -32,6 +37,7 @@ async function shutdown(signal: string): Promise<void> {
   shuttingDown = true;
   log.info('signal reçu, arrêt propre', { signal });
 
+  clearInterval(cron);
   await watcher.close();
   await worker.stop();
   await closePool();

@@ -30,6 +30,14 @@ effectivement fermé. Passe par pokemontcg.io, qui expose les points de prix TCG
 `normal`, `holofoil`, `reverseHolofoil`, `1stEditionNormal`, `1stEditionHolofoil`,
 `unlimitedHolofoil`. Ton `card_variant` doit mapper 1:1 dessus.
 
+> ⚠ **Cardmarket est en EUROS, et pokemontcg.io ne convertit pas.** Vérifié sur de
+> vraies cartes : Charizard Base à 897,19 $ chez TCGplayer contre 4184,60 chez
+> Cardmarket, et sv1-1 à 0,11 $ contre 3,92 — des écarts de 4,7x et 35x. Ce n'est
+> pas une variation de marché, c'est une unité différente doublée d'un marché
+> différent. Le `cardmarket_fallback` de §2 ne doit donc **jamais publier un prix** :
+> il enregistre la valeur et envoie en review, comme `no_data`. Le jour où une
+> conversion de devise sera en place, cette garde pourra être levée.
+
 **`market` peut être `null`** quand aucune annonce TCGplayer active n'existe pour ce
 printing. Trois causes fréquentes : carte sans listing actif, mauvais printing demandé,
 ou produit scellé. Guard partout, fallback vers `mid` puis `cm_trend`. Un `null` non
