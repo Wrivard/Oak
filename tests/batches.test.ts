@@ -191,4 +191,32 @@ describe('setExpected', () => {
   it('accepte zéro — un lot vide est un comptage valide', async () => {
     expect((await setExpected(sessionId, 0)).ok).toBe(true);
   });
+
+  it('NULL EFFACE le comptage, et ce n’est pas zéro', async () => {
+    // Vider le champ voulait dire « je ne sais pas ». Le client envoyait
+    // `Number('')`, c'est-à-dire ZÉRO : un lot de 50 cartes affichait alors un
+    // écart de +50 et refusait de se fermer, sans retour en arrière possible.
+    await ajouterScans(50);
+    await setExpected(sessionId, 50);
+    expect((await closeBatch(sessionId)).ok).toBe(true);
+
+    await query(`update sessions set status = 'open', closed_at = null where id = $1`, [
+      sessionId,
+    ]);
+
+    // Zéro : écart de +50, le lot ne se ferme plus.
+    await setExpected(sessionId, 0);
+    const avecZero = await closeBatch(sessionId);
+    expect(avecZero.ok).toBe(false);
+    expect(avecZero.ecart).toBe(50);
+
+    // Null : plus de comptage attendu, donc plus rien à vérifier.
+    await setExpected(sessionId, null);
+    const { rows } = await query<{ e: number | null }>(
+      'select expected_count as e from sessions where id = $1',
+      [sessionId],
+    );
+    expect(rows[0]?.e).toBeNull();
+    expect((await closeBatch(sessionId)).ok).toBe(true);
+  });
 });

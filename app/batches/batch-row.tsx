@@ -29,8 +29,14 @@ export default function BatchActions({ batch }: { batch: Batch }) {
   }
 
   async function saveExpected() {
-    const n = Number(expected);
-    if (!Number.isInteger(n)) return;
+    // Champ vidé = « je ne sais pas », pas « zéro ». `Number('')` vaut zéro, et
+    // un lot de 50 cartes affichait alors un écart de +50 sans qu'on puisse
+    // revenir en arrière.
+    const brut = expected.trim();
+    const n = brut === '' ? null : Number(brut);
+    if (n !== null && !Number.isInteger(n)) return;
+    if (n === batch.expected) return;
+
     setBusy(true);
     const res = await setExpected(batch.id, n);
     setBusy(false);

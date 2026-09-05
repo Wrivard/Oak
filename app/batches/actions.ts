@@ -100,8 +100,18 @@ export async function closeBatch(sessionId: string, force = false): Promise<Clos
  * et la réconciliation ne peut rien vérifier. Saisir le nombre de cartes
  * réellement mises dans le scanner rend le contrôle possible.
  */
-export async function setExpected(sessionId: string, expected: number): Promise<CloseResult> {
-  if (!Number.isInteger(expected) || expected < 0) {
+export async function setExpected(
+  sessionId: string,
+  expected: number | null,
+): Promise<CloseResult> {
+  // `null` EFFACE le comptage. Champ vidé, le client envoyait `Number('')`,
+  // c'est-à-dire ZÉRO : un lot de 50 cartes affichait alors un écart de +50 et
+  // refusait de se fermer, sans qu'on puisse revenir en arrière — il n'y avait
+  // aucun moyen de dire « je ne sais pas » une fois un chiffre saisi.
+  //
+  // Zéro reste une valeur légitime et distincte : un lot vide est un comptage
+  // vérifiable, et le tableau de santé le traitera comme tel.
+  if (expected !== null && (!Number.isInteger(expected) || expected < 0)) {
     return { ok: false, error: 'nombre invalide' };
   }
   await query('update sessions set expected_count = $2 where id = $1', [
