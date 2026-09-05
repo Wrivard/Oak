@@ -5,6 +5,7 @@ import { query } from '../../../lib/db.js';
 import { log } from '../../../lib/log.js';
 import { openSession } from '../../../lib/ingest/register.js';
 import type { CardCondition, CardVariant } from '../../../lib/sku.js';
+import { estImage } from '../../../lib/upload/drop.js';
 
 /**
  * Dépôt d'un lot de photos.
@@ -23,7 +24,6 @@ export const maxDuration = 60;
 
 const STORE = process.env['UPLOAD_DIR'] ?? './uploads';
 
-const ACCEPTED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/tiff']);
 const MAX_BYTES = 25 * 1024 * 1024;
 
 /**
@@ -99,8 +99,12 @@ export async function POST(req: Request): Promise<NextResponse> {
   const rejected: { name: string; reason: string }[] = [];
 
   for (const [i, file] of files.entries()) {
-    if (!ACCEPTED.has(file.type)) {
-      rejected.push({ name: file.name, reason: `type non supporté (${file.type})` });
+    // Même critère que le client : type MIME OU extension. Chrome laisse `type`
+    // vide sur certains `.tif` de scanner ; s'en tenir au MIME refusait des
+    // pages réellement scannées. Le vrai filtre est plus loin de toute façon —
+    // sharp échoue à décoder ce qui n'est pas une image, et l'échec est visible.
+    if (!estImage(file)) {
+      rejected.push({ name: file.name, reason: `type non supporté (${file.type || 'inconnu'})` });
       continue;
     }
     if (file.size > MAX_BYTES) {

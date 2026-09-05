@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
+import { estImage, filesFromDrop, type DropSource } from '../../lib/upload/drop.js';
 
 /**
  * Envoi d'un lot de photos. Voir docs/06-ui.md.
@@ -35,11 +36,13 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
   const [done, setDone] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [lecture, setLecture] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dirRef = useRef<HTMLInputElement | null>(null);
 
-  const addFiles = useCallback((incoming: FileList | null) => {
+  const addFiles = useCallback((incoming: readonly File[] | FileList | null) => {
     if (!incoming) return;
-    const images = [...incoming].filter((f) => f.type.startsWith('image/'));
+    const images = [...incoming].filter(estImage);
     setFiles((prev) => {
       // Dédoublonnage par nom + taille : glisser deux fois le même dossier est
       // une erreur courante, et elle créerait des doublons d'inventaire.
@@ -48,6 +51,22 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
     });
     setDone(0);
   }, []);
+
+  const onDrop = useCallback(
+    async (dt: DropSource) => {
+      // Descendre dans un dossier de 2000 pages prend plusieurs secondes. Sans
+      // ce témoin, l'écran reste figé sur « Glisse tes photos ici » et on
+      // reglisse par-dessus, ce qui doublerait le lot si le dédoublonnage ne
+      // rattrapait pas le coup.
+      setLecture(true);
+      try {
+        addFiles(await filesFromDrop(dt));
+      } finally {
+        setLecture(false);
+      }
+    },
+    [addFiles],
+  );
 
   async function upload() {
     if (files.length === 0 || session.trim() === '') return;
@@ -225,7 +244,10 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
             onDrop={(e) => {
               e.preventDefault();
               setDragging(false);
-              addFiles(e.dataTransfer.files);
+              // Les types DOM scindent FileSystemEntry en sous-types fichier et
+              // dossier ; l'objet réel porte bien `file` ou `createReader` selon
+              // ce que disent `isFile` / `isDirectory`. Le cast dit ça.
+              void onDrop(e.dataTransfer as unknown as DropSource);
             }}
             onClick={() => inputRef.current?.click()}
             className="panel"
@@ -241,18 +263,62 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
             }}
           >
             <div style={{ fontWeight: 600, fontSize: 15 }}>
-              {files.length === 0
-                ? 'Glisse tes photos ici'
-                : `${files.length} photo${files.length > 1 ? 's' : ''} prête${files.length > 1 ? 's' : ''}`}
+              {lecture
+                ? 'Lecture du dossier…'
+                : files.length === 0
+                  ? 'Glisse le dossier du scanner ici'
+                  : `${files.length} photo${files.length > 1 ? 's' : ''} prête${files.length > 1 ? 's' : ''}`}
             </div>
             <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>
-              ou clique pour choisir · JPEG, PNG, WebP, TIFF · 25 Mo par photo
+              dossier ou fichiers · JPEG, PNG, WebP, TIFF · 25 Mo par photo
             </div>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: 'var(--s2)',
+                justifyContent: 'center',
+                marginTop: 'var(--s3)',
+              }}
+            >
+              <button
+                className="btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dirRef.current?.click();
+                }}
+              >
+                Choisir un dossier
+              </button>
+              <button
+                className="btn btn--ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  inputRef.current?.click();
+                }}
+              >
+                Choisir des fichiers
+              </button>
+            </div>
+
             <input
               ref={inputRef}
               type="file"
               multiple
               accept="image/*"
+              hidden
+              onChange={(e) => addFiles(e.target.files)}
+            />
+            {/* `webkitdirectory` n'est pas dans les types React : il est posé
+                par ref. C'est ce qui fait que « Choisir un dossier » ouvre un
+                sélecteur de DOSSIER et non de fichiers. */}
+            <input
+              ref={(el) => {
+                dirRef.current = el;
+                if (el) el.setAttribute('webkitdirectory', '');
+              }}
+              type="file"
+              multiple
               hidden
               onChange={(e) => addFiles(e.target.files)}
             />
