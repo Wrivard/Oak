@@ -9,6 +9,7 @@ import { AUDIT_PAGE_SIZE, loadAudit, type AuditSort } from './queries.js';
  * qu'à la commande qu'on ne peut pas honorer.
  */
 export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Vérifier' };
 
 export default async function AuditPage({
   searchParams,

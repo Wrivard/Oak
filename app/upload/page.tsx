@@ -6,6 +6,7 @@ import UploadClient from './upload-client.js';
  * plutôt que d'un dossier surveillé.
  */
 export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Envoyer' };
 
 export default function UploadPage() {
   const today = new Date().toISOString().slice(0, 10);

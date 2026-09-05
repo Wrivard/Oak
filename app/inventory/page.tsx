@@ -3,6 +3,7 @@ import InventoryClient from './inventory-client.js';
 import { loadInventory, type SortKey, type StockFilter } from './queries.js';
 
 export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Inventaire' };
 
 /**
  * L'état de la table vit dans l'URL : un lien vers une page filtrée reste

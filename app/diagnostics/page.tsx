@@ -26,6 +26,7 @@ import AutoRefresh from '../dashboard/auto-refresh.js';
  * qui part en review avant même d'essayer le catalogue.
  */
 export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Diagnostic' };
 
 const SEUIL_GLOBAL = 85;
 const SEUIL_ERE = 60;

@@ -6,6 +6,7 @@ import { loadMetrics, type Health } from './queries.js';
  * Cinq métriques, une page. Si elle est verte, on peut aller dormir.
  */
 export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Santé' };
 
 const LIBELLE: Record<Health, string> = {
   ok: 'Tout va bien',

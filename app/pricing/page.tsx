@@ -8,6 +8,7 @@ import PricingClient from './pricing-client.js';
  * Rendue à la demande : la config change et la preview doit refléter l'état réel.
  */
 export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Prix' };
 
 /**
  * Coût d'expédition retenu pour la preview.

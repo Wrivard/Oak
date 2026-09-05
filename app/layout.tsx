@@ -4,7 +4,10 @@ import Shell from './shell/sidebar.js';
 import { loadShellCounts } from './shell/counts.js';
 
 export const metadata = {
-  title: 'pokelister',
+  // Le titre est PRÉFIXÉ par l'écran : huit onglets ouverts qui disent tous
+  // « pokelister » ne se distinguent pas, et c'est l'usage réel — on laisse les
+  // lots, la review et la santé ouverts en même temps.
+  title: { default: 'pokelister', template: '%s · pokelister' },
   description: 'Pipeline de listing Pokémon',
 };
 

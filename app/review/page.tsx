@@ -11,6 +11,7 @@ import ReviewClient from './review-client.js';
  * tourne, et une page mise en cache montrerait un état périmé.
  */
 export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Review' };
 
 /**
  * Le seuil « une carte chère se regarde » existait DEUX fois : ici, en dur dans

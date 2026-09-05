@@ -8,6 +8,7 @@ import { loadAnomalies, loadBatches, type Batch } from './queries.js';
  * qu'on laisse ouvert pendant que le worker draine un lot.
  */
 export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Lots' };
 
 function Progress({ b }: { b: Batch }) {
   // Les écartées comptent dans le total : sans elles, un lot contenant des
