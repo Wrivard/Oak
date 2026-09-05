@@ -39,7 +39,15 @@ export async function savePricingConfig(json: string): Promise<SaveResult> {
       hard_floor: cfg.hard_floor,
       bandes: cfg.bands.length,
     });
-    revalidatePath('/pricing');
+
+    // Hors du try qui décide du succès : une revalidation ratée ferait croire
+    // que la config n'a pas été enregistrée alors qu'elle l'est, et on la
+    // réenregistrerait en boucle.
+    try {
+      revalidatePath('/pricing');
+    } catch (err) {
+      log.debug('revalidation ignorée hors contexte de requête', { err });
+    }
     return { ok: true };
   } catch (err) {
     log.warn('config de prix rejetée', { err });
