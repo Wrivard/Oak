@@ -190,6 +190,29 @@ mensuellement pour les nouveaux sets.
 C'est aussi ce qui valide ton découpage de SKU : si ton `{card_id}-{variant}-{condition}`
 ne mappe pas proprement vers un `tcg_sku_id` unique, ton modèle est faux quelque part.
 
+## B.3bis Ce qui est construit, et ce qui attend
+
+`lib/channels/tcgplayer-csv.ts` et `worker/handlers/tcg-export.ts` sont faits et
+testés. Un job `tcg_export` quotidien écrit le fichier dans `exports/`, avec une clé
+d'idempotence sur la date : jamais deux fichiers pour le même jour, parce que deux
+fichiers portant les mêmes deltas finiraient tous les deux uploadés.
+
+**L'invariant est protégé par des tests.** `tcg_qty_pushed` n'avance qu'à
+`confirmExport(batchId)`, appelé après un import réussi. Générer le CSV n'y touche pas.
+Confirmer deux fois n'applique le delta qu'une fois — un double clic ne doit pas doubler
+l'inventaire, ce qui est précisément le bug que cette colonne existe pour empêcher.
+
+**Ce qui manque et qui vient de toi :**
+
+1. **`tcg_sku_id` est vide pour tous les SKUs.** Ces IDs ne s'obtiennent qu'en exportant
+   leur catalogue (§B.3). Sans eux, chaque ligne est écartée avec la raison
+   `sans_tcg_sku_id`. C'est visible dans le log de l'export, pas silencieux.
+2. **Les en-têtes du CSV sont dérivés du format documenté, pas d'un vrai fichier.** À
+   confronter à un `Export Filtered CSV` réel avant le premier import : un en-tête qui
+   ne correspond pas fait rejeter le fichier entier, ou pire, ignorer une colonne en
+   silence.
+3. **Le statut Level 4 Seller**, sans lequel toute cette partie est inutilisable.
+
 ## B.4 Automation
 
 Deux options, dans cet ordre :

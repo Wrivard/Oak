@@ -20,6 +20,16 @@ export async function tick(): Promise<void> {
   const id = await enqueue('price_refresh', { limit: 500 }, { idempotencyKey: hourKey() });
   if (id !== null) log.info('batch de repricing enfilé', { job_id: id });
 
+  // Export TCGplayer : un fichier par jour, clé d'idempotence sur la date. Le
+  // doc décrit un batch quotidien, pas un flux temps réel.
+  const day = new Date().toISOString().slice(0, 10);
+  const exportId = await enqueue(
+    'tcg_export',
+    {},
+    { idempotencyKey: `tcg_export:${day}` },
+  );
+  if (exportId !== null) log.info('export TCGplayer enfilé', { job_id: exportId });
+
   // Les traces d'appels sont de la télémétrie, pas de l'historique : leur
   // intérêt décroît avec l'âge et la table gonflerait sans fin.
   await pruneTraces();

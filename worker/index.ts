@@ -4,6 +4,7 @@ import { log } from '../lib/log.js';
 import { handleFingerprint } from './handlers/fingerprint.js';
 import { handleMatch } from './handlers/match.js';
 import { handlePriceRefresh } from './handlers/price-refresh.js';
+import { handleTcgExport } from './handlers/tcg-export.js';
 import { startWatcher } from './ingest/watcher.js';
 import { Worker } from './queue/loop.js';
 import { startCron } from './cron.js';
@@ -26,6 +27,9 @@ const worker = new Worker(env.WORKER_ID, {
   match: { handler: handleMatch, concurrency: 2 },
   // Source externe avec quota : une seule voie, jamais de parallélisme.
   price_refresh: { handler: handlePriceRefresh, concurrency: 1 },
+  // Un seul fichier par jour : jamais deux exports concurrents, quelqu'un
+  // finirait par uploader les deux et appliquer le delta en double.
+  tcg_export: { handler: handleTcgExport, concurrency: 1 },
 });
 
 const watcher = startWatcher({ inbox: INBOX, processed: PROCESSED, rejected: REJECTED });

@@ -43,3 +43,6 @@ backups/
 
 # cache du test de charge
 .loadtest-cache/
+
+# exports CSV générés
+exports/
