@@ -187,6 +187,15 @@ dupliquer la logique de bandes.
 
 ---
 
+> **Le seuil « une carte chère se regarde » n'existe qu'à un endroit.** Il
+> existait deux fois : en dur dans `lib/config/thresholds.ts` et dans
+> `pricing_rules.config.review_threshold`, que l'écran des prix rend éditable.
+> Le même nombre, la même idée, deux sources — éditer le champ ne changeait que
+> le drapeau de publication, et la review continuait de colorer selon l'ancienne
+> valeur. La config en base fait foi, parce que c'est celle qu'on peut changer
+> sans redéployer ; la constante ne sert plus que de repli pour que la review
+> s'affiche même avec une configuration de prix cassée.
+
 ## 4. La colonne qui compte : le net
 
 > **Un seul chiffre de port, dans `lib/config/fees.ts`.** Trouvé le 5 septembre

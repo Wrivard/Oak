@@ -30,7 +30,16 @@ export const THRESHOLDS = {
   /** Au-dessus de cette valeur, une carte ne s'auto-publie jamais sans un oeil. */
   autoAccept: { maxValue: 20.0 },
 
-  /** Au-dessus, review manuelle obligatoire quelle que soit la confiance. */
+  /**
+   * Au-dessus, review manuelle obligatoire quelle que soit la confiance.
+   *
+   * REPLI SEULEMENT. La valeur qui fait foi est
+   * `pricing_rules.config.review_threshold`, éditable sur `/pricing` sans
+   * redéploiement — le même nombre existait ici et là-bas, et éditer le champ
+   * ne changeait que le drapeau de publication pendant que la review continuait
+   * de colorer selon celui-ci. On ne garde celui-ci que pour afficher la review
+   * quand la configuration de prix est illisible.
+   */
   hardReview: { minValue: 75.0 },
 
   /**
