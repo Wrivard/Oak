@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { closePool, query } from '../lib/db.js';
-import { closeBatch, setExpected } from '../app/batches/actions.js';
+import { closeBatch, repairBatch, setExpected } from '../app/batches/actions.js';
 
 /**
  * Clôture d'un lot.
@@ -18,6 +18,12 @@ const SESSION = 'test-batches';
 let sessionId: string;
 
 async function wipe(): Promise<void> {
+  await query(
+    `delete from jobs where type = 'pair_upload'
+       and payload->>'session_id' in (
+         select id::text from sessions where name like $1)`,
+    [`${SESSION}%`],
+  );
   await query(
     `delete from scans where session_id in (select id from sessions where name like $1)`,
     [`${SESSION}%`],
@@ -218,5 +224,67 @@ describe('setExpected', () => {
     );
     expect(rows[0]?.e).toBeNull();
     expect((await closeBatch(sessionId)).ok).toBe(true);
+  });
+});
+
+describe('repairBatch', () => {
+  /**
+   * L'appariement est enfilé par le PUT de fin d'envoi. Si ce PUT échoue — le
+   * serveur redémarre, le réseau lâche entre le dernier paquet et la
+   * finalisation — les pages sont sur le disque et AUCUN job n'existe. Le lot
+   * reste à zéro carte pour toujours, sans erreur : c'est un état dont le
+   * système ne savait pas sortir.
+   */
+  async function jobs(): Promise<{ mode: string; sid: string }[]> {
+    const { rows } = await query<{ mode: string; sid: string }>(
+      `select payload->>'mode' as mode, payload->>'session_id' as sid
+         from jobs where type = 'pair_upload'`,
+    );
+    return rows;
+  }
+
+  it('enfile un appariement dans le mode demandé', async () => {
+    const res = await repairBatch(sessionId, 'front_only');
+    expect(res.ok).toBe(true);
+    expect(res.enfile).toBe(true);
+
+    const j = await jobs();
+    expect(j).toHaveLength(1);
+    expect(j[0]?.mode).toBe('front_only');
+    expect(j[0]?.sid).toBe(sessionId);
+  });
+
+  it('REFUSE sur un lot fermé — son comptage est déjà réconcilié', async () => {
+    // Y ajouter des cartes après coup rendrait ce comptage faux sans que rien
+    // ne le signale.
+    await ajouterScans(3);
+    await closeBatch(sessionId);
+
+    const res = await repairBatch(sessionId, 'duplex');
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/fermé/);
+    expect(await jobs()).toHaveLength(0);
+  });
+
+  it('refuse un lot introuvable', async () => {
+    const res = await repairBatch('00000000-0000-0000-0000-000000000000', 'duplex');
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/introuvable/);
+  });
+
+  it('deux clics dans la même minute n’enfilent qu’un job', async () => {
+    const a = await repairBatch(sessionId, 'duplex');
+    const b = await repairBatch(sessionId, 'duplex');
+    expect(a.enfile).toBe(true);
+    expect(b.enfile).toBe(false);
+    expect(await jobs()).toHaveLength(1);
+  });
+
+  it('les deux modes sont des jobs DISTINCTS', async () => {
+    // Se tromper de mode est le cas qui amène ici : il faut pouvoir relancer
+    // dans l'autre sans attendre la minute suivante.
+    await repairBatch(sessionId, 'duplex');
+    await repairBatch(sessionId, 'front_only');
+    expect(await jobs()).toHaveLength(2);
   });
 });

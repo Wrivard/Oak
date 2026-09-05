@@ -1,5 +1,6 @@
 'use server';
 
+import { join } from 'node:path';
 import { query } from '../../lib/db.js';
 import { log } from '../../lib/log.js';
 import { revalidateQuietly } from '../revalidate.js';
@@ -120,4 +121,61 @@ export async function setExpected(
   ]);
   revalidateQuietly('/batches');
   return { ok: true };
+}
+
+/**
+ * Relance l'appariement d'un lot.
+ *
+ * L'appariement est enfilé par le PUT de fin d'envoi. Si ce PUT échoue — le
+ * serveur redémarre, le réseau lâche entre le dernier paquet et la
+ * finalisation — les pages sont sur le disque et AUCUN job n'existe. Le lot
+ * reste alors à zéro carte pour toujours, sans erreur : les fichiers sont là,
+ * l'écran d'envoi le dit même (« ce lot contient déjà N pages »), mais rien ne
+ * peut les transformer en cartes. C'est un état dont le système ne savait pas
+ * sortir.
+ *
+ * Rejouer est SANS DANGER : `pair_upload` ignore les fichiers déjà rattachés à
+ * un scan. Un lot déjà apparié ne bouge pas, un lot à moitié apparié se termine.
+ *
+ * La clé d'idempotence porte la minute pour que ce soit possible plusieurs fois,
+ * là où celle du PUT est fixe par lot et par mode — c'est justement cette clé
+ * fixe qui empêchait de réenfiler quoi que ce soit.
+ */
+export interface PairResult {
+  ok: boolean;
+  enfile?: boolean;
+  error?: string;
+}
+
+export async function repairBatch(
+  sessionId: string,
+  mode: 'duplex' | 'front_only',
+): Promise<PairResult> {
+  const { rows } = await query<{ name: string; status: string }>(
+    'select name, status from sessions where id = $1',
+    [sessionId],
+  );
+  const b = rows[0];
+  if (!b) return { ok: false, error: 'lot introuvable' };
+  if (b.status !== 'open') {
+    // Un lot fermé a été réconcilié : y ajouter des cartes après coup rendrait
+    // ce comptage faux sans que rien ne le signale.
+    return { ok: false, error: 'lot fermé — rouvre-le d’abord si c’est voulu' };
+  }
+
+  const store = process.env['UPLOAD_DIR'] ?? './uploads';
+  const dir = join(store, b.name);
+  const minute = new Date().toISOString().slice(0, 16);
+
+  const { rows: job } = await query<{ id: string }>(
+    `insert into jobs (type, payload, idempotency_key, priority)
+     values ('pair_upload', $1, $2, 50)
+     on conflict (idempotency_key) do nothing
+     returning id::text`,
+    [{ session_id: sessionId, dir, mode }, `pair_upload:manuel:${sessionId}:${mode}:${minute}`],
+  );
+
+  log.info('appariement relancé à la main', { session: b.name, mode, enfile: job.length > 0 });
+  revalidateQuietly('/batches');
+  return { ok: true, enfile: job.length > 0 };
 }
