@@ -46,8 +46,42 @@ interface Row {
   fingerprints: string;
 }
 
-export async function loadAudit(limit = 60, source?: string): Promise<AuditRow[]> {
-  const { rows } = await query<Row>(
+export const AUDIT_PAGE_SIZE = 60;
+
+export type AuditSort = 'recent' | 'doubtful';
+
+/**
+ * `doubtful` d'abord : c'est la stratégie d'audit qui attrape le plus d'erreurs.
+ *
+ * Regarder les soixante plus RÉCENTES sur les huit cents d'une journée, c'est
+ * regarder 7 % du lot au hasard. Regarder les soixante MOINS SÛRES, c'est
+ * regarder celles où la machine a le plus de chances de s'être trompée.
+ *
+ * Réserve : la confiance de `own_history` vient d'une distance de Hamming et
+ * celle de `catalog` d'une distance cosinus — deux échelles différentes. Trier
+ * sur les deux à la fois mélange donc des chiffres qui ne se comparent pas ; le
+ * tri est le plus utile combiné à un filtre de source.
+ */
+const AUDIT_ORDER: Record<AuditSort, string> = {
+  recent: 's.resolved_at desc',
+  doubtful: 's.confidence asc nulls first, s.resolved_at desc',
+};
+
+export interface AuditPage {
+  rows: AuditRow[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+export async function loadAudit(
+  params: { page?: number; source?: string; sort?: AuditSort } = {},
+): Promise<AuditPage> {
+  const page = Math.max(1, params.page ?? 1);
+  const sort: AuditSort = params.sort === 'doubtful' ? 'doubtful' : 'recent';
+  const source = params.source;
+
+  const { rows } = await query<Row & { total: string }>(
     `select s.id::text as scan_id, s.seq, ss.name as session_name,
             s.match_source::text, s.confidence::text,
             to_char(s.resolved_at, 'YYYY-MM-DD HH24:MI') as resolved_at,
@@ -55,7 +89,8 @@ export async function loadAudit(limit = 60, source?: string): Promise<AuditRow[]
             c.name as card_name, c.set_name, c.number, c.printed_total,
             c.image_small, s.ocr_read,
             (select count(*) from known_fingerprints k
-              where k.source_scan = s.id)::text as fingerprints
+              where k.source_scan = s.id)::text as fingerprints,
+            count(*) over ()::text as total
        from scans s
        join sessions ss on ss.id = s.session_id
        join inventory i on i.sku = s.resolved_sku
@@ -65,12 +100,14 @@ export async function loadAudit(limit = 60, source?: string): Promise<AuditRow[]
         -- qui les a faites, et les revoir ne ferait que du bruit.
         and s.match_source in ('catalog', 'own_history')
         and ($1::text is null or s.match_source::text = $1)
-      order by s.resolved_at desc
-      limit $2`,
-    [source ?? null, limit],
+      order by ${AUDIT_ORDER[sort]}
+      limit $2 offset $3`,
+    [source ?? null, AUDIT_PAGE_SIZE, (page - 1) * AUDIT_PAGE_SIZE],
   );
 
-  return rows.map((r) => ({
+  const total = Number(rows[0]?.total ?? 0);
+
+  const mapped = rows.map((r) => ({
     scanId: r.scan_id,
     seq: r.seq,
     sessionName: r.session_name,
@@ -86,4 +123,11 @@ export async function loadAudit(limit = 60, source?: string): Promise<AuditRow[]
     ocrRead: r.ocr_read,
     fingerprints: Number(r.fingerprints),
   }));
+
+  return {
+    rows: mapped,
+    total,
+    page,
+    pages: Math.max(1, Math.ceil(total / AUDIT_PAGE_SIZE)),
+  };
 }

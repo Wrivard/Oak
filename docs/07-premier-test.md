@@ -99,6 +99,21 @@ le budget est de 3 secondes.
 
 ---
 
+## Test 3bis — Vérifier ce que la machine a décidé seule
+
+`/audit`, bouton **Moins sûres**. Ce n'est pas un détail de tri : sur les
+centaines de résolutions automatiques d'un lot, les soixante plus *récentes* sont
+un échantillon au hasard, les soixante moins *sûres* sont celles où la machine a
+le plus de chances de s'être trompée.
+
+Survole les vignettes — elles s'agrandissent. À 68 px on distingue un Dracaufeu
+d'un Pikachu, pas un Set de Base d'un Set de Base 2, et c'est exactement l'erreur
+à attraper : même illustration, extension différente, prix sans rapport.
+
+**« C'est faux » supprime l'empreinte fautive.** C'est le point, plus que la
+quantité : sans ça, toutes les occurrences suivantes de cette carte hériteraient
+de la même erreur par le niveau 1, sans jamais repasser par le catalogue.
+
 ## Test 4 — La boucle d'apprentissage
 
 C'est le mécanisme économique du système, et il se vérifie en cinq minutes.
