@@ -28,6 +28,7 @@ ailleurs que devant le PC.
 | **Envoyer** | Déposer un lot de photos. Recto-verso par défaut. |
 | **Lots** | Ce que devient chaque envoi. Fermeture avec réconciliation. |
 | **Review** | Identifier ce que la machine n'a pas su résoudre. Tout au clavier. |
+| **Vérifier** | Auditer ce que la machine a décidé seule, et corriger. |
 | **Inventaire** | Ce que tu possèdes. Recherche, filtres, valeur totale. |
 | **Prix** | Éditer la grille tarifaire avec preview en direct et net après frais. |
 | **Diagnostic** | Le taux de lecture OCR par ère — l'expérience 1bis, en continu. |
@@ -65,7 +66,7 @@ reverse holos à part et fais-en un lot séparé.
 ```bash
 pnpm dev                 # développement, rechargement à chaud
 pnpm build && pnpm start # production locale
-pnpm test                # 164 tests
+pnpm test                # 196 tests
 pnpm typecheck
 
 node --import tsx worker/index.ts   # le worker, à part
@@ -97,8 +98,9 @@ pnpm golden:export       # constitue le golden set depuis les reviews faites
 5. `docs/05-production.md` — observabilité, tests, sauvegardes
 6. `docs/06-ui.md` — système visuel
 7. `docs/07-premier-test.md` — **ce que tu fais au premier vrai lot**
-8. `docs/runbooks.md` — quand ça casse
-9. `PROMPTS.md` — l'ordre de build et les expériences
+8. `docs/08-nuit-du-5-septembre.md` — ce qui a changé, et les bugs trouvés
+9. `docs/runbooks.md` — quand ça casse
+10. `PROMPTS.md` — l'ordre de build et les expériences
 
 ---
 
@@ -108,7 +110,8 @@ pnpm golden:export       # constitue le golden set depuis les reviews faites
 pHash/dHash, embeddings CLIP sur 20 392 cartes, résolution à trois niveaux, UI de review,
 pricing complet, export TCGplayer, observabilité, sauvegarde restaurable.
 
-**Mesuré :** 61,7 cartes/minute en charge, 205 Mo au pic, 0 job mort sur 2 000 scans.
+**Mesuré :** 80 cartes/minute sur un lot réel, 400 pages uploadées en 8 s, mémoire du
+worker stable entre 500 et 800 Mo sur 800 cartes, 0 job mort.
 
 **En attente de données réelles :**
 
