@@ -12,6 +12,18 @@ export const metadata = {
 };
 
 /**
+ * Sur téléphone, la barre du navigateur prend cette couleur.
+ *
+ * Sans elle, elle reste blanche au-dessus d'une application entièrement sombre —
+ * une bande claire en haut de l'écran, exactement là où on regarde en triant. Le
+ * cas n'est pas théorique : le lanceur affiche l'adresse réseau justement pour
+ * reviewer depuis un téléphone.
+ */
+export const viewport = {
+  themeColor: '#171717',
+};
+
+/**
  * La coquille enveloppe toutes les pages : la navigation ne se recharge pas
  * quand on change d'écran, et les compteurs restent visibles en permanence.
  */
