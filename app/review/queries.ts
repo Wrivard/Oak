@@ -13,6 +13,11 @@ export interface Candidate {
   name: string;
   set_name: string;
   distance: number;
+  /** Image officielle, pour comparer À L'ŒIL avec le scan. */
+  image?: string | null;
+  /** Numéro imprimé : le discriminant le plus fiable entre rééditions. */
+  number?: string | null;
+  printedTotal?: number | null;
 }
 
 export interface SoldObservation {
@@ -93,13 +98,19 @@ export async function loadReviewQueue(limit = 200): Promise<ReviewScan[]> {
 
   if (rows.length === 0) return [];
 
-  // Prix des cartes candidates, en un seul aller-retour. La review doit rester
-  // instantanée : une requête par carte à l'affichage tuerait la page.
+  // Prix ET images des cartes candidates, en deux allers-retours pour toute la
+  // file. Une requête par carte à l'affichage tuerait la page.
   const cardIds = [...new Set(rows.flatMap((r) => (r.candidates ?? []).map((c) => c.card_id)))];
-  const prices = await loadPrices(cardIds);
+  const [prices, cards] = await Promise.all([loadPrices(cardIds), loadCards(cardIds)]);
 
   return rows.map((r) => {
-    const candidates = r.candidates ?? [];
+    // Les candidats sont enrichis À LA LECTURE plutôt que stockés avec leur
+    // image : une URL figée dans du jsonb devient fausse au premier refresh du
+    // catalogue, et on afficherait une image morte sans savoir pourquoi.
+    const candidates = (r.candidates ?? []).map((c) => ({
+      ...c,
+      ...(cards.get(c.card_id) ?? {}),
+    }));
     const first = candidates[0];
     return {
       id: r.id,
@@ -121,6 +132,38 @@ export async function loadReviewQueue(limit = 200): Promise<ReviewScan[]> {
 interface CardPrices {
   valueCents: number | null;
   sources: PriceSource[];
+}
+
+interface CardInfo {
+  image: string | null;
+  number: string | null;
+  printedTotal: number | null;
+}
+
+/** Ce qu'il faut pour reconnaître une carte d'un coup d'œil. */
+async function loadCards(cardIds: readonly string[]): Promise<Map<string, CardInfo>> {
+  const out = new Map<string, CardInfo>();
+  if (cardIds.length === 0) return out;
+
+  const { rows } = await query<{
+    id: string;
+    image_small: string | null;
+    number: string;
+    printed_total: number | null;
+  }>(
+    `select id, image_small, number, printed_total
+       from cards where id = any($1::text[])`,
+    [cardIds],
+  );
+
+  for (const r of rows) {
+    out.set(r.id, {
+      image: r.image_small,
+      number: r.number,
+      printedTotal: r.printed_total,
+    });
+  }
+  return out;
 }
 
 /**

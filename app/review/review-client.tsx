@@ -601,6 +601,10 @@ export default function ReviewClient({
                   Aucun candidat. Ouvre la recherche avec <kbd>S</kbd>.
                 </div>
               )}
+              {/* Les images des candidats côte à côte avec le scan. Comparer des
+                  NOMS demande de connaître la carte ; comparer des images se fait
+                  d'un coup d'oeil — et c'est là que se gagne le budget de
+                  3 secondes. */}
               <div style={{ display: 'grid', gap: 4 }}>
                 {scan?.candidates.map((c, i) => (
                   <button
@@ -608,12 +612,12 @@ export default function ReviewClient({
                     onClick={() => setChosen(i)}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '20px 1fr auto',
+                      gridTemplateColumns: '20px 42px 1fr auto',
                       gap: 'var(--s2)',
                       alignItems: 'center',
                       width: '100%',
                       textAlign: 'left',
-                      padding: '6px var(--s2)',
+                      padding: '5px var(--s2)',
                       font: 'inherit',
                       fontSize: 13,
                       color: 'var(--text)',
@@ -624,8 +628,52 @@ export default function ReviewClient({
                     }}
                   >
                     <kbd>{i + 1}</kbd>
-                    <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                      <strong>{c.name}</strong> <span className="dim">{c.set_name}</span>
+                    {c.image ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={c.image}
+                        alt=""
+                        loading="lazy"
+                        style={{
+                          width: 42,
+                          height: 58,
+                          objectFit: 'cover',
+                          objectPosition: 'top',
+                          borderRadius: 3,
+                          background: 'var(--surface-2)',
+                        }}
+                      />
+                    ) : (
+                      <span
+                        style={{
+                          width: 42,
+                          height: 58,
+                          borderRadius: 3,
+                          background: 'var(--surface-2)',
+                        }}
+                      />
+                    )}
+                    <span style={{ minWidth: 0 }}>
+                      <span
+                        style={{
+                          display: 'block',
+                          fontWeight: 500,
+                          overflow: 'hidden',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {c.name}
+                      </span>
+                      <span className="faint" style={{ fontSize: 11 }}>
+                        {c.set_name}
+                        {c.number && (
+                          <span className="mono">
+                            {' · '}
+                            {c.number}/{c.printedTotal ?? '—'}
+                          </span>
+                        )}
+                      </span>
                     </span>
                     <span className="mono faint" style={{ fontSize: 11 }}>
                       {Number(c.distance).toFixed(3)}
