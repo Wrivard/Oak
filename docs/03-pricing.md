@@ -212,6 +212,18 @@ select sku from inventory
  limit 500;
 ```
 
+> **`last_priced_at` est le compteur de rotation, et c'est un invariant.** Toute
+> issue du rafraîchissement doit l'estampiller : prixé, inchangé, sans données
+> **ou signalé**. Trouvé le 5 septembre 2026 : `flagSwing` ne le faisait pas. Un
+> SKU signalé pour mouvement anormal restait donc dans l'ensemble candidat pour
+> toujours — re-sélectionné toutes les heures, re-cherché auprès de l'API,
+> re-signalé, un événement par heure, et une place du batch de 500 occupée en
+> permanence. Deux cents cartes signalées, ce qu'un seul hoquet de source
+> produit, auraient saturé 40 % de chaque batch et empêché le reste de
+> l'inventaire d'être jamais reprixé. Signalé n'est pas exclu : le SKU est
+> repoussé de 24 h et réévalué demain, et si la source s'est remise il se prixe
+> normalement.
+
 Pour chaque : rafraîchir les sources, recalculer, puis **ne pousser que si le delta
 dépasse `reprice_delta_pct`**. Sans ce seuil tu génères des milliers de révisions par
 jour pour des variations de quelques cents.

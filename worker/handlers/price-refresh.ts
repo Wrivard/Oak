@@ -35,6 +35,31 @@ import { withBreaker } from '../queue/breaker.js';
 import { trace } from '../queue/trace.js';
 
 /**
+ * Les SKUs à rafraîchir, les plus chers d'abord.
+ *
+ * `last_priced_at` est le compteur de rotation : tout SKU traité — prixé,
+ * inchangé, sans données OU signalé — est repoussé de 24 h. C'est un invariant,
+ * pas un détail : un chemin de sortie qui ne l'estampille pas laisse le SKU
+ * dans l'ensemble candidat pour toujours. Il serait re-sélectionné à chaque
+ * heure, re-cherché auprès de l'API, re-signalé, et occuperait une place du
+ * batch de 500 en permanence — tout en écrivant un événement par heure.
+ */
+export async function selectStaleSkus(limit: number): Promise<SkuRow[]> {
+  const { rows } = await query<SkuRow>(
+    `select i.sku, i.card_id, i.variant, i.condition, i.current_price::text,
+            c.name as card_name, c.number as card_number, c.printed_total
+       from inventory i join cards c on c.id = i.card_id
+      where i.qty_on_hand > 0
+        and (i.last_priced_at is null
+             or i.last_priced_at < now() - interval '24 hours')
+      order by i.current_price desc nulls first
+      limit $1`,
+    [limit],
+  );
+  return rows;
+}
+
+/**
  * Rafraîchissement des prix. Voir docs/03-pricing.md §5.
  *
  * Avec 12-15k SKUs actifs le pricing est un processus, pas un événement : un
@@ -71,17 +96,7 @@ export async function handlePriceRefresh(job: Job): Promise<void> {
     });
   }
 
-  const { rows } = await query<SkuRow>(
-    `select i.sku, i.card_id, i.variant, i.condition, i.current_price::text,
-            c.name as card_name, c.number as card_number, c.printed_total
-       from inventory i join cards c on c.id = i.card_id
-      where i.qty_on_hand > 0
-        and (i.last_priced_at is null
-             or i.last_priced_at < now() - interval '24 hours')
-      order by i.current_price desc nulls first
-      limit $1`,
-    [limit],
-  );
+  const rows = await selectStaleSkus(limit);
 
   // Un seul aller-retour réseau pour tout le batch. L'endpoint par identifiant
   // est massivement instable (voir lib/pricing/sources.ts) et 500 appels
@@ -389,7 +404,7 @@ async function markNoData(sku: string, breakdown: Record<string, unknown>): Prom
   log.info('aucune donnée de prix, SKU laissé sans prix', { sku });
 }
 
-async function flagSwing(
+export async function flagSwing(
   sku: string,
   oldCents: number | null,
   newCents: number,
@@ -401,9 +416,24 @@ async function flagSwing(
     [sku, { old_cents: oldCents, new_cents: newCents, ...breakdown }],
   );
   // On NE pousse pas et on ne met pas à jour current_price.
+  //
+  // `last_priced_at` EST estampillé quand même. Sans ça le SKU reste dans
+  // l'ensemble candidat : re-sélectionné toutes les heures, re-cherché auprès
+  // de l'API, re-signalé, un événement par heure et une place du batch occupée
+  // en permanence. Deux cents cartes signalées suffiraient à saturer 40 % de
+  // chaque batch pour toujours. Repoussé de 24 h, il sera réévalué demain — et
+  // si la source s'est remise, il se prixera normalement.
+  //
+  // Le détail complet est conservé : « pourquoi cette carte n'est pas prixée »
+  // doit rester répondable sans relire les journaux.
   await query(
-    `update inventory set price_breakdown = $2, updated_at = now() where sku = $1`,
-    [sku, { flagged: 'price_swing', old_cents: oldCents, new_cents: newCents }],
+    `update inventory
+        set price_breakdown = $2, last_priced_at = now(), updated_at = now()
+      where sku = $1`,
+    [
+      sku,
+      { flagged: 'price_swing', old_cents: oldCents, new_cents: newCents, ...breakdown },
+    ],
   );
   log.warn('mouvement de prix anormal, non poussé', {
     sku,
