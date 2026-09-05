@@ -205,6 +205,63 @@ async function scannedCount(): Promise<number> {
   return rows[0]?.n ?? -1;
 }
 
+describe('openSession sous concurrence', () => {
+  /**
+   * « select puis insert » n'est pas sûr : deux requêtes simultanées ne
+   * trouvent rien, insèrent toutes les deux, et le lot existe en double.
+   * Mesuré : six envois simultanés vers le même nom avaient créé CINQ sessions.
+   *
+   * Les scans se répartissent alors entre elles, `/batches` affiche plusieurs
+   * lignes pour un lot physique, et `scanned_count` est réparti lui aussi —
+   * donc la réconciliation compare le comptage attendu à une fraction des
+   * cartes. Le contrôle qui existe pour rattraper une carte perdue devient faux.
+   */
+  const NOM = 'test-course-session';
+
+  it('N’OUVRE QU’UNE SEULE SESSION pour dix appels simultanés', async () => {
+    await query('delete from sessions where name = $1', [NOM]);
+
+    const ids = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        openSession({ name: NOM, variant: 'normal', condition: 'NM', language: 'en' }),
+      ),
+    );
+
+    // Tous les appelants doivent recevoir le MÊME identifiant.
+    expect(new Set(ids).size).toBe(1);
+
+    const { rows } = await query<{ n: string }>(
+      `select count(*)::text as n from sessions where name = $1 and status = 'open'`,
+      [NOM],
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+
+    await query('delete from sessions where name = $1', [NOM]);
+  });
+
+  it('réutilise le variant de la session existante, pas celui de l’appelant', async () => {
+    // Une session ouverte en reverse holo ne doit pas devenir « normal » parce
+    // qu'un second envoi l'a demandé : c'est 5 à 20x d'écart de prix.
+    await query('delete from sessions where name = $1', [NOM]);
+    await openSession({
+      name: NOM,
+      variant: 'reverseHolofoil',
+      condition: 'NM',
+      language: 'en',
+    });
+    await openSession({ name: NOM, variant: 'normal', condition: 'NM', language: 'en' });
+
+    const { rows } = await query<{ v: string }>(
+      `select default_variant::text as v from sessions where name = $1`,
+      [NOM],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.v).toBe('reverseHolofoil');
+
+    await query('delete from sessions where name = $1', [NOM]);
+  });
+});
+
 describe('registerUnreadablePage', () => {
   /**
    * Une page dont le fichier ne se lit pas A EXISTÉ : elle est passée dans le

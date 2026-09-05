@@ -144,23 +144,37 @@ export interface SessionDefaults {
  */
 export async function openSession(defaults: SessionDefaults): Promise<string> {
   return withTransaction(async (client) => {
-    const existing = await client.query<{ id: string }>(
-      `select id from sessions where name = $1 and status = 'open'`,
-      [defaults.name],
-    );
-    if (existing.rows[0]) return existing.rows[0].id;
-
+    // « select puis insert » n'est PAS sûr sous concurrence : deux requêtes
+    // simultanées ne trouvent rien, insèrent toutes les deux, et le lot existe
+    // en double. Mesuré : six envois simultanés vers le même nom ont créé cinq
+    // sessions. Les scans se répartissent alors entre elles, la réconciliation
+    // compare un comptage attendu à une fraction des cartes, et l'allocation
+    // des rangs de fichiers repart de zéro dans chacune.
+    //
+    // `on conflict do nothing` sur l'index partiel unique (migration 011) rend
+    // l'insertion atomique. Une insertion qui ne rend rien signifie qu'une autre
+    // requête a gagné la course : on relit sa ligne.
     const created = await client.query<{ id: string }>(
       `insert into sessions (name, lane, default_variant, default_condition,
                              default_language)
        values ($1, 'upload', $2, $3, $4)
+       on conflict (name) where status = 'open' do nothing
        returning id`,
       [defaults.name, defaults.variant, defaults.condition, defaults.language],
     );
-    const id = created.rows[0]?.id;
-    if (!id) throw new Error('création de session impossible');
 
-    log.info('session ouverte', { name: defaults.name, variant: defaults.variant });
+    const cree = created.rows[0]?.id;
+    if (cree) {
+      log.info('session ouverte', { name: defaults.name, variant: defaults.variant });
+      return cree;
+    }
+
+    const existing = await client.query<{ id: string }>(
+      `select id from sessions where name = $1 and status = 'open'`,
+      [defaults.name],
+    );
+    const id = existing.rows[0]?.id;
+    if (!id) throw new Error('création de session impossible');
     return id;
   });
 }

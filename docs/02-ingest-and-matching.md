@@ -148,6 +148,33 @@ Hamming : c'est de **borner le nombre d'empreintes par identité**. La deux
 centième occurrence du même Dracaufeu Set de Base n'apprend plus rien que les
 cinq premières ne disaient déjà.
 
+**Deux envois simultanés vers le même lot.** Mesuré le 5 septembre 2026, six
+paquets envoyés en parallèle vers le même nom de lot :
+
+```
+avant   48 pages acceptées, 16 fichiers sur le disque, 5 lignes de session
+après   48 pages acceptées, 48 fichiers sur le disque, 1 ligne de session
+```
+
+Deux défauts se cumulaient, et aucun ne se voyait.
+
+`openSession` faisait « select puis insert » : deux requêtes concurrentes ne
+trouvent rien, insèrent toutes les deux, et le lot existe en double. Les scans se
+répartissent alors entre plusieurs sessions du même nom, `scanned_count` aussi, et
+la réconciliation compare un comptage attendu à une fraction des cartes — le
+contrôle qui existe pour rattraper une carte perdue devient faux. Corrigé par un
+index unique **partiel** sur `(name) where status = 'open'` (migration 011) et
+`on conflict do nothing` : réutiliser le nom d'un lot fermé reste légitime.
+
+Le rang des fichiers venait ensuite d'une lecture du répertoire, donc deux
+requêtes concurrentes écrivaient les mêmes noms et s'écrasaient. `page_count`
+(migration 010) l'alloue par `update … returning`, donc atomiquement. Le rang
+effectif reste le **maximum** entre ce compteur et ce que porte le disque : le
+répertoire d'upload est nommé d'après le lot et non d'après son identifiant, donc
+réutiliser un nom fermé ne doit pas écraser les fichiers de l'ancien.
+
+`pnpm course` rejoue la course.
+
 **Un fichier PRÉSENT mais indécodable écarte le scan.** Le fichier est là, il ne
 se décode pas : tronqué, ou pas une image. Retenter ne le réparera pas — mais
 laisser le job mourir laissait le scan en `pending` **pour toujours**, et donc le

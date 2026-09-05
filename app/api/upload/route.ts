@@ -38,17 +38,44 @@ function safeName(rank: number, original: string): string {
 }
 
 /**
- * Rang de départ : la suite de ce qui existe DÉJÀ sur le disque.
+ * Rang de départ, ALLOUÉ ATOMIQUEMENT.
  *
- * On ne se fie pas au décalage annoncé par le client pour nommer. Renvoyer deux
+ * On ne se fie pas au décalage annoncé par le client pour nommer : renvoyer deux
  * fois vers le même nom de lot recommence à zéro côté client, et les fichiers du
- * premier envoi étaient ÉCRASÉS EN SILENCE — des cartes physiquement scannées
- * sans aucune trace, ce qui est le pire mode de défaillance du système.
+ * premier envoi étaient ÉCRASÉS EN SILENCE.
  *
- * Le client envoie ses paquets séquentiellement (une boucle `await`), donc lire
- * le répertoire au début de chaque requête donne bien la continuation.
+ * Lire le répertoire corrigeait ça mais laissait une course ouverte : deux
+ * requêtes concurrentes lisent le même état et écrivent les mêmes noms. Le
+ * client envoie ses paquets en série, donc un seul onglet ne peut pas la
+ * déclencher — deux onglets, ou deux dossiers envoyés en parallèle, y suffisent.
+ *
+ * `page_count` s'incrémente par `update ... returning`, donc atomiquement : deux
+ * requêtes concurrentes reçoivent des plages disjointes. On garde le MAXIMUM
+ * avec ce que porte le disque, pour qu'un répertoire rempli par un autre chemin
+ * — l'ancien watcher, une restauration de fichiers — ne soit jamais écrasé.
  */
-async function nextRank(dir: string): Promise<number> {
+async function allouerRangs(
+  sessionId: string,
+  dir: string,
+  combien: number,
+): Promise<number> {
+  const [{ rows }, surDisque] = await Promise.all([
+    query<{ base: string }>(
+      `update sessions
+          set page_count = page_count + $2
+        where id = $1
+        returning (page_count - $2)::text as base`,
+      [sessionId, combien],
+    ),
+    rangSurDisque(dir),
+  ]);
+
+  const compteur = Number(rows[0]?.base ?? 0);
+  return Math.max(compteur, surDisque);
+}
+
+/** Le plus grand rang déjà présent sur le disque. Filet, pas source de vérité. */
+async function rangSurDisque(dir: string): Promise<number> {
   let existing: string[];
   try {
     existing = await readdir(dir);
@@ -131,9 +158,10 @@ export async function POST(req: Request): Promise<NextResponse> {
   const dir = join(STORE, sessionName);
   await mkdir(dir, { recursive: true });
 
-  // Le décalage client sert à ordonner DANS la requête ; le rang absolu vient du
-  // disque, pour ne jamais écraser un envoi précédent.
-  const base = await nextRank(dir);
+  // Le décalage client sert à ordonner DANS la requête ; le rang absolu est
+  // alloué atomiquement, pour ne jamais écraser un envoi précédent ni
+  // concurrent.
+  const base = await allouerRangs(sessionId, dir, files.length);
 
   let accepted = 0;
   const rejected: { name: string; reason: string }[] = [];
@@ -171,7 +199,7 @@ export async function POST(req: Request): Promise<NextResponse> {
   // `total` permet au client de dire exactement combien de pages ont atterri
   // quand un envoi casse en route : sans ce chiffre, on ne sait pas s'il faut
   // renvoyer le dossier — et le renvoyer en entier doublerait l'inventaire.
-  const total = await nextRank(dir);
+  const total = await rangSurDisque(dir);
 
   return NextResponse.json({ sessionId, session: sessionName, accepted, rejected, total });
 }
