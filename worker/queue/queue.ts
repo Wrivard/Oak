@@ -70,6 +70,31 @@ export async function reclaimStale(leaseMs = LEASE_MS): Promise<number> {
   return rowCount ?? 0;
 }
 
+/**
+ * Repousse un job SANS consommer de tentative.
+ *
+ * Sert au circuit breaker : une panne du service externe n'est pas la faute du
+ * job. Lui faire brûler ses `max_attempts` transformerait une panne de vingt
+ * minutes en montagne de jobs `dead` à rejouer à la main (docs/05 §2.4).
+ */
+export async function defer(job: Job, retryAt: number, reason: string): Promise<void> {
+  await query(
+    `update jobs
+        set status = 'queued', locked_by = null, locked_at = null,
+            attempts = greatest(attempts - 1, 0),
+            last_error = $2,
+            run_after = to_timestamp($3 / 1000.0)
+      where id = $1`,
+    [job.id, reason, retryAt],
+  );
+  log.warn('job repoussé sans consommer de tentative', {
+    job_id: job.id,
+    job_type: job.type,
+    reprise: new Date(retryAt).toISOString(),
+    raison: reason,
+  });
+}
+
 export async function complete(job: Job): Promise<void> {
   await query(
     `update jobs set status='done', completed_at=now(), locked_by=null, locked_at=null

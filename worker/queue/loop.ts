@@ -1,5 +1,6 @@
 import { log } from '../../lib/log.js';
-import { claim, complete, fail, reclaimStale, type Job } from './queue.js';
+import { CircuitOpen } from './breaker.js';
+import { claim, complete, defer, fail, reclaimStale, type Job } from './queue.js';
 
 export type Handler = (job: Job) => Promise<void>;
 
@@ -95,6 +96,14 @@ export class Worker {
         duration_ms: Date.now() - started,
       });
     } catch (err) {
+      // Circuit ouvert : le service externe est en panne, pas le job. On le
+      // repousse à la réouverture sans lui compter de tentative.
+      if (err instanceof CircuitOpen) {
+        await defer(job, err.retryAt, err.message).catch((e: unknown) =>
+          log.error('impossible de repousser le job', { job_id: job.id, err: e }),
+        );
+        return;
+      }
       // Jamais de catch vide : toute erreur avalée est loggée avec son contexte.
       await fail(job, err).catch((e: unknown) =>
         log.error('impossible de marquer le job en échec', { job_id: job.id, err: e }),

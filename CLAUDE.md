@@ -78,6 +78,32 @@ Pas de Redis, pas de Kafka, pas de microservices. Un Postgres et deux process.
 Les étapes 0 et 1 de `PROMPTS.md` sont des **expériences, pas du code**. Si elles n'ont
 pas été faites, dis-le et arrête-toi. Le design du matching et du pricing en dépend.
 
+## Ce que ce système ne fera jamais
+
+Écrit ici pour que ni moi ni un agent ne dérive. Chacune de ces lignes est une
+décision prise, pas un manque à combler.
+
+- Il ne **devine jamais un prix** quand il n'a pas de données. `no_data` envoie en
+  review. Un système qui invente un prix quand il ne sait pas est pire qu'un
+  système qui s'arrête.
+- Il ne **publie jamais depuis Cardmarket seul** : ces prix sont en euros et
+  pokemontcg.io ne convertit pas. Mesuré : des écarts de 4,7x et 35x.
+- Il n'**annule jamais une commande** automatiquement.
+- Il ne **republie jamais une annonce** sans clé d'idempotence déterministe.
+- Il n'**écrase jamais une ligne d'inventaire eBay** sans GET préalable.
+- Il ne **retente jamais un upload TCGplayer**.
+- Il ne **ferme jamais une session** dont le comptage ne balance pas.
+- Il ne **devine jamais le variant**. Il vient de `sessions.default_variant`. Un
+  `variant_conflict` force la review quelle que soit la confiance : reverse holo
+  contre normal, c'est 5 à 20x d'écart de prix.
+- Il ne **crée jamais une session à la volée**. Un fichier dont la session est
+  inconnue part en `rejected/`, jamais supprimé.
+- Il ne **supprime jamais une ligne d'inventaire**. Une quantité à zéro reste à
+  zéro.
+- Il ne fait **aucun appel externe depuis une requête HTTP**. Tout passe par la
+  queue.
+- Il n'**appelle jamais l'API Claude**. Le niveau 3 est la review manuelle.
+
 ## Quand tu bloques
 
 Si une API externe se comporte autrement que ce que décrivent ces docs, **crois l'API,

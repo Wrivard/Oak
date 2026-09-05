@@ -60,6 +60,22 @@ son nom ; si elle n'existe pas ou est fermée, le fichier part en `rejected/`, j
 supprimé. Créer la session impliquerait de deviner `default_variant`, qui encode la
 décision de pré-tri physique du foil (§2) — mal la deviner mal-étiquette un lot entier.
 
+**L'ingestion doit être BORNÉE en concurrence.** Mesuré en test de charge : en
+fire-and-forget non borné, déposer 2 000 fichiers d'un coup lance 2 000 transactions
+simultanées contre un pool de 10 connexions. **1 849 ont expiré sur « timeout exceeded
+when trying to connect » et les fichiers ont été abandonnés en silence dans l'inbox.**
+Le worker lui-même s'est retrouvé affamé de connexions et n'arrivait plus à réclamer
+ses jobs.
+
+C'est le pire mode de défaillance de tout le système : une carte physique sans ligne
+d'inventaire, exactement ce que la réconciliation de session existe pour rattraper. Et
+un ADF à 60 pages/minute produit précisément ce genre de rafale.
+
+La file d'ingestion de `worker/ingest/watcher.ts` limite à 4 en parallèle, retente
+3 fois, puis déplace le fichier en `rejected/_echec_ingestion/` — **visible**, jamais
+abandonné là où personne ne le reverra. Le débit n'est pas perdu : la base est de toute
+façon le goulot, et la sérialiser proprement va plus vite que la saturer puis échouer.
+
 **Le compteur de session s'incrémente à l'insertion, pas à chaque fichier vu.** Sans ça,
 un rattrapage au redémarrage sur-compterait `scanned_count` et masquerait précisément
 l'écart de double-feed qu'on cherche à détecter.

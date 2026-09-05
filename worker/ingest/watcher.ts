@@ -1,5 +1,5 @@
 import { mkdir, rename } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
+import { basename, join } from 'node:path';
 import { watch, type FSWatcher } from 'chokidar';
 import { log } from '../../lib/log.js';
 import { withTransaction } from '../../lib/db.js';
@@ -162,6 +162,85 @@ export async function ingestFile(file: string, opts: WatcherOptions): Promise<vo
   }
 }
 
+/**
+ * Concurrence d'ingestion.
+ *
+ * MESURÉ, pas choisi au hasard : en fire-and-forget non borné, déposer 2 000
+ * fichiers d'un coup lance 2 000 transactions simultanées contre un pool de 10
+ * connexions. 1 849 d'entre elles ont expiré sur « timeout exceeded when trying
+ * to connect » et les fichiers ont été ABANDONNÉS EN SILENCE dans l'inbox — le
+ * pire mode de défaillance possible pour ce système, celui d'une carte physique
+ * sans ligne d'inventaire. Le worker lui-même s'est retrouvé affamé de
+ * connexions et n'arrivait plus à réclamer ses jobs.
+ *
+ * Un ADF à 60 pages/minute produit exactement ce genre de rafale.
+ */
+const INGEST_CONCURRENCY = 4;
+const MAX_INGEST_ATTEMPTS = 3;
+
+/**
+ * File d'ingestion bornée.
+ *
+ * Le débit n'est pas perdu : la base est de toute façon le goulot, et la
+ * sérialiser proprement est plus rapide que de la saturer puis d'échouer.
+ */
+class IngestQueue {
+  private readonly pending: { file: string; attempts: number }[] = [];
+  private active = 0;
+
+  constructor(private readonly opts: WatcherOptions) {}
+
+  push(file: string): void {
+    this.pending.push({ file, attempts: 0 });
+    this.pump();
+  }
+
+  private pump(): void {
+    while (this.active < INGEST_CONCURRENCY && this.pending.length > 0) {
+      const item = this.pending.shift();
+      if (!item) return;
+      this.active += 1;
+
+      void ingestFile(item.file, this.opts)
+        .catch((err: unknown) => {
+          item.attempts += 1;
+          if (item.attempts < MAX_INGEST_ATTEMPTS) {
+            // Transitoire jusqu'à preuve du contraire : on remet en file plutôt
+            // que d'abandonner le fichier là où personne ne le reverra.
+            log.warn('ingestion en échec, nouvelle tentative', {
+              file: basename(item.file),
+              tentative: item.attempts,
+              err,
+            });
+            this.pending.push(item);
+            return;
+          }
+          // Épuisé : le fichier part en rejet, VISIBLE, jamais supprimé.
+          log.error('ingestion abandonnée après plusieurs tentatives', {
+            file: basename(item.file),
+            tentatives: item.attempts,
+            err,
+          });
+          void moveTo(this.opts.rejected, '_echec_ingestion', item.file).catch(
+            (e: unknown) =>
+              log.error('déplacement en rejet impossible', {
+                file: basename(item.file),
+                err: e,
+              }),
+          );
+        })
+        .finally(() => {
+          this.active -= 1;
+          this.pump();
+        });
+    }
+  }
+
+  get depth(): number {
+    return this.pending.length + this.active;
+  }
+}
+
 export function startWatcher(opts: WatcherOptions): FSWatcher {
   const watcher = watch(opts.inbox, {
     // Le scanner écrit progressivement : attendre la stabilité du fichier.
@@ -171,11 +250,8 @@ export function startWatcher(opts: WatcherOptions): FSWatcher {
     depth: 0,
   });
 
-  watcher.on('add', (file: string) => {
-    void ingestFile(file, opts).catch((err: unknown) => {
-      log.error('ingestion échouée', { file: basename(file), dir: dirname(file), err });
-    });
-  });
+  const queue = new IngestQueue(opts);
+  watcher.on('add', (file: string) => queue.push(file));
 
   watcher.on('error', (err: unknown) => log.error('watcher en erreur', { err }));
   log.info('watcher démarré', { inbox: opts.inbox });

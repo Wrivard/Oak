@@ -31,6 +31,7 @@ import {
 import { parseSku, type CardCondition, type CardVariant } from '../../lib/sku.js';
 import { PermanentError } from '../queue/errors.js';
 import type { Job } from '../queue/queue.js';
+import { withBreaker } from '../queue/breaker.js';
 
 /**
  * Rafraîchissement des prix. Voir docs/03-pricing.md §5.
@@ -86,7 +87,9 @@ export async function handlePriceRefresh(job: Job): Promise<void> {
   // séparés n'aboutiraient jamais.
   let cards: Map<string, ApiCard>;
   try {
-    cards = await fetchPricesBatch(rows.map((r) => r.card_id), apiKey);
+    cards = await withBreaker('pokemontcg', () =>
+      fetchPricesBatch(rows.map((r) => r.card_id), apiKey),
+    );
   } catch (err) {
     log.warn('source de prix indisponible, batch abandonné', {
       candidats: rows.length,
@@ -217,7 +220,7 @@ async function fetchEbayBoth(
 
   let active: CompsSummary | null = null;
   try {
-    active = await fetchActiveListings(ebay, q);
+    active = await withBreaker('ebay', () => fetchActiveListings(ebay, q));
   } catch (err) {
     if (!(err instanceof EbayUnavailable)) throw err;
     log.warn('annonces actives indisponibles', { sku: row.sku, err });
@@ -226,7 +229,14 @@ async function fetchEbayBoth(
   let sold: CompsSummary | null = null;
   if (insightsEntitled) {
     try {
-      sold = await fetchSoldListings(ebay, q);
+      // Un refus de whitelisting n'est PAS une panne du service : il ne doit
+      // pas ouvrir le circuit, sinon un compte non autorisé couperait aussi les
+      // annonces actives, qui elles fonctionnent.
+      sold = await withBreaker(
+        'ebay',
+        () => fetchSoldListings(ebay, q),
+        (e) => !(e instanceof EbayNotEntitled),
+      );
     } catch (err) {
       if (err instanceof EbayNotEntitled) {
         // Inutile de réessayer 499 fois : le compte n'est pas whitelisté.

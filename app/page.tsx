@@ -8,6 +8,10 @@ export default function Home() {
     <main style={{ padding: 'var(--s6)' }}>
       <h1 style={{ fontSize: 18, margin: 0 }}>pokelister</h1>
       <p className="dim" style={{ marginTop: 'var(--s2)' }}>
+        <Link href="/dashboard" style={{ color: 'var(--green)' }}>
+          Santé du pipeline
+        </Link>
+        {' · '}
         <Link href="/review" style={{ color: 'var(--green)' }}>
           File de review
         </Link>

@@ -146,6 +146,18 @@ Un leak dans le traitement d'image ne se voit pas sur 50 cartes.
 
 ---
 
+### 3.5 Ce que le test de charge a réellement trouvé
+
+Le test de charge n'est pas une formalité : la **première** exécution a révélé un bug
+qui aurait perdu des scans en production. Voir `docs/02` §1 pour le détail — ingestion
+non bornée, pool de connexions épuisé, 1 849 fichiers abandonnés en silence.
+
+Retiens-en la méthode : ce bug était invisible en test unitaire et invisible sur trois
+cartes. Il n'apparaît qu'en rafale. **Refais tourner `pnpm loadtest` après toute
+modification du watcher, de la boucle worker ou du pool.**
+
+---
+
 ## 4. Sécurité et secrets
 
 - Aucun secret dans le repo. `.env.local` en dev, variables d'environnement en prod.

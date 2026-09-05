@@ -37,3 +37,9 @@ tests/fixtures/cards/
 
 # généré par Next à chaque build
 next-env.d.ts
+
+# sauvegardes locales — jamais dans git
+backups/
+
+# cache du test de charge
+.loadtest-cache/
