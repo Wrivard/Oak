@@ -3,7 +3,7 @@
 Suite de `docs/08-nuit-du-5-septembre.md`, à lire après lui.
 
 **Départ :** 196 tests, l'application telle que tu l'as vue en te levant.
-**Arrivée :** 355 tests, 35 commits, et **vingt et une pannes trouvées en exécutant**.
+**Arrivée :** 381 tests, 48 commits, et **vingt-six pannes trouvées en exécutant**.
 
 Aucune n'est venue d'une relecture. Toutes sont venues de faire tourner le
 système contre de vraies données, à volume réel.
@@ -49,7 +49,7 @@ Quand tu t'en approcheras, la décision sera de passer au plan Pro.
 
 ---
 
-## Les vingt et une pannes
+## Les vingt-six pannes
 
 **1. Glisser le dossier du scanner rendait zéro photo.** Un scanner ne produit
 pas des fichiers, il produit un dossier. `dataTransfer.files` est vide quand on
@@ -197,6 +197,62 @@ son net avec **zéro** port pendant que la grille de prix en comptait un dollar.
 Sur une carte à 1,75 $ : 1,11 $ contre 0,12 $. Deux conclusions opposées sur la
 seule question qui compte à ce niveau de prix, affichées par la même application.
 
+**22. Et le seuil « carte chère » existait aussi en double.** En dur dans le code
+et dans la config de prix éditable. Éditer le champ ne changeait que le drapeau
+de publication ; la review continuait de colorer selon l'ancienne valeur.
+
+**23. La file de jobs aurait pris 320 Mo par an.** 258 octets par job, deux jobs
+par carte, 1 700 cartes par jour — sur un quota de 500 Mo. Elle aurait fini par
+coûter plus cher que les empreintes qu'elle sert à produire, pour de l'historique
+que personne ne relit. Purgée à 14 jours ; les `dead` restent, c'est la trace de
+ce qui a raté.
+
+**24. Une langue contenant un tiret cassait le SKU en silence.** Le SKU se
+découpe par la droite : `pt-br` ferait lire « br » en langue, « pt » en condition
+et « NM » en variant. Accepté, stocké, et faux. `parseSku` valide maintenant au
+lieu de caster.
+
+**25. Un lot pouvait rester à zéro carte pour toujours.** Si la finalisation de
+l'envoi échoue, les pages sont sur le disque et aucun job n'existe. L'écran
+d'envoi le disait même (« ce lot contient déjà N pages ») sans que rien ne puisse
+les transformer en cartes. `/batches` a maintenant un bouton **Réparer**.
+
+**26. L'audit ne montrait que soixante lignes, les plus récentes.** Sur les huit
+cents résolutions automatiques d'une journée, c'est 7 % **au hasard** — pour
+l'écran dont tout le rôle est d'attraper l'erreur qui va se propager par
+empreinte. Paginé, et trié par **moins sûres** : soixante lignes bien choisies
+valent mieux que huit cents lues au hasard.
+
+---
+
+## Ce qui a été vérifié plutôt que supposé
+
+Quatre propriétés dont tout dépendait et que rien ne testait.
+
+**Les ressources partagées ne croisent pas leurs résultats.** La pipeline CLIP
+est appelée par quatre voies en parallèle, le worker tesseract par deux. Si l'une
+croisait ses résultats, une carte recevrait l'embedding ou le numéro d'une autre
+— et l'embedding partirait dans `known_fingerprints`, où il servirait de vérité à
+toutes les occurrences suivantes. Une erreur qui s'auto-propage, invisible.
+Vérifié : six images en parallèle, chacune rend bien la sienne.
+
+**Le niveau 1 attrape un re-scan réaliste, mais pas une carte de travers.** C'est
+tout le modèle économique. Mesuré : un re-scan avec léger travers, éclairage
+différent et compression reste largement sous les seuils. **À deux degrés de
+travers, non** — le dHash sort (11-14 pour un budget de 10) alors que le pHash
+tient encore. À surveiller au premier vrai lot : si la part `own_history` reste
+basse sur un second passage des mêmes cartes, c'est l'alignement dans le bac
+qu'il faut regarder, pas le seuil.
+
+**Le seuil de ressemblance des dos tient jusqu'à trois degrés.** Il aurait pu
+faire signaler *chaque* lot comme anormal. Une fixture en aplat de couleur
+disait le contraire — troisième fois que ça arrive sur ce projet, c'est
+maintenant écrit à côté du seuil.
+
+**Le pipeline complet est testé de bout en bout**, sur de vraies images, dans
+`pnpm test` : quatre pages recto/verso donnent deux cartes, les versos sont
+rattachés, et chaque scan finit sur une issue terminale.
+
 ---
 
 ## Ce qui a changé à l'écran
@@ -208,7 +264,10 @@ seule question qui compte à ce niveau de prix, affichées par la même applicat
 | **Prix** | l'éditeur JSON est devenu de **vrais champs** : plancher, bandes, condition, canal, garde-fous. Le JSON reste en bas, replié |
 | **Vérifier** | survoler une vignette l'agrandit à 260 px — à 68 px on ne distingue pas un Set de Base d'un Set de Base 2, et c'est l'erreur que cette page existe pour attraper |
 | **Diagnostic** | le taux de lecture se calcule enfin sur les scans qui ont atteint l'OCR |
-| **Lots** | vider le champ « attendu » veut dire « je ne sais pas », plus « zéro » |
+| **Lots** | vider le champ « attendu » veut dire « je ne sais pas », plus « zéro » ; bouton **Réparer** pour un lot resté à zéro carte |
+| **Inventaire** | « non prixé » dit maintenant **pourquoi** — printing absent, devise non convertie, aucune donnée |
+| **Vérifier** | paginé, et triable par **moins sûres** |
+| **Prix** | bouton **Reprixer maintenant**, au lieu d'un INSERT dans psql |
 | **Santé** | deux métriques de plus (export TCGplayer, taille de la base), et deux qui ne mentent plus |
 
 ---
