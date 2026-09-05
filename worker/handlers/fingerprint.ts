@@ -45,11 +45,25 @@ export async function handleFingerprint(job: Job): Promise<void> {
 
   const front = await readImage(scan.front_path, scanId);
 
-  const [pFront, dFront, vector] = await Promise.all([
-    phash(front),
-    dhash(front),
-    embed(front),
-  ]);
+  let pFront: string;
+  let dFront: string;
+  let vector: number[];
+  try {
+    [pFront, dFront, vector] = await Promise.all([
+      phash(front),
+      dhash(front),
+      embed(front),
+    ]);
+  } catch (err) {
+    // Le fichier est LÀ mais ne se décode pas : tronqué, ou pas une image.
+    // Retenter ne le réparera pas, et laisser le job mourir laisserait le scan
+    // en `pending` POUR TOUJOURS — donc le lot impossible à clore, puisque la
+    // clôture refuse tant qu'une carte est en traitement. Une page illisible
+    // devient une ligne écartée, comme dans `pair_upload` : visible dans le
+    // lot, comptée dans la réconciliation, hors de l'inventaire.
+    await marquerIllisible(scanId, err);
+    return;
+  }
 
   // Le dos d'une carte Pokémon est constant. Un pHash de dos qui dévie signale
   // une carte insérée à l'envers ou de travers — deux lignes qui attrapent une
@@ -84,6 +98,23 @@ export async function handleFingerprint(job: Job): Promise<void> {
   });
 
   log.info('scan empreinté', { scan_id: scanId, avec_verso: pBack !== null });
+}
+
+/**
+ * Une image présente mais indécodable devient une ligne écartée.
+ *
+ * `rejected` est l'état terminal qui n'entre dans aucun inventaire et n'écrit
+ * aucune empreinte, mais qui RESTE visible : la feuille est passée dans le
+ * scanner, elle doit laisser une trace.
+ */
+async function marquerIllisible(scanId: string, err: unknown): Promise<void> {
+  await query(
+    `update scans
+        set status = 'rejected', error = $2, resolved_at = now()
+      where id = $1 and status = 'pending'`,
+    [scanId, `image illisible : ${String(err).slice(0, 200)}`],
+  );
+  log.warn('image indécodable, scan écarté', { scan_id: scanId, err });
 }
 
 async function readImage(path: string, scanId: string): Promise<Buffer> {

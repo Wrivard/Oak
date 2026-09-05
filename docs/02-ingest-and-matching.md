@@ -133,6 +133,17 @@ Hamming : c'est de **borner le nombre d'empreintes par identité**. La deux
 centième occurrence du même Dracaufeu Set de Base n'apprend plus rien que les
 cinq premières ne disaient déjà.
 
+**Un fichier PRÉSENT mais indécodable écarte le scan.** Le fichier est là, il ne
+se décode pas : tronqué, ou pas une image. Retenter ne le réparera pas — mais
+laisser le job mourir laissait le scan en `pending` **pour toujours**, et donc le
+lot impossible à clore, puisque la clôture refuse tant qu'une carte est en
+traitement. Un seul fichier corrompu bloquait la réconciliation d'un lot entier.
+`handleFingerprint` le marque maintenant `rejected` comme le fait `pair_upload`.
+
+Ce cas est distinct du fichier **absent**, qui reste une erreur ambiguë avec deux
+tentatives : c'est la fenêtre de course décrite juste au-dessus, et l'écarter
+tout de suite perdrait une carte réelle.
+
 **Une page illisible laisse une ligne.** Mesuré le 5 septembre 2026 : `pair_upload`
 attrapait l'échec de décodage, écrivait un `log.error` et passait à la suivante. La
 page disparaissait — une feuille passée physiquement dans le scanner, sans aucune ligne
