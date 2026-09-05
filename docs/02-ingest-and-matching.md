@@ -40,6 +40,13 @@ Deux implémentations divergeraient sur le compteur de session ou sur l'enfileme
 job, et **un scan enregistré sans son job `fingerprint` disparaît en silence** — le pire
 mode de défaillance du système. D'où la fonction unique.
 
+**Le rang des fichiers vient du DISQUE, pas du client.** Renvoyer vers un nom de lot
+déjà utilisé recommence à zéro côté navigateur, et les fichiers du premier envoi étaient
+**écrasés en silence** — trois fichiers là où il devait y en avoir six, donc des cartes
+physiquement scannées sans aucune trace. La route lit le rang le plus élevé déjà présent
+et prend la suite. Le client envoie ses paquets séquentiellement, donc la continuation
+est fiable.
+
 ### Duplex : la position apparie, l'empreinte vérifie
 
 Un scanner duplex sort `image0001` (recto), `image0002` (verso), `image0003`… **La

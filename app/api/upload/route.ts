@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { NextResponse } from 'next/server';
 import { query } from '../../../lib/db.js';
@@ -28,13 +28,38 @@ const MAX_BYTES = 25 * 1024 * 1024;
 
 /**
  * Le nom du fichier PORTE L'ORDRE, et l'ordre porte l'appariement recto/verso.
- * On préserve donc le rang fourni par le client — qui le tient du tri
- * alphabétique des noms du scanner (image0001, image0002…) — et jamais le nom
- * original, qui viendrait de l'utilisateur et pourrait sortir du répertoire.
+ * On ne réutilise jamais le nom original : il vient de l'utilisateur et pourrait
+ * sortir du répertoire.
  */
 function safeName(rank: number, original: string): string {
   const ext = /\.(jpe?g|png|webp|tiff?)$/i.exec(original)?.[0]?.toLowerCase() ?? '.jpg';
   return `${String(rank).padStart(6, '0')}${ext}`;
+}
+
+/**
+ * Rang de départ : la suite de ce qui existe DÉJÀ sur le disque.
+ *
+ * On ne se fie pas au décalage annoncé par le client pour nommer. Renvoyer deux
+ * fois vers le même nom de lot recommence à zéro côté client, et les fichiers du
+ * premier envoi étaient ÉCRASÉS EN SILENCE — des cartes physiquement scannées
+ * sans aucune trace, ce qui est le pire mode de défaillance du système.
+ *
+ * Le client envoie ses paquets séquentiellement (une boucle `await`), donc lire
+ * le répertoire au début de chaque requête donne bien la continuation.
+ */
+async function nextRank(dir: string): Promise<number> {
+  let existing: string[];
+  try {
+    existing = await readdir(dir);
+  } catch {
+    return 0;
+  }
+  let max = 0;
+  for (const name of existing) {
+    const n = Number(/^(\d{6})/.exec(name)?.[1] ?? 0);
+    if (n > max) max = n;
+  }
+  return max;
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
@@ -66,6 +91,10 @@ export async function POST(req: Request): Promise<NextResponse> {
   const dir = join(STORE, sessionName);
   await mkdir(dir, { recursive: true });
 
+  // Le décalage client sert à ordonner DANS la requête ; le rang absolu vient du
+  // disque, pour ne jamais écraser un envoi précédent.
+  const base = await nextRank(dir);
+
   let accepted = 0;
   const rejected: { name: string; reason: string }[] = [];
 
@@ -84,7 +113,7 @@ export async function POST(req: Request): Promise<NextResponse> {
 
     try {
       await writeFile(
-        join(dir, safeName(offset + i + 1, file.name)),
+        join(dir, safeName(base + i + 1, file.name)),
         Buffer.from(await file.arrayBuffer()),
       );
       accepted += 1;
