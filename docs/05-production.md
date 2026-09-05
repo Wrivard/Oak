@@ -196,6 +196,30 @@ taux de duplication.
 > scans ADF. Ce n'est pas le chiffre de production, c'est la démonstration du mécanisme.
 > Le vrai taux dépend de l'OCR sur de vraies numérisations — expérience 1bis.
 
+### 3.4ter Deux plafonds trouvés à 800 cartes
+
+**Le pooler Supabase est limité à 15 clients en mode session.** Deux process à
+10 connexions chacun font 20, et le vingt-et-unième reçoit
+`EMAXCONNSESSION: max clients reached`. Sous charge, l'application et le worker
+s'affament mutuellement — et `psql` ne peut même plus se connecter pour
+diagnostiquer.
+
+Symptôme observé : `/batches` à **2,2 secondes** avec seulement 4 lots. La requête
+n'y était pour rien (0,4 ms mesurée) : c'était l'attente d'une connexion. Après
+bornage à 5 connexions par process, la même page répond en **64 ms**, et `psql`
+fonctionne à côté.
+
+`PG_POOL_MAX` règle la taille par process. L'augmenter sans augmenter la limite du
+pooler ne rend rien plus rapide : ça déplace l'attente du pool applicatif vers un
+refus du serveur.
+
+**La mémoire du worker ne fuit pas.** Sur 800 cartes en quatre lots successifs dans
+le même process : 725 → 806 → 525 → 518 Mo. Elle oscille entre 500 et 800 Mo et
+redescend — c'est le ramasse-miettes, pas une fuite. Le poids vient du modèle CLIP
+et des arènes d'onnxruntime, pas de sharp : mesuré, la concurrence de sharp ne
+change ni la vitesse (2,1 s pour 120 images) ni la mémoire (~145 Mo), de 1 à
+24 threads.
+
 ### 3.5 Ce que le test de charge a réellement trouvé
 
 Le test de charge n'est pas une formalité : la **première** exécution a révélé un bug

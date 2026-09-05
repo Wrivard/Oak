@@ -60,12 +60,19 @@ export async function loadBatches(limit = 40): Promise<Batch[]> {
             count(s.*) filter (where s.match_source = 'own_history')::text as own_history,
             count(s.*) filter (where s.match_source = 'catalog')::text as catalog,
             count(s.*) filter (where s.match_source = 'manual')::text as manual,
-            (select count(*) from channel_events ce
-              where ce.event = 'upload_anomalies'
-                and ce.payload->>'session_id' = ss.id::text)::text as anomalies
+            coalesce(a.n, 0)::text as anomalies
        from sessions ss
        left join scans s on s.session_id = ss.id
-      group by ss.id
+       -- Agrégé UNE fois plutôt qu'une sous-requête corrélée par session.
+       -- À 326 lignes la différence est invisible ; à plusieurs centaines de
+       -- milliers, la version corrélée devient O(sessions x événements).
+       left join (
+         select payload->>'session_id' as sid, count(*) as n
+           from channel_events
+          where event = 'upload_anomalies'
+          group by 1
+       ) a on a.sid = ss.id::text
+      group by ss.id, a.n
       order by ss.opened_at desc
       limit $1`,
     [limit],

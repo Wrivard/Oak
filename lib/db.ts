@@ -13,11 +13,26 @@ const { Pool } = pg;
 
 let pool: pg.Pool | null = null;
 
+/**
+ * Taille du pool, par process.
+ *
+ * MESURÉ, pas choisi : le pooler Supabase en mode session est limité à
+ * **15 clients**. Deux process (le worker et Next) à 10 connexions chacun font
+ * 20, et le vingt-et-unième reçoit `EMAXCONNSESSION: max clients reached`. Sous
+ * charge, l'application et le worker s'affament mutuellement.
+ *
+ * 5 par process laisse 5 connexions libres pour psql, les scripts et un second
+ * onglet. Augmenter cette valeur sans augmenter la limite du pooler ne rend rien
+ * plus rapide : ça déplace juste l'attente du pool applicatif vers un refus du
+ * serveur.
+ */
+const POOL_MAX = Number(process.env['PG_POOL_MAX'] ?? 5);
+
 export function getPool(): pg.Pool {
   if (pool) return pool;
   pool = new Pool({
     connectionString: loadEnv().DATABASE_URL,
-    max: 10,
+    max: Number.isFinite(POOL_MAX) && POOL_MAX > 0 ? POOL_MAX : 5,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
   });

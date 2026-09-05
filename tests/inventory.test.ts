@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closePool, query } from '../lib/db.js';
-import { loadInventory, PAGE_SIZE } from '../app/inventory/queries.js';
+import {
+  loadInventory,
+  PAGE_SIZE,
+  type InventoryRow,
+} from '../app/inventory/queries.js';
 
 /**
  * Requêtes d'inventaire.
@@ -49,7 +53,8 @@ afterAll(async () => {
 });
 
 /** Les lignes de ce test uniquement : la base peut contenir autre chose. */
-const mine = (rows: { sku: string }[]) => rows.filter((r) => r.sku.includes(PREFIX));
+const mine = (rows: readonly InventoryRow[]): InventoryRow[] =>
+  rows.filter((r) => r.sku.includes(PREFIX));
 
 describe('filtres', () => {
   it('« en stock » exclut les quantités nulles', async () => {
