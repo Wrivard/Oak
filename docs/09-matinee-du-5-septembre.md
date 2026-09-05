@@ -3,7 +3,7 @@
 Suite de `docs/08-nuit-du-5-septembre.md`, à lire après lui.
 
 **Départ :** 196 tests, l'application telle que tu l'as vue en te levant.
-**Arrivée :** 323 tests, 19 commits, et **dix pannes trouvées en exécutant**.
+**Arrivée :** 343 tests, 28 commits, et **seize pannes trouvées en exécutant**.
 
 Aucune n'est venue d'une relecture. Toutes sont venues de faire tourner le
 système contre de vraies données, à volume réel.
@@ -49,7 +49,7 @@ Quand tu t'en approcheras, la décision sera de passer au plan Pro.
 
 ---
 
-## Les dix pannes
+## Les seize pannes
 
 **1. Glisser le dossier du scanner rendait zéro photo.** Un scanner ne produit
 pas des fichiers, il produit un dossier. `dataTransfer.files` est vide quand on
@@ -122,6 +122,43 @@ mouvement de prix anormal, que `flagSwing` oubliait d'estampiller. Ils étaient
 re-sélectionnés toutes les heures, re-cherchés auprès de l'API, re-signalés, un
 événement par heure et une place du batch de 500 occupée en permanence.
 
+**11. Le taux de lecture OCR baissait quand le système marchait mieux.**
+`/diagnostics` divisait par TOUS les scans. Or un scan résolu au niveau 1
+n'exécute jamais l'OCR. Le taux aurait donc chuté à mesure que la base
+d'empreintes grandit — on aurait lu « le niveau 2 s'effondre » exactement quand
+le niveau 1 fait son travail. **C'est le chiffre du test 2, celui qui décide de
+la suite du plan de build.** Sur un jeu de contrôle de quatre scans : 25 % avant,
+50 % après, avec le détail de ce qui est hors dénominateur.
+
+**12. Un fichier corrompu bloquait la clôture de tout un lot.** L'échec de
+décodage tuait le job — visible — mais laissait le scan en `pending` pour
+toujours, et la clôture refuse tant qu'une carte est en traitement. Un seul
+fichier corrompu rendait la réconciliation d'un lot entier impossible, sur le
+contrôle qui est le seul à rattraper une carte perdue.
+
+**13. Et un job mort faisait la même chose.** Même conséquence, cause plus large.
+`reapStrandedScans()` tourne avec le cron : le scan est **écarté** si l'empreinte
+a échoué (sans empreinte, la review ne peut rien en faire), **envoyé en review**
+si c'est le matching — il porte alors son image et ses empreintes, c'est
+exactement ce que le niveau 3 attend.
+
+**14. La review ne se remplissait plus une fois vide.** Le réapprovisionnement
+était déclenché par un changement de la file. File vide, la file ne change plus,
+donc il ne repartait jamais : on restait sur « Rien à reviewer » pendant que le
+worker traitait le lot juste derrière. C'est le cas normal — on va sur la review
+avant que le worker ait fini.
+
+**15. « Voir en pleine résolution » cassait sur les scans TIFF.** La vignette
+était ré-encodée en JPEG, l'image pleine résolution servait les octets bruts sous
+un en-tête `image/jpeg`. Aucun navigateur n'affiche le TIFF, qui est le format
+par défaut de beaucoup de pilotes de scanner.
+
+**16. Les vignettes ne s'effaçaient jamais.** Une par scan, ~60 ko : 1,5 à 3 Go
+par mois sur le disque local, indéfiniment. Purgées à 30 jours, elles se
+régénèrent à la demande. Au passage, la liste des extensions d'image était écrite
+à trois endroits qui divergeaient déjà — une seule source maintenant, parce
+qu'une divergence là crée un fichier accepté que l'appariement ignore.
+
 ---
 
 ## Ce qui a changé à l'écran
@@ -131,6 +168,8 @@ re-sélectionnés toutes les heures, re-cherchés auprès de l'API, re-signalés
 | **Envoyer** | glisser un **dossier**, deux boutons explicites, « Cartes comptées », avertissement si le lot contient déjà des pages, et le nombre exact de pages arrivées quand un envoi casse |
 | **Review** | trois colonnes — le scan, **la décision**, les réglages. Les vignettes des candidats voisins sont préchargées |
 | **Prix** | l'éditeur JSON est devenu de **vrais champs** : plancher, bandes, condition, canal, garde-fous. Le JSON reste en bas, replié |
+| **Vérifier** | survoler une vignette l'agrandit à 260 px — à 68 px on ne distingue pas un Set de Base d'un Set de Base 2, et c'est l'erreur que cette page existe pour attraper |
+| **Diagnostic** | le taux de lecture se calcule enfin sur les scans qui ont atteint l'OCR |
 | **Santé** | deux métriques de plus (export TCGplayer, taille de la base), et deux qui ne mentent plus |
 
 ---
@@ -146,6 +185,7 @@ restauration de 15 000 lignes                       2,4 s   (8 min avant)
 répétition complète, 40 cartes                      réconciliation exacte
 dix formats de scanner (TIFF, CMJN, gris, 600 dpi)  8 acceptés, 2 écartés
 deux printings de la MÊME carte, base6-57            2,49 $ contre 162,00 $
+répétition par le lanceur, 30 cartes                réconciliation exacte, 0 job mort
 ```
 
 **L'architecture tient.** Rien dans les écrans ne s'effondre au volume cible, et
