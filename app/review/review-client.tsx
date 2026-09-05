@@ -223,6 +223,9 @@ export default function ReviewClient({
 
     const remplir = async (): Promise<void> => {
       if (!vivant || refilling.current) return;
+      // Onglet caché : personne ne trie, rien à précharger. On rattrape au
+      // retour, par l'écouteur ci-dessous.
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       const courante = queueRef.current;
       if (courante.length >= 40) return;
 
@@ -239,9 +242,13 @@ export default function ReviewClient({
 
     void remplir();
     const t = setInterval(() => void remplir(), 5000);
+    const onVisible = (): void => void remplir();
+    document.addEventListener('visibilitychange', onVisible);
+
     return () => {
       vivant = false;
       clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
 
