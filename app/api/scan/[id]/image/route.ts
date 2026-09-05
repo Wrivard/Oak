@@ -17,7 +17,11 @@ import { log } from '../../../../../lib/log.js';
  * décodé pour chaque carte — sur un budget de 3 secondes par carte, ça se voit.
  * La vignette tombe autour de 60 Ko, soit 10 à 15 fois moins.
  *
- * `?full=1` sert l'original, pour qui veut inspecter un défaut de surface.
+ * `?full=1` sert l'image ENTIÈRE, non redimensionnée, pour qui veut inspecter un
+ * défaut de surface. Toujours ré-encodée en JPEG : beaucoup de pilotes de
+ * scanner sortent du TIFF, qu'aucun navigateur n'affiche. Servir les octets
+ * bruts sous un en-tête `image/jpeg` donnait une image cassée sur exactement les
+ * lots produits par le format par défaut du scanner.
  */
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +30,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** 2× la largeur d'affichage : net sur un écran à haute densité. */
 const THUMB_WIDTH = 700;
 const THUMB_QUALITY = 80;
+/** Pleine résolution : on ne redimensionne pas, on ré-encode seulement. */
+const FULL_QUALITY = 92;
 const CACHE_DIR = process.env['THUMB_CACHE_DIR'] ?? './.thumb-cache';
 
 async function thumbnail(id: string, path: string): Promise<Buffer> {
@@ -71,7 +77,9 @@ export async function GET(
   const full = new URL(req.url).searchParams.get('full') === '1';
 
   try {
-    const buf = full ? await readFile(path) : await thumbnail(id, path);
+    const buf = full
+      ? await sharp(await readFile(path)).jpeg({ quality: FULL_QUALITY }).toBuffer()
+      : await thumbnail(id, path);
     return new NextResponse(new Uint8Array(buf), {
       headers: {
         'Content-Type': 'image/jpeg',
