@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { savePricingConfig } from './actions.js';
+import { savePricingConfig, triggerPriceRefresh } from './actions.js';
 import RulesEditor from './rules-editor.js';
 import type { PreviewSku } from './queries.js';
 import { formatCents, netAfterFees } from '../../lib/pricing/net.js';
@@ -111,6 +111,28 @@ export default function PricingClient({
     setSaved(res.ok ? 'enregistré' : (res.error ?? 'échec'));
   }
 
+  /**
+   * Rejouer le pricing tout de suite.
+   *
+   * Le cron passe toutes les heures. Après avoir changé une règle, attendre
+   * l'heure suivante pour voir l'effet sur de vraies cartes n'est pas tenable —
+   * et l'alternative documentée était d'ouvrir psql pour insérer un job à la
+   * main, ce qui n'est pas une interface.
+   */
+  async function reprixer() {
+    setBusy(true);
+    setSaved(null);
+    const res = await triggerPriceRefresh();
+    setBusy(false);
+    setSaved(
+      res.ok
+        ? res.enfile
+          ? 'repricing enfilé — le worker s’en occupe'
+          : 'un repricing est déjà en file'
+        : (res.error ?? 'échec'),
+    );
+  }
+
   return (
     <>
       <header className="page-head">
@@ -120,6 +142,16 @@ export default function PricingClient({
         </span>
         <div className="page-actions">
           {saved && <span className="dim" style={{ fontSize: 12 }}>{saved}</span>}
+          {/* Voir l'effet d'une règle sur de VRAIES cartes sans attendre le
+              cron. On enfile un job, on ne price pas ici : invariant 4. */}
+          <button
+            className="btn"
+            onClick={() => void reprixer()}
+            disabled={busy}
+            title="Enfile un rafraîchissement des prix ; le worker le traite"
+          >
+            Reprixer maintenant
+          </button>
           <button
             className="btn btn--primary"
             onClick={() => void save()}

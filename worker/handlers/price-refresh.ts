@@ -28,7 +28,7 @@ import {
   type CompsSummary,
   type EbayEnv,
 } from '../../lib/pricing/ebay-comps.js';
-import { parseSku, type CardCondition, type CardVariant } from '../../lib/sku.js';
+import type { CardCondition, CardVariant } from '../../lib/sku.js';
 import { PermanentError } from '../queue/errors.js';
 import type { Job } from '../queue/queue.js';
 import { withBreaker } from '../queue/breaker.js';
@@ -489,9 +489,4 @@ async function applyPrice(
       [sku, price, breakdown],
     );
   });
-}
-
-/** Le SKU porte déjà l'identité : pas de requête supplémentaire pour la retrouver. */
-export function identityFromSku(sku: string): ReturnType<typeof parseSku> {
-  return parseSku(sku);
 }

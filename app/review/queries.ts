@@ -1,5 +1,4 @@
 import { query } from '../../lib/db.js';
-import { netAfterFees } from '../../lib/pricing/net.js';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
 
 /**
@@ -214,9 +213,4 @@ async function loadPrices(cardIds: readonly string[]): Promise<Map<string, CardP
     out.set(row.card_id, entry);
   }
   return out;
-}
-
-/** Net après frais eBay, expédition à zéro faute de données mesurées. */
-export function netForPrice(priceCents: number): ReturnType<typeof netAfterFees> {
-  return netAfterFees(priceCents, 0, 'ebay');
 }

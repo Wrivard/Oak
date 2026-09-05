@@ -50,3 +50,49 @@ export async function savePricingConfig(json: string): Promise<SaveResult> {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/**
+ * Déclenche un rafraîchissement des prix maintenant.
+ *
+ * Le cron le fait toutes les heures sur 500 SKUs. Après avoir changé une règle,
+ * attendre l'heure suivante pour voir l'effet sur de vraies cartes n'est pas
+ * tenable — et la seule alternative documentée était d'ouvrir psql pour insérer
+ * un job à la main, ce qui n'est pas une interface.
+ *
+ * ON ENFILE UN JOB, on ne price pas ici. Invariant 4 de CLAUDE.md : aucun appel
+ * API externe dans une requête HTTP. Un batch de 500 SKUs contre pokemontcg.io
+ * dépasserait de toute façon largement le temps d'une requête.
+ *
+ * La clé d'idempotence est à la minute : cliquer trois fois de suite n'enfile
+ * qu'un seul batch, ce qui évite de brûler le quota de l'API par impatience.
+ */
+export interface RefreshResult {
+  ok: boolean;
+  /** false si un batch de cette minute était déjà en file. */
+  enfile?: boolean;
+  error?: string;
+}
+
+export async function triggerPriceRefresh(limit = 200): Promise<RefreshResult> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 2000) {
+    return { ok: false, error: 'limite invalide' };
+  }
+
+  try {
+    const minute = new Date().toISOString().slice(0, 16);
+    const { rows } = await query<{ id: string }>(
+      `insert into jobs (type, payload, idempotency_key, priority)
+       values ('price_refresh', $1, $2, 10)
+       on conflict (idempotency_key) do nothing
+       returning id::text`,
+      [{ limit }, `price_refresh:manuel:${minute}`],
+    );
+
+    const enfile = rows.length > 0;
+    log.info('rafraîchissement des prix demandé à la main', { limit, enfile });
+    return { ok: true, enfile };
+  } catch (err) {
+    log.error('impossible d’enfiler le rafraîchissement', { err });
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

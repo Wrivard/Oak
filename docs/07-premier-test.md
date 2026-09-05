@@ -119,12 +119,9 @@ l'écriture des empreintes, et c'est grave : c'est ce qui fait tendre le coût v
 
 ## Test 5 — Le pricing sur de vraies cartes
 
-Une fois des cartes en inventaire, le cron horaire les prixe. Pour ne pas attendre :
-
-```sql
-insert into jobs (type, payload, idempotency_key)
-values ('price_refresh', '{"limit":50}', 'manuel-' || now()::text);
-```
+Une fois des cartes en inventaire, le cron horaire les prixe. Pour ne pas
+attendre, `/pricing` a un bouton **Reprixer maintenant** — il enfile un job, le
+worker s'en occupe. Trois clics d'impatience n'enfilent qu'un seul batch.
 
 Puis `/inventory`, filtre **Sans prix**.
 
