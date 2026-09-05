@@ -55,7 +55,13 @@ function decoupe(contenu: string): Map<string, string> {
  * Renvoie les clés effectivement ajoutées. Jamais les valeurs : un fichier
  * d'environnement contient un mot de passe de base de données.
  */
-export function loadDotEnv(cwd = process.cwd(), env: NodeJS.ProcessEnv = process.env): string[] {
+export function loadDotEnv(
+  cwd = process.cwd(),
+  // `Record` plutôt que `NodeJS.ProcessEnv` : Next augmente ce type pour rendre
+  // `NODE_ENV` obligatoire, ce qui interdirait de passer un environnement vide
+  // — exactement ce qu'un test doit pouvoir faire.
+  env: Record<string, string | undefined> = process.env,
+): string[] {
   const ajoutees: string[] = [];
 
   for (const nom of FICHIERS) {

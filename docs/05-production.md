@@ -306,6 +306,26 @@ Ce qui est reconstructible et ne mérite pas de backup : `cards`, `card_embeddin
 
 **Teste ta restauration.** Un backup jamais restauré n'est pas un backup.
 
+> **Mesuré le 5 septembre 2026, à 15 000 SKUs et 15 000 scans.** La restauration
+> insérait UNE LIGNE PAR REQUÊTE : contre le pooler Supabase, un aller-retour
+> coûte 32 ms, soit 64 s pour 2 000 lignes et huit minutes pour 15 000 — par
+> table. Le test d'aller-retour dépassait son budget de 120 s. Un backup qu'on
+> ne peut pas restaurer dans un temps utile n'est qu'à moitié un backup.
+>
+> Insertion par lots, bornée par la limite de 65 535 paramètres liés de
+> Postgres : **2,4 s pour 15 000 lignes d'inventaire, 2,2 s pour 15 000 scans**.
+> Les lignes sont regroupées par signature de colonnes — un fichier édité à la
+> main ou une sauvegarde d'un schéma antérieur peut mélanger des lignes de clés
+> différentes, et les insérer ensemble décalerait les valeurs d'une colonne, ce
+> qui est pire qu'un échec.
+>
+> La sauvegarde, elle, lisait la table entière en mémoire. À 200 000 scans
+> portant chacun un embedding sérialisé (512 flottants, ~8 Ko), c'est plus d'un
+> gigaoctet de tampon avant la première ligne écrite : elle tomberait le jour où
+> elle devient indispensable. Elle pagine maintenant par curseur sur la clé
+> primaire — pas par `offset`, qui ferait relire 200 000 lignes à chaque tranche
+> — et respecte la contre-pression du flux d'écriture. 30 000 lignes en 1,6 s.
+
 > **Mesuré le 5 septembre 2026 :** la restauration échouait sur `invalid input
 > syntax for type json` dès qu'un scan portait des candidats — c'est-à-dire sur
 > toute donnée réelle. node-pg sérialise un objet JavaScript en JSON, mais un

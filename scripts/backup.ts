@@ -57,17 +57,67 @@ const SELECTS: Record<BackupTable, string> = {
   channel_events: 'select * from channel_events',
 };
 
-export async function dumpTable(table: BackupTable, dir: string): Promise<number> {
-  const { rows } = await query(SELECTS[table]);
-  const out = createWriteStream(join(dir, `${table}.jsonl`), { encoding: 'utf-8' });
+/**
+ * Clé de pagination par table. Toujours la clé primaire : elle est unique et
+ * indexée, donc la pagination par curseur est stable et ne saute rien même si
+ * des lignes sont insérées pendant la sauvegarde.
+ */
+const CLE: Record<BackupTable, string> = {
+  known_fingerprints: 'id',
+  inventory: 'sku',
+  sessions: 'id',
+  scans: 'id',
+  price_history: 'id',
+  channel_events: 'id',
+};
 
-  for (const row of rows) out.write(`${JSON.stringify(row)}\n`);
+/** Lignes par tranche. Voir dumpTable pour pourquoi ce n'est pas « toutes ». */
+const TRANCHE = 2000;
+
+export async function dumpTable(table: BackupTable, dir: string): Promise<number> {
+  const out = createWriteStream(join(dir, `${table}.jsonl`), { encoding: 'utf-8' });
+  const cle = CLE[table];
+  let curseur: string | null = null;
+  let total = 0;
+  type Ligne = Record<string, unknown>;
+
+  // PAR TRANCHES, pas d'un coup. `select * from scans` charge la table entière
+  // en mémoire : à 200 000 scans dont chacun porte un embedding sérialisé en
+  // texte (512 flottants, ~8 Ko), ça fait plus d'un gigaoctet de tampon avant
+  // la première ligne écrite. La sauvegarde tomberait précisément le jour où
+  // elle devient indispensable.
+  //
+  // Pagination par CURSEUR sur la clé primaire, pas `offset` : un `offset` de
+  // 200 000 fait relire 200 000 lignes à chaque tranche.
+  for (;;) {
+    const sql =
+      `select * from (${SELECTS[table]}) t` +
+      (curseur === null ? '' : ` where t."${cle}" > $1`) +
+      ` order by t."${cle}" limit ${TRANCHE}`;
+    const params: string[] = curseur === null ? [] : [curseur];
+    const rows: Ligne[] = (await query<Ligne>(sql, params)).rows;
+    if (rows.length === 0) break;
+
+    for (const row of rows) {
+      if (!out.write(`${JSON.stringify(row)}\n`)) {
+        // Respecter la contre-pression : sans ça, le tampon de flux remplace
+        // simplement le tampon de requête qu'on vient d'éviter.
+        await new Promise<void>((resolve) => out.once('drain', resolve));
+      }
+    }
+
+    total += rows.length;
+    const derniere: Ligne | undefined = rows[rows.length - 1];
+    curseur = derniere === undefined ? null : String(derniere[cle]);
+    if (rows.length < TRANCHE) break;
+  }
+
   await new Promise<void>((resolve, reject) => {
     out.on('error', reject);
     out.end(resolve);
   });
 
-  return rows.length;
+  return total;
 }
 
 export async function runBackup(): Promise<{ dir: string; counts: Record<string, number> }> {
@@ -224,28 +274,65 @@ export async function restoreTable(table: BackupTable, dir: string): Promise<num
   const lines = content.split(String.fromCharCode(10)).filter((l) => l.trim() !== '');
   let inserted = 0;
 
-  for (const line of lines) {
-    const row = JSON.parse(line) as Record<string, unknown>;
-    const cols = Object.keys(row);
-    if (cols.length === 0) continue;
+  const valeur = (row: Record<string, unknown>, c: string): unknown => {
+    const v = row[c];
+    return JSON_COLUMNS.has(c) && v !== null && v !== undefined ? JSON.stringify(v) : v;
+  };
 
-    const placeholders = cols
-      .map((c, i) => `$${i + 1}${CASTS[c] ?? ''}`)
-      .join(', ');
+  /**
+   * Insertion PAR LOTS. Une ligne par requête, c'est un aller-retour réseau
+   * par enregistrement : mesuré, restaurer 30 000 lignes dépassait deux
+   * minutes et faisait échouer le test d'aller-retour. Un backup qu'on ne peut
+   * pas restaurer dans un temps utile n'est qu'à moitié un backup.
+   *
+   * Le lot est borné par la limite dure de Postgres, 65 535 paramètres liés
+   * par requête.
+   */
+  async function flush(cols: string[], lot: Record<string, unknown>[]): Promise<void> {
+    if (lot.length === 0) return;
+
+    const params: unknown[] = [];
+    const tuples = lot.map((row) => {
+      const placeholders = cols.map((c) => {
+        params.push(valeur(row, c));
+        return `$${params.length}${CASTS[c] ?? ''}`;
+      });
+      return `(${placeholders.join(', ')})`;
+    });
 
     const { rowCount } = await query(
       `insert into ${table} (${cols.map((c) => `"${c}"`).join(', ')})
-       values (${placeholders})
+       values ${tuples.join(', ')}
        on conflict do nothing`,
-      cols.map((c) => {
-        const v = row[c];
-        return JSON_COLUMNS.has(c) && v !== null && v !== undefined
-          ? JSON.stringify(v)
-          : v;
-      }),
+      params,
     );
     inserted += rowCount ?? 0;
   }
+
+  // Regroupées par signature de colonnes : un fichier édité à la main, ou une
+  // sauvegarde d'une version antérieure du schéma, peut mélanger des lignes qui
+  // n'ont pas les mêmes clés. Les insérer dans le même lot produirait des
+  // valeurs décalées d'une colonne — pire qu'un échec.
+  let signature = '';
+  let cols: string[] = [];
+  let lot: Record<string, unknown>[] = [];
+
+  for (const line of lines) {
+    const row = JSON.parse(line) as Record<string, unknown>;
+    const k = Object.keys(row);
+    if (k.length === 0) continue;
+
+    const sig = k.join(',');
+    const maxLot = Math.max(1, Math.floor(60_000 / k.length));
+    if (sig !== signature || lot.length >= maxLot) {
+      await flush(cols, lot);
+      signature = sig;
+      cols = k;
+      lot = [];
+    }
+    lot.push(row);
+  }
+  await flush(cols, lot);
 
   return inserted;
 }

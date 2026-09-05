@@ -70,7 +70,7 @@ describe('parseDotEnv', () => {
 describe('loadDotEnv', () => {
   it('remplit ce qui manque', async () => {
     await writeFile(join(dir, '.env.local'), 'DATABASE_URL=postgres://x/y\nLOG_LEVEL=debug\n');
-    const env: NodeJS.ProcessEnv = {};
+    const env: Record<string, string | undefined> = {};
     const ajoutees = loadDotEnv(dir, env);
     expect(env['DATABASE_URL']).toBe('postgres://x/y');
     expect(ajoutees).toContain('LOG_LEVEL');
@@ -80,7 +80,7 @@ describe('loadDotEnv', () => {
     // `PG_POOL_MAX=2 pnpm worker` doit faire ce qu'il annonce, et en production
     // les vraies variables priment sur un fichier oublié sur le disque.
     await writeFile(join(dir, '.env.local'), 'DATABASE_URL=postgres://fichier/y\n');
-    const env: NodeJS.ProcessEnv = { DATABASE_URL: 'postgres://process/y' };
+    const env: Record<string, string | undefined> = { DATABASE_URL: 'postgres://process/y' };
     const ajoutees = loadDotEnv(dir, env);
     expect(env['DATABASE_URL']).toBe('postgres://process/y');
     expect(ajoutees).not.toContain('DATABASE_URL');
@@ -105,7 +105,7 @@ describe('loadDotEnv', () => {
   it('.env.local prime sur .env', async () => {
     await writeFile(join(dir, '.env'), 'A=du-env\nB=seulement-env\n');
     await writeFile(join(dir, '.env.local'), 'A=du-local\n');
-    const env: NodeJS.ProcessEnv = {};
+    const env: Record<string, string | undefined> = {};
     loadDotEnv(dir, env);
     expect(env['A']).toBe('du-local');
     expect(env['B']).toBe('seulement-env');
