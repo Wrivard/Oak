@@ -160,7 +160,22 @@ async function refreshOne(
   // `no_data` ne produit JAMAIS de prix. Il envoie en review. Un système qui
   // invente un prix quand il ne sait pas est pire qu'un système qui s'arrête.
   if (estimate.valueCents === null) {
-    await markNoData(row.sku, estimate.breakdown);
+    // Le printing demandé absent de la source est une raison DISTINCTE d'une
+    // absence totale de données, et c'est celle qui se corrige : soit le lot a
+    // été envoyé avec le mauvais variant, soit l'API n'a pas ce printing. La
+    // review doit voir laquelle.
+    const absent = row.variant !== undefined && fetched.raw['printing_absent'] === true;
+    await markNoData(row.sku, {
+      ...estimate.breakdown,
+      ...(absent
+        ? {
+            raison:
+              `printing « ${row.variant} » absent de la source ` +
+              `(disponibles : ${JSON.stringify(fetched.raw['printings_disponibles'])}) — ` +
+              `aucun autre printing n'est substitué, l'écart normal/reverse va de 5x à 20x`,
+          }
+        : {}),
+    });
     return 'no_data';
   }
 

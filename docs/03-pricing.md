@@ -62,6 +62,18 @@ effectivement fermé. Passe par pokemontcg.io, qui expose les points de prix TCG
 > il enregistre la valeur et envoie en review, comme `no_data`. Le jour où une
 > conversion de devise sera en place, cette garde pourra être levée.
 
+> ⚠ **Un printing absent ne donne AUCUN prix.** Trouvé le 5 septembre 2026 :
+> `extractPrices` retombait sur le premier printing disponible quand celui
+> demandé manquait. Un SKU `reverseHolofoil` dont l'API n'a que `normal` était
+> donc prixé au prix du normal, publié, vendu — exactement l'erreur à 5-20x que
+> le reste du système refuse (« il ne devine jamais le variant », et un
+> `variant_conflict` force la review quelle que soit la confiance). La chaîne de
+> repli ci-dessous reste **dans** le printing : `market` → `mid` → `cm_trend`.
+> Un printing absent laisse les points TCGplayer à `null`, l'estimation retombe
+> sur Cardmarket seul — non publiable — et la carte part en review avec la liste
+> des printings que l'API avait réellement, pour qu'on voie si c'est le lot qui
+> a été envoyé au mauvais variant.
+
 **`market` peut être `null`** quand aucune annonce TCGplayer active n'existe pour ce
 printing. Trois causes fréquentes : carte sans listing actif, mauvais printing demandé,
 ou produit scellé. Guard partout, fallback vers `mid` puis `cm_trend`. Un `null` non

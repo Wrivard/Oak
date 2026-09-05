@@ -156,12 +156,24 @@ export async function fetchPricesBatch(
  * dessus. `market` peut être null quand aucune annonce active n'existe pour ce
  * printing — c'est fréquent, pas exceptionnel, et un null non gardé qui plante un
  * batch de 1 700 cartes à 3 h du matin coûte une nuit.
+ *
+ * ON NE SUBSTITUE JAMAIS UN AUTRE PRINTING. Cette fonction retombait sur le
+ * premier printing disponible quand celui demandé manquait : un SKU
+ * `reverseHolofoil` dont l'API n'a que `normal` était donc prixé au prix du
+ * normal, publié, vendu. C'est exactement l'erreur à 5-20x que tout le reste du
+ * système refuse — « il ne devine jamais le variant », et un `variant_conflict`
+ * force la review quelle que soit la confiance.
+ *
+ * docs/03 §1 ne décrit qu'une seule chaîne de repli, et elle reste DANS le
+ * printing : `market` → `mid` → `cm_trend`. Un printing absent ne donne donc
+ * aucun prix TCGplayer ; l'estimation retombe sur Cardmarket seul, qui n'est pas
+ * publiable non plus (EUR non converti), et la carte part en review. S'arrêter
+ * vaut mieux qu'inventer.
  */
 export function extractPrices(card: ApiCard, variant: CardVariant): FetchedPrices {
   const prices = card.tcgplayer?.prices ?? {};
-  const exact = prices[variant];
-  const fallbackKey = Object.keys(prices).find((k) => prices[k] !== undefined);
-  const point = exact ?? (fallbackKey ? prices[fallbackKey] : undefined);
+  const point = prices[variant];
+  const disponibles = Object.keys(prices).filter((k) => prices[k] !== undefined);
 
   return {
     tcgMarket: toCents(point?.market),
@@ -172,7 +184,12 @@ export function extractPrices(card: ApiCard, variant: CardVariant): FetchedPrice
     tcgplayerUrl: card.tcgplayer?.url ?? null,
     raw: {
       printing_demande: variant,
-      printing_utilise: exact ? variant : (fallbackKey ?? null),
+      printing_utilise: point ? variant : null,
+      // Ce que l'API avait, pour que la review comprenne d'un coup d'oeil
+      // pourquoi la carte est là : « tu as demandé reverseHolofoil, l'API n'a
+      // que normal ».
+      printings_disponibles: disponibles,
+      printing_absent: point === undefined,
       tcgplayer_updated_at: card.tcgplayer?.updatedAt ?? null,
       point: point ?? null,
     },
