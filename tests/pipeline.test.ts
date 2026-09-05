@@ -25,6 +25,8 @@ import type { Job } from '../worker/queue/queue.js';
  *   - un scan résolu crée son SKU et incrémente sa quantité, une seule fois.
  */
 const SESSION = 'test-pipeline';
+/** Les cartes des fixtures : ce que le matching peut résoudre depuis ces images. */
+const CARTES = ['base1-4', 'base1-2'];
 let dir: string;
 let sessionId: string;
 
@@ -69,6 +71,15 @@ async function wipe(): Promise<void> {
     [SESSION],
   );
   await query(`delete from sessions where name = $1`, [SESSION]);
+
+  // L'INVENTAIRE AUSSI. Une résolution en crée une ligne, et la laisser derrière
+  // fait grossir la quantité à chaque exécution — un test qui laisse de l'état
+  // finit par tester cet état. En production, une ligne d'inventaire ne se
+  // supprime jamais (invariant 7) ; ici c'est celle que le test vient d'écrire.
+  const motifs = CARTES.map((c) => `${c}-%`);
+  await query('delete from channel_events where sku like any($1::text[])', [motifs]);
+  await query('delete from price_history where sku like any($1::text[])', [motifs]);
+  await query('delete from inventory where card_id = any($1::text[])', [CARTES]);
 }
 
 const job = (payload: Record<string, unknown>): Job =>
