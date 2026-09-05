@@ -249,6 +249,19 @@ faire signaler *chaque* lot comme anormal. Une fixture en aplat de couleur
 disait le contraire — troisième fois que ça arrive sur ce projet, c'est
 maintenant écrit à côté du seuil.
 
+**La géométrie du crop OCR est mesurable, et le résultat est actionnable.**
+`pnpm ocr:bandes` essaie neuf géométries sur les mêmes images et classe par
+numéros **justes**. Sur 60 renders toutes ères mélangées, une bande **pleine
+largeur à 0,84** ressort devant toutes les demi-bandes — 45 % contre 33 % au
+mieux. C'est l'entrée du test 2, et c'est le genre de décision qui se prenait
+jusqu'ici au jugé.
+
+> J'ai d'abord écrit l'inverse. Mon premier échantillon était 100 % pré-2019, où
+> le numéro est en bas à droite : la bande bas-gauche y sortait à 0 % et j'en ai
+> conclu qu'elle ne servait à rien. Elle est en réalité la meilleure sur le
+> moderne, à 67 %. Le script affiche maintenant la composition par ère et
+> avertit quand il n'y en a qu'une.
+
 **Le pipeline complet est testé de bout en bout**, sur de vraies images, dans
 `pnpm test` : quatre pages recto/verso donnent deux cartes, les versos sont
 rattachés, et chaque scan finit sur une issue terminale.
@@ -306,6 +319,7 @@ pnpm verify        typecheck + tests + build + smoke, en une fois
 pnpm repetition    le parcours de ta journée par les VRAIS chemins HTTP
 pnpm edge          dix formats de scanner, dont deux fichiers corrompus
 pnpm course        six envois simultanés vers le même lot, rien ne doit se perdre
+pnpm ocr:bandes    quelle géométrie de crop lit le mieux le numéro, sur TES scans
 pnpm seed:volume   remplit la base au volume cible (--purge pour effacer)
 ```
 
