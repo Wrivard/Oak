@@ -34,8 +34,13 @@ rem changements n'avaient pas ete appliques. La construction prend ~7 secondes.
 echo   Construction de l'application...
 call pnpm build || goto :erreur
 
+rem Le journal du worker va dans un fichier : sa fenetre est reduite et
+rem personne ne la regarde. Sans ca, un worker qui meurt au demarrage ne laisse
+rem AUCUNE trace visible, et on envoie un lot entier en attendant qu'il se
+rem passe quelque chose.
+if not exist "logs" mkdir "logs"
 echo   Demarrage du worker...
-start "pokelister - worker" /min cmd /c "node --import tsx worker/index.ts"
+start "pokelister - worker" /min cmd /c "node --import tsx worker/index.ts > logs\worker.log 2>&1"
 
 echo   Demarrage de l'application...
 start "pokelister - app" /min cmd /c "node node_modules/next/dist/bin/next start -p 3000 -H 0.0.0.0"
@@ -58,6 +63,22 @@ pause
 exit /b 1
 
 :pret
+
+rem Le worker est-il encore la ? C'est la panne qui ne se voit pas : l'app
+rem demarre parfaitement sans lui, on peut envoyer des photos, et rien n'est
+rem jamais traite.
+powershell -NoProfile -Command ^
+  "if (-not (Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -match 'worker.index' })) { exit 1 }"
+if errorlevel 1 (
+  echo.
+  echo   LE WORKER NE TOURNE PAS. L'application va demarrer, mais rien de ce
+  echo   que tu enverras ne sera traite. Dernieres lignes de logs\worker.log :
+  echo.
+  powershell -NoProfile -Command "if (Test-Path 'logs\worker.log') { Get-Content 'logs\worker.log' -Tail 12 } else { '  (aucun journal)' }"
+  echo.
+  pause
+)
+
 echo   Pret.
 start "" http://localhost:3000
 

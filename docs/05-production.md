@@ -370,3 +370,31 @@ les seuils ont été touchés sans passer le golden set.
 - Il n'écrase jamais une ligne d'inventaire eBay sans GET préalable
 - Il ne retry jamais un upload TCGplayer
 - Il ne ferme jamais une session dont le comptage ne balance pas
+
+---
+
+## 8. Le lanceur
+
+`Demarrer.bat` reconstruit, démarre le worker puis l'application, attend que
+l'application réponde, ouvre le navigateur et affiche les adresses réseau.
+
+**Mesuré le 5 septembre 2026 :** il démarrait un worker qui mourait
+immédiatement. Next charge `.env.local` tout seul ; le worker, non — il lisait
+uniquement l'environnement du process, et le lanceur l'ouvre dans un `cmd` neuf.
+Le worker s'arrêtait donc sur « DATABASE_URL: Required » dans une fenêtre
+réduite que personne ne regarde, pendant que l'application, elle, tournait
+parfaitement. On pouvait envoyer un lot entier et attendre indéfiniment.
+
+Deux corrections, indépendantes l'une de l'autre :
+
+- `lib/dotenv.ts` charge `.env.local` puis `.env` dans `loadEnv()`. Les valeurs
+  déjà présentes dans l'environnement **gagnent toujours** : `PG_POOL_MAX=2 pnpm
+  worker` continue de faire ce qu'il annonce, et en production les vraies
+  variables priment sur un fichier oublié sur le disque. La fonction ne renvoie
+  que des noms de clés, jamais des valeurs — un fichier d'environnement contient
+  un mot de passe de base.
+- le lanceur écrit le journal du worker dans `logs/worker.log`, vérifie après
+  démarrage que le process est encore là, et affiche les dernières lignes du
+  journal s'il ne l'est pas. C'est la panne qui ne se voit pas : l'application
+  démarre parfaitement sans worker.
+

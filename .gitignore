@@ -56,3 +56,6 @@ exports/
 
 # photos uploadées
 uploads/
+
+# journaux d'execution
+logs/

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { loadDotEnv } from './dotenv.js';
 
 /**
  * Validation des variables d'environnement au démarrage.
@@ -34,6 +35,13 @@ let cached: Env | null = null;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   if (cached) return cached;
+
+  // Next charge `.env.local` tout seul ; le worker, non. Sans cette ligne,
+  // `Demarrer.bat` démarrait un worker qui mourait aussitôt sur
+  // « DATABASE_URL: Required », dans une fenêtre réduite que personne ne
+  // regarde — pendant que l'application, elle, tournait très bien. Les valeurs
+  // déjà présentes dans l'environnement gagnent toujours.
+  if (source === process.env) loadDotEnv();
 
   const parsed = schema.safeParse(source);
   if (!parsed.success) {
