@@ -146,6 +146,56 @@ Un leak dans le traitement d'image ne se voit pas sur 50 cartes.
 
 ---
 
+### 3.4bis Résultats mesurés — 2 000 scans, 2026-09-05
+
+```
+scans                 2000        images distinctes     199
+durée                 32,4 min    débit                 61,7 cartes/min
+file max              1871        RSS max               205 Mo
+jobs morts            0           ingestion             2000/2000, 0 perte
+```
+
+**Débit.** 61,7 cartes/minute, soit 3 700/heure. Les 1 700 cartes quotidiennes se
+traitent en **28 minutes de worker**. Le goulot est l'OCR du niveau 2 : les 2 000
+empreintes étaient calculées en quelques minutes, le reste du temps est du matching.
+
+**Mémoire.** 205 Mo au pic, stable. Pas de fuite sur 32 minutes de charge continue.
+
+**Le p95 des jobs (26 min) est de la latence de FILE, pas du traitement.** Les 2 000
+fichiers sont déposés d'un coup ; un job enfilé à la première seconde attend que 1 999
+autres passent. Sur un flux réel d'ADF ce chiffre n'a pas de sens — c'est le débit qui
+compte.
+
+### La découverte qui compte : la duplication n'améliore rien toute seule
+
+| | total | résolues | auto |
+|---|---|---|---|
+| première occurrence | 199 | 81 | **40,7 %** |
+| répétitions | 1 801 | 734 | **40,8 %** |
+
+Les deux taux sont **identiques**, et ce n'est pas un hasard : une carte n'entre dans
+`known_fingerprints` que si elle est **résolue**. Les 59 % qui partent en review
+n'écrivent aucune empreinte, donc leurs répétitions repartent en review elles aussi. Les
+81 qui se résolvent au premier passage font résoudre leurs ~9 répétitions par le niveau 1
+— 734, exactement ce qu'on observe.
+
+**Conséquence économique, et elle est structurante :**
+
+> Le taux d'auto-résolution global est entièrement déterminé par le taux de réussite à la
+> **première occurrence**. La duplication n'améliore rien — elle **amplifie** ce taux,
+> quel qu'il soit.
+
+Le corollaire est plutôt une bonne nouvelle : **l'effort de review est proportionnel au
+nombre de cartes DISTINCTES, pas au volume total.** À 12-15k SKUs uniques pour
+25-50k cartes/mois, reviewer une carte est un coût unique, amorti sur toutes ses
+répétitions futures. Mais ça veut dire que tout ce qui améliore la première occurrence —
+l'OCR (expérience 1bis), les seuils, la fraîcheur du catalogue — se multiplie par le
+taux de duplication.
+
+> ⚠ Les 40,7 % de première occurrence portent sur des **renders officiels**, pas des
+> scans ADF. Ce n'est pas le chiffre de production, c'est la démonstration du mécanisme.
+> Le vrai taux dépend de l'OCR sur de vraies numérisations — expérience 1bis.
+
 ### 3.5 Ce que le test de charge a réellement trouvé
 
 Le test de charge n'est pas une formalité : la **première** exécution a révélé un bug
