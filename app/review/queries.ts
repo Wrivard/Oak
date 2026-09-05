@@ -1,5 +1,5 @@
 import { query } from '../../lib/db.js';
-import type { CardCondition, CardVariant } from '../../lib/sku.js';
+import { CONDITIONS, VARIANTS, type CardCondition, type CardVariant } from '../../lib/sku.js';
 
 /**
  * Chargement de la file de review. Lecture seule, côté serveur.
@@ -55,18 +55,14 @@ export interface ReviewScan {
   prices: PriceSource[];
 }
 
-const VARIANTS: readonly CardVariant[] = [
-  'normal',
-  'holofoil',
-  'reverseHolofoil',
-  '1stEditionNormal',
-  '1stEditionHolofoil',
-  'unlimitedHolofoil',
-  'promo',
-];
-
-const CONDITIONS: readonly CardCondition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
-
+/**
+ * Les listes viennent de `lib/sku.ts`, pas d'une copie locale.
+ *
+ * Elles étaient réécrites ici. Deux listes qui doivent s'accorder et rien qui le
+ * garantisse : ajouter un variant à un seul endroit rend une option
+ * choisissable à l'écran que `buildSku` refuse — ou l'inverse, un variant qui
+ * existe en base mais qu'on ne peut pas sélectionner pour corriger une carte.
+ */
 export const OPTIONS = { variants: VARIANTS, conditions: CONDITIONS };
 
 interface Row {
