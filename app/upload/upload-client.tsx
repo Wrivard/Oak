@@ -28,6 +28,12 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
   const [session, setSession] = useState(defaultSession);
   const [variant, setVariant] = useState<CardVariant>('normal');
   const [condition, setCondition] = useState<CardCondition>('NM');
+  /**
+   * Le scanner sort image0001 (recto), image0002 (verso)… C'est le cas courant,
+   * donc le défaut. Le mode recto seul reste disponible pour des photos prises
+   * à la main.
+   */
+  const [duplex, setDuplex] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
   const [sent, setSent] = useState(0);
   const [rejected, setRejected] = useState<Rejected[]>([]);
@@ -57,13 +63,21 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
     setRejected([]);
 
     try {
-      for (let i = 0; i < files.length; i += BATCH) {
+      // L'ORDRE EST L'INFORMATION. On trie par nom avant d'envoyer et on
+      // transmet le rang : c'est lui qui porte l'alternance recto/verso, et un
+      // paquet arrivé dans le désordre apparierait les mauvaises faces.
+      const ordered = [...files].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true }),
+      );
+
+      for (let i = 0; i < ordered.length; i += BATCH) {
         const form = new FormData();
         form.set('session', session.trim());
         form.set('variant', variant);
         form.set('condition', condition);
         form.set('language', 'en');
-        for (const f of files.slice(i, i + BATCH)) form.append('files', f);
+        form.set('offset', String(i));
+        for (const f of ordered.slice(i, i + BATCH)) form.append('files', f);
 
         const res = await fetch('/api/upload', { method: 'POST', body: form });
         if (!res.ok) {
@@ -74,6 +88,22 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
         setSent((n) => n + body.accepted);
         if (body.rejected.length > 0) setRejected((r) => [...r, ...body.rejected]);
       }
+
+      // Le lot est complet : c'est seulement maintenant qu'on peut apparier,
+      // parce qu'il faut voir TOUTES les pages pour distinguer les dos.
+      const fin = await fetch('/api/upload', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session: session.trim(),
+          mode: duplex ? 'duplex' : 'front_only',
+        }),
+      });
+      if (!fin.ok) {
+        const body = (await fin.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `finalisation : HTTP ${fin.status}`);
+      }
+
       setFiles([]);
       setDone(true);
     } catch (err) {
@@ -142,6 +172,35 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
           </select>
         </label>
       </section>
+
+      <label
+        style={{
+          display: 'flex',
+          gap: 'var(--s2)',
+          alignItems: 'flex-start',
+          marginTop: 'var(--s3)',
+          cursor: 'pointer',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={duplex}
+          onChange={(e) => setDuplex(e.target.checked)}
+          style={{ marginTop: 3 }}
+        />
+        <span>
+          <strong>Recto-verso</strong>{' '}
+          <span className="dim">
+            — le scanner alterne recto puis verso (image0001, image0002…)
+          </span>
+          <br />
+          <span className="faint" style={{ fontSize: 11 }}>
+            Les dos sont reconnus à leur empreinte, pas à leur rang : si une carte rate
+            son verso, les suivantes ne sont pas décalées et l&apos;anomalie est
+            signalée.
+          </span>
+        </span>
+      </label>
 
       <p className="faint" style={{ fontSize: 11, marginTop: 'var(--s2)' }}>
         Le variant s&apos;applique à TOUT le lot. Trie les reverse holos à part avant de
@@ -233,8 +292,13 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
 
       {done && sent > 0 && (
         <p style={{ color: 'var(--green)', marginTop: 'var(--s3)' }}>
-          {sent} photo{sent > 1 ? 's' : ''} envoyée{sent > 1 ? 's' : ''}. Le worker les
-          identifie maintenant — les cartes non résolues arriveront dans la{' '}
+          {sent} photo{sent > 1 ? 's' : ''} envoyée{sent > 1 ? 's' : ''}
+          {duplex && ` — environ ${Math.ceil(sent / 2)} cartes`}. Le worker apparie et
+          identifie maintenant ; suis l&apos;avancement sur le{' '}
+          <a href="/dashboard" style={{ color: 'var(--green)' }}>
+            dashboard
+          </a>
+          , les cartes non résolues arriveront dans la{' '}
           <a href="/review" style={{ color: 'var(--green)' }}>
             file de review
           </a>

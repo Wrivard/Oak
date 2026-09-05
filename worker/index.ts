@@ -4,6 +4,7 @@ import { log } from '../lib/log.js';
 import { handleFingerprint } from './handlers/fingerprint.js';
 import { handleMatch } from './handlers/match.js';
 import { handlePriceRefresh } from './handlers/price-refresh.js';
+import { handlePairUpload } from './handlers/pair-upload.js';
 import { handleTcgExport } from './handlers/tcg-export.js';
 import { startWatcher } from './ingest/watcher.js';
 import { Worker } from './queue/loop.js';
@@ -25,6 +26,9 @@ const worker = new Worker(env.WORKER_ID, {
   fingerprint: { handler: handleFingerprint, concurrency: 4 },
   // OCR + rerank : du CPU local, mais tesseract est plus lourd que les hachages.
   match: { handler: handleMatch, concurrency: 2 },
+  // Hachage d'un lot entier : du CPU, une seule voie pour ne pas concurrencer
+  // le matching qui est déjà le goulot.
+  pair_upload: { handler: handlePairUpload, concurrency: 1 },
   // Source externe avec quota : une seule voie, jamais de parallélisme.
   price_refresh: { handler: handlePriceRefresh, concurrency: 1 },
   // Un seul fichier par jour : jamais deux exports concurrents, quelqu'un

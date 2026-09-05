@@ -40,6 +40,24 @@ Deux implémentations divergeraient sur le compteur de session ou sur l'enfileme
 job, et **un scan enregistré sans son job `fingerprint` disparaît en silence** — le pire
 mode de défaillance du système. D'où la fonction unique.
 
+### Duplex : la position apparie, l'empreinte vérifie
+
+Un scanner duplex sort `image0001` (recto), `image0002` (verso), `image0003`… **La
+position décide de l'appariement** : c'est ce que le matériel produit, et c'est simple.
+
+L'empreinte ne décide pas, elle **contrôle**. Le dos d'une carte Pokémon est constant :
+si les pages paires ne se ressemblent pas entre elles, c'est qu'une page a été perdue et
+que tout le lot est décalé d'un cran. Sans ce contrôle, **chaque carte hériterait du dos
+de la suivante**, en silence, et on graderait la mauvaise carte.
+
+Le seuil de cohérence est à 80 % des pages paires. En dessous, l'anomalie est écrite
+dans `channel_events` et le log passe en `warn`.
+
+> Une première version faisait l'inverse : regrouper par ressemblance pour *déduire* les
+> dos, sans se fier à la position. Trop fragile — sur des images peu détaillées le
+> regroupement se trompe — et ça compliquait un problème que la position résout.
+> Vérifié sur un lot de 12 pages : 6 cartes, cohérence 1,0.
+
 L'upload demande le variant et la condition **du lot entier**, exactement comme une
 session ADF : le variant ne se devine pas depuis une photo à plat (§2), et il vaut 5 à
 20x d'écart de prix. Le tri physique reste en amont.
