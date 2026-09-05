@@ -98,6 +98,41 @@ une erreur *ambiguë*, pas permanente — il existe une fenêtre entre le commit
 `rename` où le chemin final n'est pas encore en place, et deux tentatives avec backoff
 la couvrent.
 
+**Le niveau 1 tient à l'échelle. Mesuré le 5 septembre 2026, sur 120 000
+empreintes synthétiques.** La question était sérieuse : `known_fingerprints`
+gagne **une ligne par scan résolu**, sans déduplication — à 25-50 000 cartes par
+mois, la table dépasse 100 000 lignes en trois mois, et le niveau 1 la parcourt
+en entier à chaque scan. Aucun index ne peut accélérer une distance de Hamming.
+
+```
+120 000 empreintes · balayage séquentiel parallèle
+  premier appel, cache froid     633 ms
+  ensuite, cache chaud        45 - 62 ms
+```
+
+Ce qui sauve la mise : le tas ne fait que **15 Mo**. La colonne `embedding`
+(512 flottants) part en TOAST, hors ligne, et le balayage ne la lit jamais — il
+ne touche que `phash`, `dhash` et quatre colonnes courtes. La croissance est
+donc linéaire en taille de tas : à un million d'empreintes, environ 375 ms par
+scan, soit une dizaine de minutes par jour à 1 700 cartes. C'est loin, et ce
+n'est pas un mur.
+
+Deux pistes testées et **rejetées** :
+
+- *Un index couvrant* `(phash) include (dhash, card_id, …)`, pour un balayage
+  d'index seul de 9 Mo au lieu du tas de 15 Mo. Mesuré : **plus lent** (64 à
+  240 ms), et il aurait coûté une écriture d'index de plus sur le chemin le plus
+  chaud du système. Le planificateur avait raison, l'index a été retiré.
+- *Calculer les `bit_count` une seule fois via un `lateral`* au lieu de quatre
+  fois dans la requête. Spectaculaire au premier essai — 622 ms contre 47 — puis
+  identique une fois le cache chaud. C'était la différence entre froid et chaud,
+  pas entre les deux écritures. Aucune modification de code n'était justifiée.
+
+Si un jour ça devient un mur, la réponse n'est pas d'indexer la distance de
+Hamming : c'est de **borner le nombre d'empreintes par identité**. La deux
+centième occurrence du même Dracaufeu Set de Base n'apprend plus rien que les
+cinq premières ne disaient déjà.
+
 **Une page illisible laisse une ligne.** Mesuré le 5 septembre 2026 : `pair_upload`
 attrapait l'échec de décodage, écrivait un `log.error` et passait à la suivante. La
 page disparaissait — une feuille passée physiquement dans le scanner, sans aucune ligne
