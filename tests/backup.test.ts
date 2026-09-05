@@ -37,6 +37,13 @@ const vec = (seed: number): string => {
 async function wipe(): Promise<void> {
   await query(`delete from known_fingerprints where card_id = $1`, [CARD]);
   await query(
+    `delete from jobs where payload->>'scan_id' in (
+       select s.id::text from scans s
+         join sessions ss on ss.id = s.session_id
+        where ss.name = $1)`,
+    [SESSION],
+  );
+  await query(
     `delete from scans where session_id in (select id from sessions where name = $1)`,
     [SESSION],
   );

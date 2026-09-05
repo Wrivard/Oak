@@ -70,6 +70,16 @@ async function cleanup(): Promise<void> {
     `delete from channel_events where sku like $1`,
     [`${CARD}-%`],
   );
+  // Les jobs AVANT les scans : un job qui pointe sur un scan supprimé meurt en
+  // 'scan introuvable' et laisse une fausse alarme au dashboard, qui compte les
+  // jobs morts des 24 dernières heures.
+  await query(
+    `delete from jobs where payload->>'scan_id' in (
+       select s.id::text from scans s
+         join sessions ss on ss.id = s.session_id
+        where ss.name = $1)`,
+    [SESSION],
+  );
   await query(
     `delete from scans where session_id in (select id from sessions where name=$1)`,
     [SESSION],

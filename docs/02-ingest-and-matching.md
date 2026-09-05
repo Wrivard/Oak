@@ -26,6 +26,24 @@ session : `sessions.expected_count` (compteur du scanner) contre `sessions.scann
 
 **Aucune penny sleeve dans l'ADF.** Ça jamme et ça peut abîmer le chemin papier.
 
+### Deux entrées, un seul enregistrement
+
+Le pipeline accepte les scans par **deux chemins**, et les deux passent par
+`lib/ingest/register.ts` :
+
+| Entrée | Pour qui |
+|---|---|
+| Watcher sur dossier | un ADF qui dépose des fichiers en continu |
+| Upload navigateur (`/upload`) | des photos prises par une autre application |
+
+Deux implémentations divergeraient sur le compteur de session ou sur l'enfilement du
+job, et **un scan enregistré sans son job `fingerprint` disparaît en silence** — le pire
+mode de défaillance du système. D'où la fonction unique.
+
+L'upload demande le variant et la condition **du lot entier**, exactement comme une
+session ADF : le variant ne se devine pas depuis une photo à plat (§2), et il vaut 5 à
+20x d'écart de prix. Le tri physique reste en amont.
+
 ### Le watcher
 
 N'intègre pas TWAIN/ISIS. Scan-to-folder + `chokidar` sur le dossier.
