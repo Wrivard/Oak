@@ -496,6 +496,10 @@ Deux corrections, indépendantes l'une de l'autre :
   processus doublent aussi les connexions, et le pooler Supabase plafonne à 15.
   Le contrôle est fait **avant** la reconstruction : inutile d'attendre sept
   secondes pour finir par refuser.
+- **le journal précédent est conservé** en `logs/worker.precedent.log`. La
+  redirection `>` écrase, et c'est exactement le fichier qu'on veut lire : quand
+  le worker meurt, le réflexe est de relancer, et relancer effaçait la seule
+  explication.
 - le lanceur écrit le journal du worker dans `logs/worker.log`, vérifie après
   démarrage que le process est encore là, et affiche les dernières lignes du
   journal s'il ne l'est pas. C'est la panne qui ne se voit pas : l'application
