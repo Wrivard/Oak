@@ -177,3 +177,77 @@ delete from jobs where type = 'price_refresh' and status in ('queued','failed');
 ```
 
 Le prochain tic horaire réenfilera un batch propre.
+
+---
+
+## 7. « La base est passée en lecture seule »
+
+Symptôme : tout échoue sur `cannot execute INSERT in a read-only transaction`.
+Le worker meurt, les envois échouent, l'inventaire ne bouge plus. **Le pipeline
+est arrêté**, ce n'est pas un ralentissement.
+
+Cause : le plan gratuit Supabase plafonne la **base de données** à 500 Mo. Au-delà,
+Supabase coupe les écritures. Le tableau de santé avertit à 80 % — si on en est
+là, c'est qu'on ne l'a pas regardé.
+
+Le piège de la sortie de secours : il faut les deux commandes **dans la même
+session** SQL. Le `set` seul ne suffit pas, et une session neuve repart en lecture
+seule.
+
+```sql
+-- Dans UNE seule session (l'éditeur SQL Supabase, ou un seul psql).
+set session characteristics as transaction read write;
+set statement_timeout = 0;
+
+-- Faire de la place. Par ordre de gain :
+delete from jobs where status = 'done' and created_at < now() - interval '7 days';
+delete from channel_events where event like 'api\_%' and created_at < now() - interval '7 days';
+vacuum full jobs;
+vacuum full channel_events;
+
+select pg_size_pretty(pg_database_size(current_database()));
+```
+
+Le `vacuum full` est indispensable : sans lui l'espace reste réservé et la base
+reste en lecture seule. Vérifier ensuite dans une session **neuve** que
+`show default_transaction_read_only` vaut `off`.
+
+Si ça ne suffit pas, la seule table qui reste grosse est `known_fingerprints`, et
+**on ne la vide pas** : c'est des mois de review manuelle. C'est le moment de
+passer au plan Pro.
+
+---
+
+## 8. « Un lot reste à zéro carte »
+
+Symptôme : les photos sont parties, `/upload` dit même « ce lot contient déjà
+N pages », et `/batches` affiche zéro carte.
+
+Cause : la finalisation de l'envoi — le `PUT` qui enfile l'appariement — a échoué.
+Les fichiers sont sur le disque, aucun job n'existe.
+
+Sur `/batches`, bouton **Réparer** → « Apparier recto-verso ». Rejouer est sans
+danger : les pages déjà rattachées à un scan sont ignorées.
+
+Si le lot est **fermé**, l'action refuse : son comptage est déjà réconcilié.
+Rouvrir d'abord, en connaissance de cause.
+
+---
+
+## 9. « Le worker ne démarre pas »
+
+Le lanceur écrit son journal dans `logs/worker.log` et affiche les dernières
+lignes s'il détecte que le worker est mort. Les deux causes, par ordre de
+fréquence :
+
+1. **`.env.local` absent ou `DATABASE_URL` faux.** Le worker charge ce fichier
+   lui-même depuis le 5 septembre — avant, il ne le faisait pas et mourait
+   silencieusement dans une fenêtre réduite.
+2. **Le projet Supabase est en pause.** Le plan gratuit met en pause après une
+   semaine d'inactivité. Le réveiller depuis le tableau de bord Supabase.
+
+Et si `Demarrer.bat` répond « pokelister tourne déjà » : c'est voulu. Un second
+worker écraserait des pages, parce que l'appariement alloue ses numéros d'ordre
+par `max(seq) + 1`, ce qui n'est sûr qu'à un seul processus. `Arreter.bat` avant
+de relancer.
+
