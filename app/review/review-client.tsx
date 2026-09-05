@@ -494,16 +494,7 @@ export default function ReviewClient({
           ))}
         </aside>
 
-        <main
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(220px, 300px) 1fr',
-            gap: 'var(--s4)',
-            padding: 'var(--s4)',
-            minHeight: 0,
-            overflow: 'auto',
-          }}
-        >
+        <main className="review-grid">
           <div>
             {imageManquante ? (
               <div
@@ -555,7 +546,8 @@ export default function ReviewClient({
             )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)', minWidth: 0 }}>
+          {/* Colonne du milieu : LA DÉCISION. Rien d'autre ne doit s'y trouver. */}
+          <div className="review-col">
             {scan?.variant_conflict && (
               <div className="note note--alarm">
                 Conflit de variant — une empreinte connue de cette carte porte un variant
@@ -734,6 +726,11 @@ export default function ReviewClient({
               </section>
             )}
 
+          </div>
+
+          {/* Colonne de droite : LES RÉGLAGES ET LES CHIFFRES. Séparés de la
+              décision pour que l'œil n'ait pas à faire le tri. */}
+          <div className="review-col review-side">
             <section style={{ display: 'flex', gap: 'var(--s3)', flexWrap: 'wrap' }}>
               {/* Le variant est l'erreur la plus coûteuse : il change de couleur
                   dès qu'il diverge du défaut de session. */}

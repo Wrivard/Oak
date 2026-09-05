@@ -288,6 +288,43 @@ a:hover {
   max-width: 780px;
 }
 
+/* --- Grille de la review ---------------------------------------------------
+   Trois colonnes : le scan, la décision, les réglages. Sur un écran de portable
+   une seule colonne obligerait à DÉFILER pendant qu'on trie, et défiler coûte
+   des secondes sur un budget de trois.
+
+   En dessous de 1200 px on empile — la review depuis un téléphone reste
+   utilisable, elle est juste moins dense. */
+
+.review-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(300px, 1fr) minmax(280px, 360px);
+  gap: var(--s4);
+  padding: var(--s4);
+  min-height: 0;
+  overflow: auto;
+}
+@media (max-width: 1200px) {
+  .review-grid {
+    grid-template-columns: minmax(160px, 220px) 1fr;
+  }
+  .review-side {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 720px) {
+  .review-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.review-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  min-width: 0;
+}
+
 /* --- Panneaux ------------------------------------------------------------- */
 
 .panel {
