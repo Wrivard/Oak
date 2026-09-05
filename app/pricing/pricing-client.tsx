@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { savePricingConfig } from './actions.js';
+import RulesEditor from './rules-editor.js';
 import type { PreviewSku } from './queries.js';
 import { formatCents, netAfterFees } from '../../lib/pricing/net.js';
 import { parsePricingConfig, suggestPrice } from '../../lib/pricing/rules.js';
@@ -13,6 +14,11 @@ import type { CardCondition } from '../../lib/sku.js';
  * Le calcul de preview utilise EXACTEMENT `suggestPrice`, la même fonction que
  * le handler `price_refresh`. Une preview qui réimplémenterait la règle
  * mentirait le jour où les deux divergent.
+ *
+ * Les champs vivent dans `RulesEditor` et réécrivent le JSON à chaque
+ * modification : le texte reste la source de vérité unique, lue par la preview
+ * et par l'enregistrement. Deux états parallèles finiraient par diverger, et
+ * diverger ici veut dire publier un prix qu'on n'a pas voulu.
  */
 interface Props {
   initialConfig: string;
@@ -126,7 +132,7 @@ export default function PricingClient({
 
       <div
         className="page-body page-body--flush"
-        style={{ display: 'grid', gridTemplateColumns: '420px 1fr', minHeight: 0 }}
+        style={{ display: 'grid', gridTemplateColumns: '520px 1fr', minHeight: 0 }}
       >
         <section
           style={{
@@ -135,39 +141,12 @@ export default function PricingClient({
             minHeight: 0,
             padding: 'var(--s4)',
             borderRight: '1px solid var(--border)',
+            gap: 'var(--s2)',
           }}
         >
-          <span className="label">Configuration</span>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            spellCheck={false}
-            className="textarea"
-            style={{
-              flex: 1,
-              marginTop: 'var(--s2)',
-              minHeight: 0,
-              borderColor: parsed.error ? 'var(--red)' : 'var(--border)',
-            }}
-          />
-          {parsed.error && (
-            <pre
-              className="mono"
-              style={{
-                color: 'var(--red)',
-                fontSize: 11,
-                whiteSpace: 'pre-wrap',
-                margin: 'var(--s2) 0 0',
-                maxHeight: 90,
-                overflow: 'auto',
-              }}
-            >
-              {parsed.error}
-            </pre>
-          )}
-          <p className="faint" style={{ fontSize: 11, margin: 'var(--s2) 0 0' }}>
-            Validée avant écriture : une config malformée est refusée, pas appliquée.
-          </p>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+            <RulesEditor cfg={parsed.cfg} error={parsed.error} text={text} onChange={setText} />
+          </div>
         </section>
 
         <section style={{ minHeight: 0, overflow: 'auto', padding: 'var(--s4)' }}>
