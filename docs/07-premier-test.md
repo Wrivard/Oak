@@ -10,11 +10,20 @@ Prévois environ deux heures, dont une d'attente pendant que le worker travaille
 ## Avant de commencer
 
 ```bash
+pnpm verify                   # typecheck + tests + build + les 9 pages rendues
 pnpm reset:data --confirm     # repart propre, garde le catalogue
 ```
 
 Puis double-clique `Demarrer.bat`. Vérifie que `/dashboard` est vert avant d'aller
 plus loin — s'il y a déjà une alarme, elle ne viendra pas de ton test.
+
+Deux répétitions facultatives, si tu veux voir la chaîne tourner sans y mettre de
+vraies cartes. Elles écrivent dans la base : `pnpm reset:data --confirm` après.
+
+```bash
+pnpm repetition 40            # 80 pages par les VRAIS chemins HTTP, réconciliation
+pnpm edge                     # dix formats de scanner, dont deux fichiers corrompus
+```
 
 ---
 
@@ -24,10 +33,16 @@ plus loin — s'il y a déjà une alarme, elle ne viendra pas de ton test.
 l'OCR marche le mieux, donc c'est le meilleur cas et il doit passer.
 
 1. Scanne en recto-verso. Tu dois obtenir **100 fichiers** `image0001`… `image0100`.
-2. `/upload` — nomme le lot, choisis le variant, coche **Recto-verso**, dépose tout.
-3. `/batches` — tu dois voir **50 cartes**, pas 100. Si tu en vois 100, l'appariement
+2. `/upload` — nomme le lot, choisis le variant, coche **Recto-verso**, et **glisse le
+   dossier entier** du scanner (ou « Choisir un dossier »). L'écran affiche
+   « Lecture du dossier… » pendant qu'il descend dedans, puis le nombre de photos.
+3. Saisis **50** dans **Cartes comptées** avant d'envoyer. C'est le seul contrôle qui
+   rattrape une double-alimentation de l'ADF : deux feuilles passées collées font une
+   carte physique sans ligne d'inventaire, et l'écart de comptage est le seul signal
+   qu'elle a existé. Sans lui, `/dashboard` dira « contrôle inactif », pas « tout va
+   bien ».
+4. `/batches` — tu dois voir **50 cartes**, pas 100. Si tu en vois 100, l'appariement
    n'a pas fonctionné et il faut s'arrêter là.
-4. Saisis **50** dans le champ « attendu ». C'est ce qui rend la réconciliation possible.
 5. Attends que la barre d'avancement se vide de gris.
 
 **Ce que tu regardes :**
@@ -38,6 +53,8 @@ l'OCR marche le mieux, donc c'est le meilleur cas et il doit passer.
 | `/batches` | aucune anomalie en haut | aucune page perdue, aucun décalage |
 | `/diagnostics` | taux de lecture OCR | **le chiffre le plus important du test** |
 | `/dashboard` | jobs morts = 0 | rien n'a échoué en silence |
+| `/dashboard` | écart de comptage | « 1 lot balance » et non « contrôle inactif » |
+| `/batches` | colonne des écartées | une page illisible y apparaît au lieu de disparaître |
 
 ---
 
@@ -117,6 +134,17 @@ Puis `/inventory`, filtre **Sans prix**.
   l'expérience 1ter, et si la part est grande, la lane « lot » n'est pas une option mais
   une nécessité de conception.
 
+`/pricing` s'édite maintenant en vrais champs — plancher, bandes, condition, canal — et
+le tableau de droite recalcule à chaque frappe sur **tes** SKUs. Le JSON reste en bas,
+replié, pour coller une config entière.
+
+> **Une carte sans prix peut l'être pour une raison précise.** Si le lot a été envoyé en
+> reverse holo et que la source n'a que le printing normal, le SKU part en review au
+> lieu d'être prixé — l'écart normal/reverse va de 5x à 20x, et aucun autre printing
+> n'est substitué. La raison est dans `price_breakdown`, avec la liste des printings que
+> l'API avait réellement. Si beaucoup de cartes tombent là, c'est le variant du lot
+> qu'il faut regarder, pas le pricing.
+
 ---
 
 ## Test 6 — Le volume
@@ -127,6 +155,10 @@ cartes** et laisse tourner.
 **Ce que tu regardes pendant :**
 
 - `/dashboard` — la profondeur de file monte puis redescend. Les jobs morts restent à 0.
+- `/dashboard` — **Taille de la base**. Le plan gratuit plafonne à 500 Mo, et au-delà
+  Supabase passe la base en lecture seule : plus un scan, plus une vente. Chaque scan
+  résolu écrit une empreinte d'environ 2,9 ko, ce qui donne trois à cinq mois avant le
+  mur. La métrique avertit à 80 %, alarme à 95 %.
 - La mémoire du process worker ne monte pas indéfiniment (205 Mo mesurés sur 2 000
   scans).
 
@@ -143,7 +175,9 @@ un backup, et c'est le moment de le savoir — pas le jour où tu en as besoin.
   comme tels à l'écran, tant que tu ne les as pas relevés dans le Seller Hub.
 - **L'export TCGplayer écarte tout.** `tcg_sku_id` est vide : ces IDs ne s'obtiennent
   qu'en exportant leur catalogue. L'export le dit ligne par ligne au lieu de produire un
-  fichier vide sans explication.
+  fichier vide sans explication, et `/dashboard` porte maintenant la ligne
+  « Dernier export TCGplayer » — en alarme tant que le fichier sort vide alors qu'il y a
+  du stock.
 - **La porte de non-régression du matching est inactive.** Le golden set est vide.
   `pnpm golden:export` le constitue à partir de tes reviews : après 200 cartes reviewées
   à la main, elle s'active et protège les seuils.
