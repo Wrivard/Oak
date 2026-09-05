@@ -189,6 +189,15 @@ dupliquer la logique de bandes.
 
 ## 4. La colonne qui compte : le net
 
+> **Un seul chiffre de port, dans `lib/config/fees.ts`.** Trouvé le 5 septembre
+> 2026 : la review calculait son net avec **zéro** port pendant que la grille de
+> prix en comptait un dollar. Sur une carte à 1,75 $, ça donne 1,11 $ contre
+> 0,12 $ — deux conclusions opposées sur la seule question qui compte à ce niveau
+> de prix, affichées par deux écrans de la même application. Le port est
+> maintenant une constante partagée, marquée non vérifiée comme les taux de
+> frais. Au passage : une saisie de prix illisible dans la review était ignorée
+> en silence ; le champ devient rouge et le net affiche « illisible ».
+
 ```ts
 export function netAfterFees(price: number, shippingCost: number, ch: Channel) {
   if (ch === 'ebay') {

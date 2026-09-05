@@ -10,11 +10,14 @@ import PricingClient from './pricing-client.js';
 export const dynamic = 'force-dynamic';
 
 /**
- * Coût d'expédition retenu pour la preview. Une enveloppe rembourrée avec suivi
- * tourne autour de 1 $ — c'est l'ordre de grandeur qui rend le net à 1,75 $
- * lisible. À remplacer par le coût réel mesuré quand il sera connu.
+ * Coût d'expédition retenu pour la preview.
+ *
+ * Il vient de `lib/config/fees.ts`, pas d'une constante locale : la review
+ * affichait un net calculé avec ZÉRO port pendant que cet écran en comptait un
+ * dollar. Sur une carte à 1,75 $, 1,11 $ contre 0,12 $ — deux conclusions
+ * opposées sur la seule question qui compte à ce niveau de prix.
  */
-const PREVIEW_SHIPPING_CENTS = 100;
+const PREVIEW_SHIPPING_CENTS = FEES.shippingCents;
 
 export default async function PricingPage() {
   const [config, skus] = await Promise.all([loadConfig(), loadPreviewSkus()]);

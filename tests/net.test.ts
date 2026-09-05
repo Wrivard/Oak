@@ -99,3 +99,25 @@ describe('parseAmount', () => {
     }
   });
 });
+
+describe('le port vit dans la config, pas dans un écran', () => {
+  it('un seul chiffre pour la review et la grille de prix', () => {
+    // La review calculait son net avec ZÉRO port pendant que /pricing en
+    // comptait un dollar. Sur une carte à 1,75 $ : 1,11 $ contre 0,12 $, deux
+    // conclusions opposées sur la seule question qui compte à ce niveau de prix.
+    expect(FEES.shippingCents).toBeGreaterThan(0);
+    expect(Number.isInteger(FEES.shippingCents)).toBe(true);
+  });
+
+  it('à 1,75 $ avec le port réel, il ne reste presque rien', () => {
+    // C'est l'expérience 1ter : si beaucoup de cartes atterrissent au plancher,
+    // la lane « lot » n'est pas une option mais une nécessité de conception.
+    const net = netAfterFees(175, FEES.shippingCents, 'ebay').netCents;
+    expect(net).toBeLessThan(30);
+    expect(net).toBeGreaterThan(0);
+  });
+
+  it('sous le plancher, le net devient négatif — et c’est le but de l’afficher', () => {
+    expect(netAfterFees(100, FEES.shippingCents, 'ebay').netCents).toBeLessThan(0);
+  });
+});

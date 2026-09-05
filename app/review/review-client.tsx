@@ -11,6 +11,7 @@ import {
 import HelpOverlay from './help-overlay.js';
 import type { ReviewScan } from './queries.js';
 import { formatCents, netAfterFees, parseAmount } from '../../lib/pricing/net.js';
+import { FEES } from '../../lib/config/fees.js';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
 
 /**
@@ -463,6 +464,8 @@ export default function ReviewClient({
   }
 
   const priceCents = priceText === '' ? null : parseAmount(priceText);
+  /** Saisie non vide que `parseAmount` refuse : à dire, pas à ignorer. */
+  const prixIllisible = priceText.trim() !== '' && priceCents === null;
   const soldSales = scan?.prices.find((p) => p.source === 'ebay_sold')?.sales ?? [];
   const variantDiverge = effVariant !== scan?.default_variant;
 
@@ -845,16 +848,41 @@ export default function ReviewClient({
                   placeholder="—"
                   onChange={(e) => setPriceText(e.target.value)}
                   onBlur={() => setEditing(false)}
-                  style={{ width: 100, borderColor: editing ? 'var(--green)' : undefined }}
+                  style={{
+                    width: 100,
+                    // Une saisie illisible était ignorée en silence : on croyait
+                    // avoir mis un prix et la carte partait sans.
+                    borderColor: prixIllisible
+                      ? 'var(--red)'
+                      : editing
+                        ? 'var(--green)'
+                        : undefined,
+                  }}
                 />
               </label>
 
               <div className="field" style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                <span className="label">Net après frais</span>
-                <span className="num" style={{ fontSize: 18, lineHeight: '32px' }}>
-                  {priceCents === null
-                    ? '—'
-                    : formatCents(netAfterFees(priceCents, 0, 'ebay').netCents)}
+                <span className="label">
+                  Net · port {formatCents(FEES.shippingCents)}
+                </span>
+                {/* MÊME port que la grille de prix. Cet écran comptait zéro
+                    pendant que /pricing comptait un dollar : sur une carte à
+                    1,75 $, 1,11 $ contre 0,12 $, deux conclusions opposées. */}
+                <span
+                  className="num"
+                  style={{
+                    fontSize: 18,
+                    lineHeight: '32px',
+                    color: prixIllisible ? 'var(--red)' : undefined,
+                  }}
+                >
+                  {prixIllisible
+                    ? 'illisible'
+                    : priceCents === null
+                      ? '—'
+                      : formatCents(
+                          netAfterFees(priceCents, FEES.shippingCents, 'ebay').netCents,
+                        )}
                 </span>
               </div>
             </section>
