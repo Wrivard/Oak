@@ -1,5 +1,6 @@
 import { query } from '../../lib/db.js';
 import { computeMix, MANUAL_RATE_ALARM } from '../../lib/metrics/mix.js';
+import { computeReconciliation } from '../../lib/metrics/reconciliation.js';
 
 /**
  * Les cinq métriques de docs/05-production.md §1.2.
@@ -189,25 +190,25 @@ async function needsReview(): Promise<Metric> {
  * qu'il est SILENCIEUX : une double-alimentation du scanner fait exister une
  * carte physique sans ligne d'inventaire. On ne la vend pas, on ne la retrouve
  * jamais (docs/02 §1).
+ *
+ * La requête ramène TOUS les lots ouverts, pas seulement ceux en écart : sans
+ * les lots sans comptage attendu, on ne peut pas distinguer « ça balance » de
+ * « on ne vérifie rien ». Voir lib/metrics/reconciliation.ts.
  */
 async function reconciliationGap(): Promise<Metric> {
-  const { rows } = await query<{ name: string; expected: number; scanned: number }>(
+  const { rows } = await query<{ name: string; expected: number | null; scanned: number }>(
     `select name, expected_count as expected, scanned_count as scanned
        from sessions
-      where status = 'open' and expected_count is not null
-        and expected_count <> scanned_count`,
+      where status = 'open'`,
   );
+
+  const r = computeReconciliation(rows);
 
   return {
     label: 'Écart de comptage de session',
-    value: String(rows.length),
-    detail:
-      rows.length === 0
-        ? 'toutes les sessions balancent'
-        : rows
-            .map((r) => `${r.name} : ${r.scanned}/${r.expected}`)
-            .join(' · '),
-    health: rows.length > 0 ? 'alarm' : 'ok',
-    threshold: '> 0 session en écart',
+    value: r.value,
+    detail: r.detail,
+    health: r.health,
+    threshold: '> 0 session en écart, ou aucun comptage attendu saisi',
   };
 }

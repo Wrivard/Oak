@@ -45,6 +45,15 @@ Une seule page, cinq métriques. Si elle est verte, tu peux aller dormir.
 | Profondeur de queue par type de job | `> 5 000` ou croissance monotone 1 h |
 | Jobs `dead` dernières 24 h | `> 0` |
 | Écart de réconciliation eBay | `> 0` |
+
+> **Mesuré le 5 septembre 2026 :** cette métrique affichait « toutes les sessions
+> balancent » alors qu'aucun lot ouvert n'avait de comptage attendu — c'est-à-dire
+> pendant que le contrôle était purement inactif. `expected_count` reste nul tant
+> qu'on ne saisit pas à la main le nombre de cartes mises dans le scanner, donc le
+> cas « non vérifiable » est le cas **normal**, pas un cas limite. L'absence
+> d'écart et l'absence de contrôle ne sont pas la même chose, et confondre les
+> deux donne une fausse assurance sur exactement le point qu'on ne peut pas
+> rattraper plus tard. Voir `lib/metrics/reconciliation.ts`.
 | Cartes en `needs_review` | `> capacité quotidienne` |
 
 Le **taux de review manuelle** est ta métrique économique principale : c'est le seul
