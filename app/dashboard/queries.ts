@@ -24,14 +24,50 @@ const MANUAL_RATE_ALARM = 0.15;
 const QUEUE_DEPTH_ALARM = 5000;
 
 export async function loadMetrics(): Promise<Metric[]> {
-  const [resolution, queue, dead, review, reconcile] = await Promise.all([
+  const [worker, resolution, queue, dead, review, reconcile] = await Promise.all([
+    workerAlive(),
     resolutionMix(),
     queueDepth(),
     deadJobs(),
     needsReview(),
     reconciliationGap(),
   ]);
-  return [resolution, queue, dead, review, reconcile];
+  // Le worker en premier : si lui ne tourne pas, les cinq autres métriques
+  // décrivent un système figé et n'apprennent rien.
+  return [worker, resolution, queue, dead, review, reconcile];
+}
+
+/**
+ * Le worker draine-t-il ?
+ *
+ * Ce n'est pas dans les cinq métriques du doc, mais c'est la panne la plus
+ * probable en exploitation réelle : on ferme la fenêtre sans y penser et plus
+ * rien n'avance, sans aucun signal.
+ */
+async function workerAlive(): Promise<Metric> {
+  const { rows } = await query<{ attente: string; recent: string; dernier: string | null }>(
+    `select
+       (select count(*) from jobs
+         where status in ('queued','failed')
+           and run_after < now() - interval '2 minutes')::text as attente,
+       (select count(*) from jobs
+         where completed_at > now() - interval '2 minutes')::text as recent,
+       (select to_char(max(completed_at), 'HH24:MI:SS') from jobs)::text as dernier`,
+  );
+
+  const attente = Number(rows[0]?.attente ?? 0);
+  const recent = Number(rows[0]?.recent ?? 0);
+  const muet = attente > 0 && recent === 0;
+
+  return {
+    label: 'Worker',
+    value: muet ? 'arrêté' : recent > 0 ? 'actif' : 'au repos',
+    detail: muet
+      ? `${attente} job${attente > 1 ? 's' : ''} en attente, rien de terminé depuis 2 min`
+      : `dernier job terminé à ${rows[0]?.dernier ?? '—'}`,
+    health: muet ? 'alarm' : 'ok',
+    threshold: 'des jobs attendent et rien n’avance',
+  };
 }
 
 /**

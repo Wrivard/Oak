@@ -15,6 +15,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 interface Counts {
   review: number;
   health: 'ok' | 'warn' | 'alarm';
+  workerMuet: boolean;
+  enAttente: number;
 }
 
 interface Props {
@@ -165,7 +167,23 @@ export default function Shell({ counts, children }: Props) {
         </div>
       </aside>
 
-      <div className="main">{children}</div>
+      <div className="main">
+        {/* Visible sur TOUTES les pages : si le worker ne tourne pas, rien de ce
+            qu'on fait ailleurs n'aura d'effet, et il n'y a aucun autre signal. */}
+        {counts.workerMuet && (
+          <div
+            className="note note--alarm"
+            style={{ margin: 'var(--s3) var(--s5) 0', borderRadius: 'var(--r2)' }}
+          >
+            <strong>Le worker ne tourne pas.</strong> {counts.enAttente} job
+            {counts.enAttente > 1 ? 's attendent' : ' attend'} sans que rien n’avance.
+            Relance{' '}
+            <span className="mono">Demarrer.bat</span>, ou dans un terminal :{' '}
+            <span className="mono">node --import tsx worker/index.ts</span>
+          </div>
+        )}
+        {children}
+      </div>
     </div>
   );
 }

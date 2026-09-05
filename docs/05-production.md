@@ -43,6 +43,22 @@ S'il remonte, quelque chose a changé : nouveaux sets non seedés, réglages sca
 modifiés, OCR qui décroche sur une ère, seuils dérivés. Il devrait descendre avec le
 temps, jamais monter.
 
+### 1.2bis La sixième métrique : le worker draine-t-il ?
+
+Elle n'est pas dans la liste ci-dessus, et c'est pourtant la panne la plus probable
+en exploitation réelle : **on ferme la fenêtre du worker sans y penser**. On envoie
+ensuite un lot, rien ne se passe, et aucun écran ne dit pourquoi.
+
+Détection : des jobs prêts depuis plus de deux minutes **et** aucun job terminé
+pendant ce temps. Personne ne draine.
+
+Le signal ne vit pas seulement sur le dashboard — une bannière rouge s'affiche sur
+**toutes** les pages, avec la commande exacte à lancer. Si le worker ne tourne pas,
+rien de ce qu'on fait ailleurs n'aura d'effet, et il n'y a aucun autre indice.
+
+Le worker est affiché en PREMIER sur le dashboard : quand il est arrêté, les cinq
+autres métriques décrivent un système figé et n'apprennent rien.
+
 ### 1.3 Traces sur les appels externes
 
 Chaque appel eBay et tcgapi : durée, statut, taille de payload, et pour eBay
