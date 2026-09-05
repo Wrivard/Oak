@@ -44,6 +44,18 @@ const ICONS: Record<string, ReactNode> = {
       />
     </svg>
   ),
+  inventory: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M3 7l9-4 9 4v10l-9 4-9-4V7Z" strokeLinejoin="round" />
+      <path d="M3 7l9 4 9-4M12 11v10" strokeLinejoin="round" />
+    </svg>
+  ),
+  batches: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="4" width="18" height="6" rx="1.5" />
+      <rect x="3" y="14" width="18" height="6" rx="1.5" />
+    </svg>
+  ),
   dashboard: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M4 19V9M10 19V5M16 19v-7M22 19H2" strokeLinecap="round" />
@@ -53,7 +65,9 @@ const ICONS: Record<string, ReactNode> = {
 
 const NAV = [
   { href: '/upload', label: 'Envoyer', icon: 'upload' },
+  { href: '/batches', label: 'Lots', icon: 'batches' },
   { href: '/review', label: 'Review', icon: 'review' },
+  { href: '/inventory', label: 'Inventaire', icon: 'inventory' },
   { href: '/pricing', label: 'Prix', icon: 'pricing' },
   { href: '/dashboard', label: 'Santé', icon: 'dashboard' },
 ] as const;
