@@ -10,7 +10,9 @@ import { loadAnomalies, loadBatches, type Batch } from './queries.js';
 export const dynamic = 'force-dynamic';
 
 function Progress({ b }: { b: Batch }) {
-  const total = b.pending + b.review + b.resolved;
+  // Les écartées comptent dans le total : sans elles, un lot contenant des
+  // intercalaires afficherait une barre qui ne se remplit jamais.
+  const total = b.pending + b.review + b.resolved + b.rejected;
   if (total === 0) return <span className="faint">—</span>;
 
   const pct = (n: number) => `${(100 * n) / total}%`;
@@ -22,10 +24,12 @@ function Progress({ b }: { b: Batch }) {
       <div style={{ display: 'flex', height: 5, borderRadius: 3, overflow: 'hidden', background: 'var(--surface-3)' }}>
         <span style={{ width: pct(b.resolved), background: 'var(--green)' }} />
         <span style={{ width: pct(b.review), background: 'var(--amber)' }} />
+        <span style={{ width: pct(b.rejected), background: 'var(--text-faint)' }} />
         <span style={{ width: pct(b.pending), background: 'var(--border-lit)' }} />
       </div>
       <div className="mono faint" style={{ fontSize: 11, marginTop: 3 }}>
         {b.resolved} résolues · {b.review} en review
+        {b.rejected > 0 && ` · ${b.rejected} écartées`}
         {b.pending > 0 && ` · ${b.pending} en cours`}
       </div>
     </div>
@@ -35,7 +39,10 @@ function Progress({ b }: { b: Batch }) {
 export default async function BatchesPage() {
   const [batches, anomalies] = await Promise.all([loadBatches(), loadAnomalies()]);
 
-  const totalCards = batches.reduce((s, b) => s + b.resolved + b.review + b.pending, 0);
+  const totalCards = batches.reduce(
+    (s, b) => s + b.resolved + b.review + b.pending + b.rejected,
+    0,
+  );
 
   return (
     <>

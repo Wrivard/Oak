@@ -20,6 +20,8 @@ export interface Batch {
   pending: number;
   review: number;
   resolved: number;
+  /** Pages écartées : pas des cartes (intercalaire, page blanche). */
+  rejected: number;
   ownHistory: number;
   catalog: number;
   manual: number;
@@ -41,6 +43,7 @@ interface Row {
   pending: string;
   review: string;
   resolved: string;
+  rejected: string;
   own_history: string;
   catalog: string;
   manual: string;
@@ -57,6 +60,7 @@ export async function loadBatches(limit = 40): Promise<Batch[]> {
             count(s.*) filter (where s.status in ('pending','fingerprinted','matched'))::text as pending,
             count(s.*) filter (where s.status = 'needs_review')::text as review,
             count(s.*) filter (where s.status = 'resolved')::text as resolved,
+            count(s.*) filter (where s.status = 'rejected')::text as rejected,
             count(s.*) filter (where s.match_source = 'own_history')::text as own_history,
             count(s.*) filter (where s.match_source = 'catalog')::text as catalog,
             count(s.*) filter (where s.match_source = 'manual')::text as manual,
@@ -92,6 +96,7 @@ export async function loadBatches(limit = 40): Promise<Batch[]> {
     pending: Number(r.pending),
     review: Number(r.review),
     resolved: Number(r.resolved),
+    rejected: Number(r.rejected),
     ownHistory: Number(r.own_history),
     catalog: Number(r.catalog),
     manual: Number(r.manual),
