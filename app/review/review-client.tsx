@@ -495,6 +495,35 @@ export default function ReviewClient({
               </div>
             )}
 
+            {/* Pourquoi cette carte est ici. Sans ce chiffre, «l'OCR a raté»
+                reste une supposition — et c'est la donnée de l'expérience 1bis. */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--s2)',
+                fontSize: 12,
+              }}
+            >
+              <span className="label">Numéro lu</span>
+              {scan?.ocrRead ? (
+                <>
+                  <span className="mono" style={{ color: 'var(--green)' }}>
+                    {scan.ocrRead}
+                  </span>
+                  {scan.ocrBand !== null && (
+                    <span className="faint" style={{ fontSize: 11 }}>
+                      bande {scan.ocrBand}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="mono" style={{ color: 'var(--amber)' }}>
+                  rien lu — le filtre déterministe n’a pas pu s’appliquer
+                </span>
+              )}
+            </div>
+
             <section>
               <div className="label" style={{ marginBottom: 'var(--s2)' }}>
                 Candidats

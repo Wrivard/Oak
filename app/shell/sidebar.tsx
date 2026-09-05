@@ -56,6 +56,12 @@ const ICONS: Record<string, ReactNode> = {
       <rect x="3" y="14" width="18" height="6" rx="1.5" />
     </svg>
   ),
+  diagnostics: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-4-4" strokeLinecap="round" />
+    </svg>
+  ),
   dashboard: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M4 19V9M10 19V5M16 19v-7M22 19H2" strokeLinecap="round" />
@@ -69,6 +75,7 @@ const NAV = [
   { href: '/review', label: 'Review', icon: 'review' },
   { href: '/inventory', label: 'Inventaire', icon: 'inventory' },
   { href: '/pricing', label: 'Prix', icon: 'pricing' },
+  { href: '/diagnostics', label: 'Diagnostic', icon: 'diagnostics' },
   { href: '/dashboard', label: 'Santé', icon: 'dashboard' },
 ] as const;
 

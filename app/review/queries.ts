@@ -39,6 +39,9 @@ export interface ReviewScan {
   seq: number;
   session_name: string;
   variant_conflict: boolean;
+  /** Ce que l'OCR a lu, ou null s'il n'a rien lu. Voir migration 007. */
+  ocrRead: string | null;
+  ocrBand: number | null;
   candidates: Candidate[];
   default_variant: CardVariant;
   default_condition: CardCondition;
@@ -67,6 +70,8 @@ interface Row {
   seq: number;
   session_name: string;
   variant_conflict: boolean;
+  ocr_read: string | null;
+  ocr_band: number | null;
   candidates: Candidate[] | null;
   default_variant: CardVariant;
   default_condition: CardCondition;
@@ -76,6 +81,7 @@ interface Row {
 export async function loadReviewQueue(limit = 200): Promise<ReviewScan[]> {
   const { rows } = await query<Row>(
     `select s.id, s.seq, ss.name as session_name, s.variant_conflict,
+            s.ocr_read, s.ocr_band,
             s.candidates, ss.default_variant, ss.default_condition,
             ss.default_language
        from scans s join sessions ss on ss.id = s.session_id
@@ -100,6 +106,8 @@ export async function loadReviewQueue(limit = 200): Promise<ReviewScan[]> {
       seq: r.seq,
       session_name: r.session_name,
       variant_conflict: r.variant_conflict,
+      ocrRead: r.ocr_read,
+      ocrBand: r.ocr_band,
       candidates,
       default_variant: r.default_variant,
       default_condition: r.default_condition,

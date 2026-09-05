@@ -19,6 +19,14 @@ export interface CardNumber {
   printedTotal: number | null;
   confidence: number;
   raw: string;
+  /**
+   * Indice de la bande de `THRESHOLDS.ocr.bands` qui a produit cette lecture.
+   *
+   * C'est la donnée qui dira s'il faut un crop era-aware et laquelle
+   * privilégier : si le vintage ne sort jamais que de la bande 1 et le moderne
+   * de la bande 0, la question est tranchée sans deviner.
+   */
+  band: number;
 }
 
 let worker: Promise<TesseractWorker> | undefined;
@@ -77,7 +85,9 @@ export async function cropBand(input: Buffer, band: Band): Promise<Buffer> {
  *
  * Le zéro de tête est retiré : le catalogue stocke "4", pas "004".
  */
-export function parseNumberText(text: string): Omit<CardNumber, 'confidence'> | null {
+export function parseNumberText(
+  text: string,
+): Omit<CardNumber, 'confidence' | 'band'> | null {
   const clean = text.replace(/\s+/g, ' ').trim();
 
   const fraction = /\b([A-Z]{0,4}\d{1,3})\s*\/\s*(\d{1,3})\b/i.exec(clean);
@@ -125,7 +135,7 @@ export async function readCardNumbers(
   const seen = new Set<string>();
   const out: CardNumber[] = [];
 
-  for (const band of THRESHOLDS.ocr.bands) {
+  for (const [bandIndex, band] of THRESHOLDS.ocr.bands.entries()) {
     let text: string;
     let confidence: number;
     try {
@@ -146,7 +156,7 @@ export async function readCardNumbers(
     if (seen.has(key)) continue;
     seen.add(key);
 
-    const candidate: CardNumber = { ...parsed, confidence };
+    const candidate: CardNumber = { ...parsed, confidence, band: bandIndex };
     out.push(candidate);
 
     if (onCandidate && (await onCandidate(candidate))) break;

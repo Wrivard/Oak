@@ -69,6 +69,12 @@ affine par ère seulement si nécessaire.
 **Décision.** Sous 85 % global → le niveau 2 change de design **avant l'étape 3**.
 Ventilation sous 60 % sur une ère → crop era-aware obligatoire.
 
+> **Cette expérience est maintenant automatique.** Depuis la migration 007, chaque scan
+> enregistre ce que l'OCR a lu (`scans.ocr_read`), avec quelle confiance et par quelle
+> bande de crop. La page `/diagnostics` affiche le taux global, la ventilation par ère
+> et la bande qui a réussi — sur **tous** les scans passés, pas sur un échantillon de
+> 100. Il n'y a plus qu'à envoyer un vrai lot et lire l'écran.
+
 ---
 
 ## Étape 1ter — Expérience distribution de valeur (PAS DE CODE)

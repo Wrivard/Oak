@@ -83,6 +83,10 @@ export async function handleMatch(job: Job): Promise<void> {
   // ---- NIVEAU 2 — catalogue -----------------------------------------------
   const level2 = await matchCatalog(scan);
 
+  // La lecture OCR est enregistrée AVANT de brancher : qu'on résolve ou non,
+  // c'est la donnée de l'expérience 1bis, et elle vaut sur les deux issues.
+  await recordOcr(scan.id, level2);
+
   if (level2.resolved) {
     await resolveScan(
       scan,
@@ -114,6 +118,24 @@ export async function handleMatch(job: Job): Promise<void> {
     candidats: forReview.length,
     ocr_lu: level2.numberRead,
   });
+}
+
+/**
+ * Enregistre ce que l'OCR a lu.
+ *
+ * Sans ça, diagnostiquer «pourquoi cette carte est partie en review» oblige à
+ * rejouer le pipeline à la main. Voir migration 007.
+ */
+async function recordOcr(
+  scanId: string,
+  level2: { numberRead: string | null; ocrConfidence: number | null; ocrBand: number | null },
+): Promise<void> {
+  await query(
+    `update scans
+        set ocr_read = $2, ocr_confidence = $3, ocr_band = $4
+      where id = $1`,
+    [scanId, level2.numberRead, level2.ocrConfidence, level2.ocrBand],
+  );
 }
 
 async function loadScan(scanId: string): Promise<ScanContext | null> {
@@ -184,6 +206,8 @@ async function matchCatalog(scan: ScanContext): Promise<{
   candidates: Candidate[];
   resolved: { identity: Identity; confidence: number } | null;
   numberRead: string | null;
+  ocrConfidence: number | null;
+  ocrBand: number | null;
 }> {
   let image: Buffer;
   try {
@@ -195,8 +219,16 @@ async function matchCatalog(scan: ScanContext): Promise<{
 
   let candidates: Candidate[] = [];
   let numberRead: string | null = null;
+  let ocrConfidence: number | null = null;
+  let ocrBand: number | null = null;
 
   await readCardNumbers(image, async (reading) => {
+    // On enregistre CHAQUE lecture tentée, même celle qui ne donnera rien : le
+    // diagnostic a besoin de savoir ce que tesseract a cru voir, pas seulement
+    // ce qui a été validé.
+    numberRead ??= `${reading.number}/${reading.printedTotal ?? '-'}`;
+    ocrConfidence ??= reading.confidence;
+    ocrBand ??= reading.band;
     const found = await filterAndRerank(
       reading.number,
       reading.printedTotal,
@@ -205,11 +237,16 @@ async function matchCatalog(scan: ScanContext): Promise<{
     );
     if (found.length === 0) return false;
     candidates = found;
+    // La lecture VALIDÉE remplace la première tentative.
     numberRead = `${reading.number}/${reading.printedTotal ?? '-'}`;
+    ocrConfidence = reading.confidence;
+    ocrBand = reading.band;
     return true;
   });
 
-  if (candidates.length === 0) return { candidates, resolved: null, numberRead };
+  if (candidates.length === 0) {
+    return { candidates, resolved: null, numberRead, ocrConfidence, ocrBand };
+  }
 
   const best = candidates[0] as Candidate;
   const second = candidates[1];
@@ -221,7 +258,7 @@ async function matchCatalog(scan: ScanContext): Promise<{
   const separated = margin >= THRESHOLDS.catalog.minMargin;
 
   if (!withinThreshold || !separated) {
-    return { candidates, resolved: null, numberRead };
+    return { candidates, resolved: null, numberRead, ocrConfidence, ocrBand };
   }
 
   return {
@@ -236,6 +273,8 @@ async function matchCatalog(scan: ScanContext): Promise<{
       confidence: 1 - Number(best.distance) / THRESHOLDS.catalog.cosineMax,
     },
     numberRead,
+    ocrConfidence,
+    ocrBand,
   };
 }
 
