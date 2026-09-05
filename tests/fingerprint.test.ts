@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { dhash, hamming, phash } from '../lib/fingerprint/hash.js';
 import { embed, EMBED_DIM, l2normalize } from '../lib/fingerprint/embed.js';
 import { cardImage } from './fixtures/cards.js';
+import { THRESHOLDS } from '../lib/config/thresholds.js';
 
 /**
  * Les quatre propriétés dont dépend le niveau 1 de résolution.
@@ -70,4 +71,59 @@ describe('empreintes perceptuelles', () => {
   it('l2normalize refuse un vecteur nul plutôt que de produire des NaN', () => {
     expect(() => l2normalize([0, 0, 0])).toThrow(/nul/);
   });
+});
+
+describe('le niveau 1 doit attraper un RE-SCAN de la même carte', () => {
+  /**
+   * C'est tout le modèle économique : la première occurrence coûte une review,
+   * les suivantes doivent être gratuites. Si la variation d'un re-scan dépasse
+   * les seuils, le niveau 1 ne se déclenche jamais et le coût marginal ne
+   * descend pas — le système continue de marcher, mais il cesse d'être rentable.
+   *
+   * Ce test est une PORTE : il ne fixe pas les seuils, il vérifie qu'ils
+   * laissent encore passer un re-scan réaliste.
+   */
+  const P = THRESHOLDS.ownHistory.phashMax;
+  const D = THRESHOLDS.ownHistory.dhashMax;
+
+  async function distances(base: Buffer, variante: Buffer) {
+    return {
+      p: hamming(await phash(base), await phash(variante)),
+      d: hamming(await dhash(base), await dhash(variante)),
+    };
+  }
+
+  it('un re-scan réaliste reste sous les deux seuils', async () => {
+    // Léger travers, éclairage un peu différent, compression du scanner.
+    const base = await cardImage('charizard');
+    const rescan = await sharp(base)
+      .rotate(0.8, { background: '#000' })
+      .modulate({ brightness: 1.04, saturation: 0.97 })
+      .blur(0.3)
+      .jpeg({ quality: 82 })
+      .toBuffer();
+
+    const { p, d } = await distances(base, rescan);
+    expect(p).toBeLessThanOrEqual(P);
+    expect(d).toBeLessThanOrEqual(D);
+  }, 60_000);
+
+  it('LE dHASH EST LA CONTRAINTE, et c’est la rotation qui le pousse', async () => {
+    // Mesuré : à 2° de travers, le dHash sort du seuil (11 à 14 pour un budget
+    // de 10) alors que le pHash tient encore (6 à 8 pour 8). Le hachage de
+    // gradient est plus sensible à la rotation que celui de fréquence.
+    //
+    // Conséquence d'exploitation : au-delà d'environ un degré et demi de
+    // travers dans l'ADF, une carte déjà connue repart en review. Ce test
+    // documente la limite plutôt que de prétendre qu'elle n'existe pas.
+    const base = await cardImage('blastoise');
+    const droit = await sharp(base).rotate(1, { background: '#000' }).jpeg().toBuffer();
+    const travers = await sharp(base).rotate(2, { background: '#000' }).jpeg().toBuffer();
+
+    const a = await distances(base, droit);
+    const b = await distances(base, travers);
+
+    expect(a.d).toBeLessThanOrEqual(D);
+    expect(b.d).toBeGreaterThan(a.d);
+  }, 60_000);
 });

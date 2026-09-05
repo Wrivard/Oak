@@ -177,6 +177,39 @@ Hamming : c'est de **borner le nombre d'empreintes par identité**. La deux
 centième occurrence du même Dracaufeu Set de Base n'apprend plus rien que les
 cinq premières ne disaient déjà.
 
+**Le niveau 1 attrape un re-scan réaliste, mais pas une carte de travers.**
+C'est tout le modèle économique : la première occurrence coûte une review, les
+suivantes doivent être gratuites. Mesuré le 5 septembre 2026 sur deux cartes
+réelles, seuils `pHash ≤ 8` et `dHash ≤ 10` :
+
+```
+                        pHash   dHash
+re-scan identique          0       0     niveau 1
+recompression q75          0       0-1   niveau 1
+±6 % de luminosité         0       0-1   niveau 1
+recadrage 2 %              2       3-6   niveau 1
+rotation 1°                4-6     4-6   niveau 1
+re-scan réaliste           4       4-6   niveau 1
+rotation 2°                6-8    11-14  RATÉ, repart en review
+```
+
+**Le dHash est la contrainte, et c'est la rotation qui le pousse.** Le hachage de
+gradient est plus sensible au travers que celui de fréquence : à deux degrés, le
+pHash tient encore (6-8 pour un budget de 8) et le dHash sort (11-14 pour 10).
+
+Conséquence d'exploitation, à surveiller au premier vrai lot : **au-delà
+d'environ un degré et demi de travers dans l'ADF, une carte déjà connue repart en
+review**. Le système continue de marcher, il cesse simplement d'être gratuit sur
+les répétitions — et c'est exactement ce que la métrique `own_history / catalog /
+manual` du tableau de santé montrerait.
+
+Si ça se produit, la réponse n'est pas de desserrer le seuil : à 11-14 on entre
+dans la zone où des cartes différentes commencent à se ressembler (la marge
+mesurée est de 29 sur la somme). C'est de redresser le scan avant de le hacher,
+ou de mieux caler les cartes dans le bac. `tests/fingerprint.test.ts` porte les
+deux cas en garde : un re-scan réaliste doit passer, et la sensibilité du dHash à
+la rotation est documentée plutôt que découverte.
+
 **Le seuil de ressemblance des dos tient, et la fixture qui disait le contraire
 mentait.** L'appariement vérifie que les pages paires se ressemblent entre elles,
 à 12 de distance de Hamming sur le pHash. Si un ADF introduisait plus de
