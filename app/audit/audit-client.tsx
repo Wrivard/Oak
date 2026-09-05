@@ -71,25 +71,14 @@ export default function AuditClient({ rows }: { rows: AuditRow[] }) {
                 opacity: corrigee ? 0.45 : 1,
               }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/api/scan/${r.scanId}/image`}
-                alt="scan"
-                loading="lazy"
-                style={{
-                  width: 68,
-                  height: 94,
-                  objectFit: 'cover',
-                  objectPosition: 'top',
-                  borderRadius: 'var(--r1)',
-                  background: 'var(--surface-2)',
-                }}
-              />
-              {r.cardImage ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
+              {/* Survoler agrandit : à 68 px on distingue un Dracaufeu d'un
+                  Pikachu, pas un Set de Base d'un Set de Base 2 — or c'est
+                  exactement l'erreur que cette page existe pour attraper. */}
+              <span className="zoom" tabIndex={0}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={r.cardImage}
-                  alt={r.cardName}
+                  src={`/api/scan/${r.scanId}/image`}
+                  alt="scan"
                   loading="lazy"
                   style={{
                     width: 68,
@@ -100,6 +89,24 @@ export default function AuditClient({ rows }: { rows: AuditRow[] }) {
                     background: 'var(--surface-2)',
                   }}
                 />
+              </span>
+              {r.cardImage ? (
+                <span className="zoom" tabIndex={0}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={r.cardImage}
+                    alt={r.cardName}
+                    loading="lazy"
+                    style={{
+                      width: 68,
+                      height: 94,
+                      objectFit: 'cover',
+                      objectPosition: 'top',
+                      borderRadius: 'var(--r1)',
+                      background: 'var(--surface-2)',
+                    }}
+                  />
+                </span>
               ) : (
                 <span
                   style={{

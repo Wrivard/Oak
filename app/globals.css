@@ -296,6 +296,45 @@ a:hover {
    En dessous de 1200 px on empile — la review depuis un téléphone reste
    utilisable, elle est juste moins dense. */
 
+/* --- Loupe au survol -------------------------------------------------------
+   Une vignette de 68 px suffit à distinguer un Dracaufeu d'un Pikachu, pas un
+   Set de Base d'un Set de Base 2 — or c'est exactement l'erreur qui compte,
+   même illustration, set différent, prix sans rapport. Le symbole d'extension et
+   le numéro ne sont lisibles qu'agrandis.
+
+   L'image agrandie sort du flux : le conteneur garde sa taille et la ligne ne
+   saute pas sous le curseur. Pas de JavaScript — un survol ne mérite pas un
+   rendu React. */
+.zoom {
+  position: relative;
+  display: block;
+  flex: none;
+}
+.zoom > img {
+  display: block;
+  transition: opacity 90ms ease;
+}
+.zoom:hover > img,
+.zoom:focus-visible > img {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 260px;
+  height: auto;
+  max-width: none;
+  object-fit: contain;
+  z-index: 40;
+  border-radius: var(--r3);
+  border: 1px solid var(--border-lit);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 65%);
+}
+/* Près du bord droit, on agrandit vers la gauche plutôt que hors de l'écran. */
+.zoom--left:hover > img,
+.zoom--left:focus-visible > img {
+  left: auto;
+  right: -6px;
+}
+
 .review-grid {
   display: grid;
   grid-template-columns: minmax(180px, 240px) minmax(300px, 1fr) minmax(280px, 360px);

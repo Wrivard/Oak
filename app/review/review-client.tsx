@@ -680,25 +680,31 @@ export default function ReviewClient({
                   >
                     <kbd>{i + 1}</kbd>
                     {c.image ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={c.image}
-                        alt=""
-                        /* PAS `lazy` : ces vignettes sont la décision. `lazy`
-                           attend un passage de layout avant même de lancer la
-                           requête, sur exactement les images qu'on doit
-                           comparer tout de suite. */
-                        loading="eager"
-                        decoding="async"
-                        style={{
-                          width: 42,
-                          height: 58,
-                          objectFit: 'cover',
-                          objectPosition: 'top',
-                          borderRadius: 3,
-                          background: 'var(--surface-2)',
-                        }}
-                      />
+                      /* Survoler agrandit. À 42 px on voit l'illustration, pas
+                         le symbole d'extension ni le numéro — et deux
+                         réimpressions de la même carte ne se distinguent que
+                         par là. */
+                      <span className="zoom">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={c.image}
+                          alt=""
+                          /* PAS `lazy` : ces vignettes sont la décision. `lazy`
+                             attend un passage de layout avant même de lancer la
+                             requête, sur exactement les images qu'on doit
+                             comparer tout de suite. */
+                          loading="eager"
+                          decoding="async"
+                            style={{
+                            width: 42,
+                            height: 58,
+                            objectFit: 'cover',
+                            objectPosition: 'top',
+                            borderRadius: 3,
+                            background: 'var(--surface-2)',
+                          }}
+                        />
+                      </span>
                     ) : (
                       <span
                         style={{
