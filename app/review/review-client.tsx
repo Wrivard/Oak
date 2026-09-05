@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { confirmScan, loadMore, searchCatalog, type SearchHit } from './actions.js';
+import HelpOverlay from './help-overlay.js';
 import type { ReviewScan } from './queries.js';
 import { formatCents, netAfterFees, parseAmount } from '../../lib/pricing/net.js';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
@@ -338,6 +339,7 @@ export default function ReviewClient({
   if (queue.length === 0) {
     return (
       <>
+        <HelpOverlay />
         <header className="page-head">
           <h1 className="page-title">Review</h1>
         </header>
@@ -368,6 +370,7 @@ export default function ReviewClient({
 
   return (
     <>
+      <HelpOverlay />
       <header className="page-head">
         <h1 className="page-title">Review</h1>
         <span className="page-sub">
@@ -788,6 +791,9 @@ export default function ReviewClient({
         </span>
         <span>
           <kbd>U</kbd> annuler
+        </span>
+        <span style={{ marginLeft: 'auto' }}>
+          <kbd>?</kbd> aide
         </span>
       </footer>
     </>

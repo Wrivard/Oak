@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import AutoRefresh from '../dashboard/auto-refresh.js';
+import BatchActions from './batch-row.js';
 import { loadAnomalies, loadBatches, type Batch } from './queries.js';
 
 /**
@@ -84,6 +85,7 @@ export default async function BatchesPage() {
                 <th style={{ textAlign: 'left' }}>Avancement</th>
                 <th>Résolution</th>
                 <th>Comptage</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -122,6 +124,9 @@ export default async function BatchesPage() {
                       ) : (
                         <span className="mono faint">{b.scanned}</span>
                       )}
+                    </td>
+                    <td>
+                      <BatchActions batch={b} />
                     </td>
                   </tr>
                 );
