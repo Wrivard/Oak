@@ -3,7 +3,7 @@
 Suite de `docs/08-nuit-du-5-septembre.md`, à lire après lui.
 
 **Départ :** 196 tests, l'application telle que tu l'as vue en te levant.
-**Arrivée :** 381 tests, 48 commits, et **vingt-six pannes trouvées en exécutant**.
+**Arrivée :** 389 tests, 62 commits, et **vingt-six pannes trouvées en exécutant**.
 
 Aucune n'est venue d'une relecture. Toutes sont venues de faire tourner le
 système contre de vraies données, à volume réel.
@@ -262,6 +262,14 @@ jusqu'ici au jugé.
 > moderne, à 67 %. Le script affiche maintenant la composition par ère et
 > avertit quand il n'y en a qu'une.
 
+**Les invariants de `CLAUDE.md` sont testés sur le code, pas sur parole.** Ce
+sont des règles dont la violation ne casse aucun test : un appel à l'API Claude
+depuis le code d'une app payée par abonnement ne casse rien, il **facture**. Sept
+d'entre elles ont maintenant une porte — pas de SDK Anthropic, pas d'appel
+externe dans une requête HTTP, pas de suppression d'inventaire, un seul
+constructeur de SKU, pas de `catch` totalement vide, ni `any` ni assertion
+non-null, pas de `parseFloat` sur le chemin de l'argent.
+
 **Le pipeline complet est testé de bout en bout**, sur de vraies images, dans
 `pnpm test` : quatre pages recto/verso donnent deux cartes, les versos sont
 rattachés, et chaque scan finit sur une issue terminale.
@@ -281,6 +289,8 @@ rattachés, et chaque scan finit sur une issue terminale.
 | **Inventaire** | « non prixé » dit maintenant **pourquoi** — printing absent, devise non convertie, aucune donnée |
 | **Vérifier** | paginé, et triable par **moins sûres** |
 | **Prix** | bouton **Reprixer maintenant**, au lieu d'un INSERT dans psql |
+| **Vérifier** | filtre **« Les miennes »** : corriger une erreur de review était impossible |
+| Partout | une icône d'onglet, un titre par écran, et rien qui tourne quand l'onglet est caché |
 | **Santé** | deux métriques de plus (export TCGplayer, taille de la base), et deux qui ne mentent plus |
 
 ---
