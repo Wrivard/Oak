@@ -71,6 +71,15 @@ export async function handlePairUpload(job: Job): Promise<void> {
 
   const { pairs, anomalies, alternanceSaine, coherenceDos } = pairPages(pages, mode);
 
+  // `max(seq) + 1` n'est PAS sûr sous concurrence : deux appariements
+  // simultanés sur le même lot calculeraient le même départ, et
+  // `on conflict (session_id, seq) do update` ferait écraser le front_path de
+  // l'un par celui de l'autre — une page perdue en silence.
+  //
+  // Ce qui l'empêche est `pair_upload: { concurrency: 1 }` dans worker/index.ts,
+  // ET le fait qu'un seul worker tourne. Monter cette concurrence, ou lancer un
+  // second worker, exige de rendre l'allocation atomique d'abord — comme
+  // `sessions.page_count` le fait pour les rangs de fichiers.
   const { rows: seqRow } = await query<{ next: string }>(
     'select coalesce(max(seq), 0) + 1 as next from scans where session_id = $1',
     [sessionId],

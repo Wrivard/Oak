@@ -28,6 +28,12 @@ const worker = new Worker(env.WORKER_ID, {
   match: { handler: handleMatch, concurrency: 2 },
   // Hachage d'un lot entier : du CPU, une seule voie pour ne pas concurrencer
   // le matching qui est déjà le goulot.
+  //
+  // CETTE VALEUR EST AUSSI UNE GARANTIE DE CORRECTION, pas seulement un réglage
+  // de performance : `handlePairUpload` alloue les numéros d'ordre par
+  // `max(seq) + 1`, ce qui n'est pas sûr sous concurrence. Deux appariements
+  // simultanés sur le même lot écraseraient une page. Ne pas monter ce chiffre
+  // sans rendre l'allocation atomique d'abord.
   pair_upload: { handler: handlePairUpload, concurrency: 1 },
   // Source externe avec quota : une seule voie, jamais de parallélisme.
   price_refresh: { handler: handlePriceRefresh, concurrency: 1 },

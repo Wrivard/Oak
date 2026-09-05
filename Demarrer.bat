@@ -28,6 +28,24 @@ if not exist "node_modules" (
   call pnpm install || goto :erreur
 )
 
+rem Deja demarre ? Double-cliquer ce fichier deux fois est un geste normal
+rem quand on n'est pas sur que ca a marche. Un SECOND worker n'echouerait pas
+rem bruyamment : il tournerait a cote du premier, et l'appariement des lots
+rem alloue ses numeros d'ordre par max(seq)+1, ce qui n'est pas sur a deux. Une
+rem page se ferait ecraser en silence. Deux process doublent aussi les
+rem connexions, et le pooler Supabase plafonne a 15.
+powershell -NoProfile -Command ^
+  "if (Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -match 'worker.index' }) { exit 1 }"
+if errorlevel 1 (
+  echo.
+  echo   pokelister tourne deja.
+  echo   Ouvre http://localhost:3000, ou lance Arreter.bat avant de redemarrer.
+  echo.
+  start "" http://localhost:3000
+  ping -n 6 127.0.0.1 >nul
+  exit /b 0
+)
+
 rem On reconstruit A CHAQUE FOIS. Ne construire que si .next est absent servait
 rem un build perime apres chaque mise a jour du code, et on croyait que les
 rem changements n'avaient pas ete appliques. La construction prend ~7 secondes.

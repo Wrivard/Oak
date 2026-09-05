@@ -468,6 +468,14 @@ Deux corrections, indépendantes l'une de l'autre :
   variables priment sur un fichier oublié sur le disque. La fonction ne renvoie
   que des noms de clés, jamais des valeurs — un fichier d'environnement contient
   un mot de passe de base.
+- **il refuse de démarrer deux fois.** Double-cliquer le fichier une seconde fois
+  est un geste normal quand on n'est pas sûr que ça a marché. Un second worker
+  n'échouerait pas bruyamment : il tournerait à côté du premier. Or
+  `pair_upload` alloue ses numéros d'ordre par `max(seq) + 1`, ce qui n'est sûr
+  qu'à un seul processus — à deux, une page se fait écraser en silence. Deux
+  processus doublent aussi les connexions, et le pooler Supabase plafonne à 15.
+  Le contrôle est fait **avant** la reconstruction : inutile d'attendre sept
+  secondes pour finir par refuser.
 - le lanceur écrit le journal du worker dans `logs/worker.log`, vérifie après
   démarrage que le process est encore là, et affiche les dernières lignes du
   journal s'il ne l'est pas. C'est la panne qui ne se voit pas : l'application
