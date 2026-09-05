@@ -98,6 +98,21 @@ une erreur *ambiguë*, pas permanente — il existe une fenêtre entre le commit
 `rename` où le chemin final n'est pas encore en place, et deux tentatives avec backoff
 la couvrent.
 
+**Le taux de lecture OCR se mesure sur les scans qui ont ATTEINT l'OCR.** Trouvé
+le 5 septembre 2026 : `/diagnostics` divisait par tous les scans. Or un scan
+résolu au niveau 1 n'exécute jamais l'OCR — `recordOcr` n'est appelé qu'après la
+tentative de niveau 2. Le taux de lecture aurait donc **baissé à mesure que la
+base d'empreintes grandit**, c'est-à-dire à mesure que le système marche mieux :
+on aurait lu « le niveau 2 s'effondre, il faut le redessiner » exactement quand
+le niveau 1 fait son travail. Et c'est le chiffre qui décide de l'étape 3 du plan
+de build.
+
+Deux cas sautent l'OCR et se reconnaissent sans colonne dédiée :
+`match_source = 'own_history'`, et le conflit de variant détecté au niveau 1, qui
+part en review avant d'essayer le catalogue. L'écran affiche les deux
+séparément — « N traités au niveau 1, sans passer par l'OCR — hors dénominateur »
+— pour que l'écart entre les deux nombres se lise au lieu de se deviner.
+
 **Le niveau 1 tient à l'échelle. Mesuré le 5 septembre 2026, sur 120 000
 empreintes synthétiques.** La question était sérieuse : `known_fingerprints`
 gagne **une ligne par scan résolu**, sans déduplication — à 25-50 000 cartes par

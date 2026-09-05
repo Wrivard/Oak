@@ -11,15 +11,35 @@ import AutoRefresh from '../dashboard/auto-refresh.js';
  *
  * Décision de l'expérience, reprise ici : sous 85 % global, le niveau 2 change
  * de design. Ventilation sous 60 % sur une ère, crop era-aware obligatoire.
+ *
+ * LE TAUX DE LECTURE SE MESURE SUR LES SCANS QUI ONT ATTEINT L'OCR.
+ *
+ * Un scan résolu au niveau 1 — empreinte déjà connue — n'exécute jamais l'OCR :
+ * `recordOcr` n'est appelé qu'après la tentative de niveau 2. Le compter au
+ * dénominateur ferait BAISSER le taux de lecture à mesure que la base
+ * d'empreintes grandit, c'est-à-dire à mesure que le système marche mieux. On
+ * lirait « le niveau 2 s'effondre, il faut le redessiner » exactement quand le
+ * niveau 1 fait son travail.
+ *
+ * Sans colonne dédiée, deux cas sautent l'OCR et se reconnaissent :
+ * `match_source = 'own_history'`, et le conflit de variant détecté au niveau 1,
+ * qui part en review avant même d'essayer le catalogue.
  */
 export const dynamic = 'force-dynamic';
 
 const SEUIL_GLOBAL = 85;
 const SEUIL_ERE = 60;
 
+/** Les scans qui ont réellement exécuté l'OCR. Voir le commentaire de tête. */
+const A_TENTE_OCR = `
+  s.match_source is distinct from 'own_history'
+  and coalesce(s.variant_conflict, false) = false`;
+
 interface EraRow {
   ere: string;
   total: string;
+  /** Dénominateur du taux de lecture : ceux qui ont atteint l'OCR. */
+  mesures: string;
   lus: string;
   resolus: string;
 }
@@ -48,6 +68,7 @@ export default async function DiagnosticsPage() {
     query<EraRow>(
       `select ${ERES} as ere,
               count(*)::text as total,
+              count(*) filter (where ${A_TENTE_OCR})::text as mesures,
               count(*) filter (where s.ocr_read is not null)::text as lus,
               count(*) filter (where s.status = 'resolved')::text as resolus
          from scans s
@@ -61,18 +82,25 @@ export default async function DiagnosticsPage() {
          from scans where ocr_read is not null
         group by 1 order by 1`,
     ),
-    query<{ total: string; lus: string; resolus: string }>(
+    query<{ total: string; mesures: string; lus: string; resolus: string }>(
       `select count(*)::text as total,
-              count(*) filter (where ocr_read is not null)::text as lus,
-              count(*) filter (where status = 'resolved')::text as resolus
-         from scans where status in ('resolved', 'needs_review')`,
+              count(*) filter (where ${A_TENTE_OCR})::text as mesures,
+              count(*) filter (where s.ocr_read is not null)::text as lus,
+              count(*) filter (where s.status = 'resolved')::text as resolus
+         from scans s where s.status in ('resolved', 'needs_review')`,
     ),
   ]);
 
   const total = Number(global[0]?.total ?? 0);
+  const mesures = Number(global[0]?.mesures ?? 0);
   const lus = Number(global[0]?.lus ?? 0);
   const resolus = Number(global[0]?.resolus ?? 0);
-  const tauxOcr = total === 0 ? 0 : (100 * lus) / total;
+  /**
+   * Traités au niveau 1 : résolus par empreinte, ou renvoyés en review pour
+   * conflit de variant. Les deux sortent avant que l'OCR ne s'exécute.
+   */
+  const niveau1 = total - mesures;
+  const tauxOcr = mesures === 0 ? 0 : (100 * lus) / mesures;
   const tauxAuto = total === 0 ? 0 : (100 * resolus) / total;
 
   return (
@@ -108,7 +136,14 @@ export default async function DiagnosticsPage() {
                     {tauxOcr.toFixed(1)} %
                   </div>
                   <div className="faint" style={{ fontSize: 11 }}>
-                    {lus} sur {total} · décision à {SEUIL_GLOBAL} %
+                    {lus} sur {mesures} · décision à {SEUIL_GLOBAL} %
+                    {niveau1 > 0 && (
+                      <>
+                        <br />
+                        {niveau1} traité{niveau1 > 1 ? 's' : ''} au niveau 1, sans
+                        passer par l’OCR — hors dénominateur
+                      </>
+                    )}
                   </div>
                 </article>
 
@@ -150,12 +185,19 @@ export default async function DiagnosticsPage() {
                   </thead>
                   <tbody>
                     {eras.map((e) => {
-                      const t = Number(e.total);
-                      const pct = t === 0 ? 0 : (100 * Number(e.lus)) / t;
+                      // Même dénominateur que le taux global : ceux qui ont
+                      // atteint l'OCR, pas tous les scans de l'ère.
+                      const m = Number(e.mesures);
+                      const pct = m === 0 ? 0 : (100 * Number(e.lus)) / m;
                       return (
                         <tr key={e.ere}>
                           <td>{e.ere}</td>
-                          <td className="mono">{e.total}</td>
+                          <td className="mono">
+                            {e.total}
+                            {Number(e.total) !== m && (
+                              <span className="faint"> · {m} mesurés</span>
+                            )}
+                          </td>
                           <td
                             className="num"
                             style={{
