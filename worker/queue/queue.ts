@@ -154,8 +154,13 @@ export async function enqueue(
   payload: Record<string, unknown>,
   opts: { idempotencyKey?: string; priority?: number; client?: PoolClient } = {},
 ): Promise<number | null> {
-  const exec = opts.client
-    ? (t: string, p: unknown[]) => opts.client!.query(t, p)
+  // Extrait dans une constante pour que TypeScript le RESTREIGNE : écrit
+  // `opts.client ? … opts.client!.query …`, le compilateur ne suit pas le
+  // narrowing jusque dans la fonction fléchée et il faut une assertion non-null.
+  // CLAUDE.md les interdit, et c'était la dernière du code applicatif.
+  const client = opts.client;
+  const exec = client
+    ? (t: string, p: unknown[]) => client.query(t, p)
     : (t: string, p: unknown[]) => query(t, p);
 
   const { rows } = await exec(

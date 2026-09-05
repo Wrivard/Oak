@@ -448,6 +448,28 @@ les seuils ont été touchés sans passer le golden set.
 
 ---
 
+## 7ter. Les invariants sont testés, pas seulement écrits
+
+`CLAUDE.md` énonce des règles dont la violation **ne casse aucun test**. Elle
+change en silence ce que le système fait ou ce qu'il coûte : un appel à l'API
+Claude depuis le code d'une application payée par abonnement ne casse rien, il
+facture ; un appel externe dans une requête HTTP ne casse rien, il fait expirer
+la requête le jour où le réseau est lent.
+
+`tests/invariants.test.ts` lit les sources et vérifie sept d'entre elles :
+
+- aucun SDK Anthropic, aucune lecture d'`ANTHROPIC_API_KEY` ;
+- aucun `fetch` vers un hôte externe dans le code **serveur** de `app/` ;
+- `delete from inventory` nulle part hors des scripts d'effacement volontaire ;
+- aucune concaténation de SKU hors de `lib/sku.ts` ;
+- aucun `catch` **totalement** vide — un `catch` commenté qui prend une décision
+  explicite reste la pratique du projet et reste permis ;
+- ni `any` ni assertion non-null dans le code applicatif ;
+- aucun `parseFloat` dans le code qui touche à l'argent.
+
+Le fichier commence par vérifier qu'il a bien collecté des sources : sans ce
+garde-fou, une erreur de chemin ferait passer les sept règles en ne lisant rien.
+
 ## 7bis. Le pipeline est testé de bout en bout
 
 Chaque étage avait ses tests ; leur **enchaînement** n'en avait pas. Il vivait
