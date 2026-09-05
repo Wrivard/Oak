@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
 import { estImage, filesFromDrop, type DropSource } from '../../lib/upload/drop.js';
 import { nomDeLotInvalide } from '../../lib/upload/nom-de-lot.js';
+import { enPaquets } from '../../lib/upload/paquets.js';
 
 /**
  * Envoi d'un lot de photos. Voir docs/06-ui.md.
@@ -11,8 +12,10 @@ import { nomDeLotInvalide } from '../../lib/upload/nom-de-lot.js';
  * Envoi par PAQUETS : un lot de 300 photos à 2 Mo fait 600 Mo, ce qu'aucun
  * serveur n'accepte d'un coup et ce qui ne donnerait aucune progression à
  * l'écran. Par paquets, on voit avancer et un échec ne perd que le paquet.
+ *
+ * Le découpage est borné en OCTETS autant qu'en nombre de fichiers : voir
+ * lib/upload/paquets.ts. Dix TIFF de 20 Mo faisaient une requête de 200 Mo.
  */
-const BATCH = 10;
 
 interface Props {
   variants: readonly CardVariant[];
@@ -132,14 +135,16 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
         a.name.localeCompare(b.name, undefined, { numeric: true }),
       );
 
-      for (let i = 0; i < ordered.length; i += BATCH) {
+      let envoyees = 0;
+      for (const paquet of enPaquets(ordered)) {
         const form = new FormData();
         form.set('session', session.trim());
         form.set('variant', variant);
         form.set('condition', condition);
         form.set('language', 'en');
-        form.set('offset', String(i));
-        for (const f of ordered.slice(i, i + BATCH)) form.append('files', f);
+        form.set('offset', String(envoyees));
+        for (const f of paquet) form.append('files', f);
+        envoyees += paquet.length;
 
         const res = await fetch('/api/upload', { method: 'POST', body: form });
         if (!res.ok) {

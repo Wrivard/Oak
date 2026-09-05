@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { estImage, filesFromDrop, type DropSource, type FsEntry } from '../lib/upload/drop.js';
 import { NOM_DE_LOT_MAX, nomDeLotInvalide } from '../lib/upload/nom-de-lot.js';
+import { enPaquets } from '../lib/upload/paquets.js';
 
 /**
  * Glisser le DOSSIER du scanner.
@@ -172,5 +173,54 @@ describe('nomDeLotInvalide', () => {
     expect(nomDeLotInvalide('')).toMatch(/requis/);
     expect(nomDeLotInvalide('x'.repeat(NOM_DE_LOT_MAX + 1))).toMatch(/trop long/);
     expect(nomDeLotInvalide('x'.repeat(NOM_DE_LOT_MAX))).toBeNull();
+  });
+});
+
+describe('enPaquets', () => {
+  /**
+   * Le découpage se faisait par NOMBRE, dix fichiers par requête. À 500 ko la
+   * photo ça fait 5 Mo — sans problème. À 20 Mo la photo, ce que sort un TIFF
+   * 600 dpi et que la limite par fichier autorise, ça fait 200 Mo par requête,
+   * tamponnés des deux côtés. Le process tombe et l'envoi s'arrête au milieu du
+   * lot.
+   */
+  const f = (size: number, name = 'x.jpg') => ({ size, name });
+
+  it('BORNE LES OCTETS, pas seulement le nombre', () => {
+    // Dix TIFF de 20 Mo : un par paquet, pas dix.
+    const paquets = enPaquets(Array.from({ length: 10 }, () => f(20 * 1024 * 1024)));
+    expect(paquets).toHaveLength(10);
+    for (const p of paquets) expect(p).toHaveLength(1);
+  });
+
+  it('garde dix fichiers par paquet quand ils sont petits', () => {
+    const paquets = enPaquets(Array.from({ length: 25 }, () => f(500 * 1024)));
+    expect(paquets.map((p) => p.length)).toEqual([10, 10, 5]);
+  });
+
+  it('n’oublie AUCUN fichier, quelles que soient les tailles', () => {
+    // Le seul invariant qui compte : une page qui n'est pas envoyée est une
+    // carte physiquement scannée sans ligne d'inventaire.
+    const tailles = [1, 30_000_000, 2, 16 * 1024 * 1024, 3, 4, 5_000_000, 5];
+    const paquets = enPaquets(tailles.map((t) => f(t)));
+    expect(paquets.flat().map((x) => x.size)).toEqual(tailles);
+  });
+
+  it('laisse partir SEUL un fichier au-dessus du plafond', () => {
+    // Sinon il ne partirait jamais et le lot resterait bloqué. C'est la route
+    // qui décide ce qui est trop gros, pas le découpage.
+    const paquets = enPaquets([f(1000), f(99 * 1024 * 1024), f(1000)]);
+    expect(paquets).toHaveLength(3);
+    expect(paquets[1]).toHaveLength(1);
+  });
+
+  it('ne rend pas de paquet vide', () => {
+    expect(enPaquets([])).toEqual([]);
+    for (const p of enPaquets([f(1)])) expect(p.length).toBeGreaterThan(0);
+  });
+
+  it('respecte les plafonds qu’on lui donne', () => {
+    expect(enPaquets([f(1), f(1), f(1)], 1000, 2).map((p) => p.length)).toEqual([2, 1]);
+    expect(enPaquets([f(400), f(400), f(400)], 1000, 99).map((p) => p.length)).toEqual([2, 1]);
   });
 });
