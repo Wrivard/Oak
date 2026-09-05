@@ -96,10 +96,19 @@ export async function loadAudit(
        join inventory i on i.sku = s.resolved_sku
        join cards c on c.id = i.card_id
       where s.status = 'resolved'
-        -- Les résolutions MANUELLES n'ont pas à être auditées : c'est un humain
-        -- qui les a faites, et les revoir ne ferait que du bruit.
-        and s.match_source in ('catalog', 'own_history')
-        and ($1::text is null or s.match_source::text = $1)
+        -- Les résolutions manuelles sont HORS de la vue par défaut : elles sont
+        -- majoritaires au début, et les faire défiler noierait celles que la
+        -- machine a décidées seule — qui sont l'objet de cet écran.
+        --
+        -- Mais elles restent atteignables par ?source=manual. Un humain se
+        -- trompe aussi, et une erreur manuelle est même PIRE : confirmed_by =
+        -- 'manual' fait autorité, et l'empreinte fausse se propage au niveau 1
+        -- sans jamais repasser par le catalogue. Sans ce filtre, il n'existait
+        -- aucun chemin pour la retrouver et la corriger.
+        and ($1::text is null
+             or s.match_source::text = $1)
+        and ($1::text is not null
+             or s.match_source in ('catalog', 'own_history'))
       order by ${AUDIT_ORDER[sort]}
       limit $2 offset $3`,
     [source ?? null, AUDIT_PAGE_SIZE, (page - 1) * AUDIT_PAGE_SIZE],

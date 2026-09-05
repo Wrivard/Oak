@@ -21,7 +21,8 @@ export default async function AuditPage({
     Array.isArray(sp[k]) ? sp[k][0] : (sp[k] as string | undefined);
 
   const raw = un('source');
-  const source = raw === 'catalog' || raw === 'own_history' ? raw : undefined;
+  const source =
+    raw === 'catalog' || raw === 'own_history' || raw === 'manual' ? raw : undefined;
   const sort: AuditSort = un('sort') === 'doubtful' ? 'doubtful' : 'recent';
   const page = Math.max(1, Number(un('page') ?? 1) || 1);
 
@@ -67,6 +68,16 @@ export default async function AuditPage({
           <Link href={lien({ source: 'own_history', page: undefined })}
                 className={`btn${source === 'own_history' ? ' btn--primary' : ''}`}>
             Empreinte
+          </Link>
+          {/* Hors de la vue par défaut : les résolutions manuelles sont
+              majoritaires au début et noieraient celles que la machine a
+              décidées seule. Mais un humain se trompe aussi, et l'empreinte
+              qu'il écrit fait autorité — sans ce filtre, aucun chemin
+              n'existait pour retrouver et corriger une erreur de review. */}
+          <Link href={lien({ source: 'manual', page: undefined })}
+                className={`btn${source === 'manual' ? ' btn--primary' : ' btn--ghost'}`}
+                title="Tes propres décisions de review. Une erreur y écrit une empreinte qui fait autorité.">
+            Les miennes
           </Link>
           {/* Regarder les soixante plus RÉCENTES sur les huit cents d'une
               journée, c'est regarder 7 % du lot au hasard. Les soixante MOINS
