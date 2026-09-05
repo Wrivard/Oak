@@ -6,6 +6,7 @@ import { log } from '../../../lib/log.js';
 import { openSession } from '../../../lib/ingest/register.js';
 import type { CardCondition, CardVariant } from '../../../lib/sku.js';
 import { estImage } from '../../../lib/upload/drop.js';
+import { nomDeLotInvalide } from '../../../lib/upload/nom-de-lot.js';
 
 /**
  * Dépôt d'un lot de photos.
@@ -62,6 +63,44 @@ async function nextRank(dir: string): Promise<number> {
   return max;
 }
 
+/**
+ * Ce que contient déjà un lot, AVANT d'envoyer.
+ *
+ * Envoyer deux fois le même dossier n'écrase plus rien — mais ça AJOUTE, et
+ * l'inventaire compte alors chaque carte deux fois. La réconciliation finit par
+ * l'attraper à la clôture ; la voir avant de lancer 2000 pages coûte moins cher.
+ *
+ * Ne crée rien : ni session, ni répertoire.
+ */
+export async function GET(req: Request): Promise<NextResponse> {
+  const nom = (new URL(req.url).searchParams.get('session') ?? '').trim();
+  if (nomDeLotInvalide(nom) !== null) {
+    return NextResponse.json({ pages: 0, scans: 0, status: null });
+  }
+
+  let pages = 0;
+  try {
+    pages = (await readdir(join(STORE, nom))).filter((n) => /^\d{6}\./.test(n)).length;
+  } catch {
+    // Répertoire absent : le lot n'a jamais reçu de page. Ce n'est pas une erreur.
+  }
+
+  const { rows } = await query<{ status: string; scans: string }>(
+    `select ss.status::text, count(s.*)::text as scans
+       from sessions ss
+       left join scans s on s.session_id = ss.id
+      where ss.name = $1
+      group by ss.id`,
+    [nom],
+  );
+
+  return NextResponse.json({
+    pages,
+    scans: Number(rows[0]?.scans ?? 0),
+    status: rows[0]?.status ?? null,
+  });
+}
+
 export async function POST(req: Request): Promise<NextResponse> {
   let form: FormData;
   try {
@@ -77,8 +116,9 @@ export async function POST(req: Request): Promise<NextResponse> {
   const offset = Number(form.get('offset') ?? 0);
   const files = form.getAll('files').filter((f): f is File => f instanceof File);
 
-  if (sessionName.length === 0) {
-    return NextResponse.json({ error: 'nom de session requis' }, { status: 400 });
+  const mauvaisNom = nomDeLotInvalide(sessionName);
+  if (mauvaisNom !== null) {
+    return NextResponse.json({ error: mauvaisNom }, { status: 400 });
   }
   if (files.length === 0) {
     return NextResponse.json({ error: 'aucun fichier' }, { status: 400 });
@@ -128,7 +168,12 @@ export async function POST(req: Request): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.json({ sessionId, session: sessionName, accepted, rejected });
+  // `total` permet au client de dire exactement combien de pages ont atterri
+  // quand un envoi casse en route : sans ce chiffre, on ne sait pas s'il faut
+  // renvoyer le dossier — et le renvoyer en entier doublerait l'inventaire.
+  const total = await nextRank(dir);
+
+  return NextResponse.json({ sessionId, session: sessionName, accepted, rejected, total });
 }
 
 /**

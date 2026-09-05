@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
 import { estImage, filesFromDrop, type DropSource } from '../../lib/upload/drop.js';
+import { nomDeLotInvalide } from '../../lib/upload/nom-de-lot.js';
 
 /**
  * Envoi d'un lot de photos. Voir docs/06-ui.md.
@@ -24,6 +25,12 @@ interface Rejected {
   reason: string;
 }
 
+interface Existant {
+  pages: number;
+  scans: number;
+  status: 'open' | 'closed' | null;
+}
+
 export default function UploadClient({ variants, conditions, defaultSession }: Props) {
   const [session, setSession] = useState(defaultSession);
   const [variant, setVariant] = useState<CardVariant>('normal');
@@ -37,6 +44,10 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [lecture, setLecture] = useState(false);
+  /** Ce que le lot visé contient DÉJÀ, côté serveur. */
+  const [existant, setExistant] = useState<Existant | null>(null);
+  /** Pages réellement arrivées quand un envoi casse en route. */
+  const [atterries, setAtterries] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dirRef = useRef<HTMLInputElement | null>(null);
 
@@ -51,6 +62,41 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
     });
     setDone(0);
   }, []);
+
+  /**
+   * Ce que le lot visé contient déjà.
+   *
+   * Envoyer deux fois le même dossier n'écrase plus rien — mais ça AJOUTE, et
+   * l'inventaire compte alors chaque carte deux fois. La réconciliation finit
+   * par l'attraper à la clôture ; le voir AVANT de lancer 2000 pages coûte
+   * beaucoup moins cher.
+   *
+   * Débouncé : le nom se tape lettre par lettre, et chaque lettre est une
+   * requête si on ne l'attend pas.
+   */
+  useEffect(() => {
+    const nom = session.trim();
+    if (nom === '') {
+      setExistant(null);
+      return;
+    }
+    let vivant = true;
+    const t = setTimeout(() => {
+      void fetch(`/api/upload?session=${encodeURIComponent(nom)}`)
+        .then((r) => (r.ok ? (r.json() as Promise<Existant>) : null))
+        .then((e) => {
+          if (vivant) setExistant(e);
+        })
+        .catch(() => {
+          // Pas de réponse : on n'affiche rien plutôt qu'une fausse assurance.
+          if (vivant) setExistant(null);
+        });
+    }, 350);
+    return () => {
+      vivant = false;
+      clearTimeout(t);
+    };
+  }, [session, done]);
 
   const onDrop = useCallback(
     async (dt: DropSource) => {
@@ -69,11 +115,13 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
   );
 
   async function upload() {
-    if (files.length === 0 || session.trim() === '') return;
+    if (files.length === 0 || nomInvalide !== null) return;
     setBusy(true);
     setError(null);
     setSent(0);
     setRejected([]);
+    setAtterries(null);
+    let arrivees = existant?.pages ?? 0;
 
     try {
       // L'ORDRE EST L'INFORMATION : c'est lui qui porte l'alternance
@@ -96,7 +144,12 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           throw new Error(body.error ?? `HTTP ${res.status}`);
         }
-        const body = (await res.json()) as { accepted: number; rejected: Rejected[] };
+        const body = (await res.json()) as {
+          accepted: number;
+          rejected: Rejected[];
+          total: number;
+        };
+        arrivees = body.total;
         setSent((n) => n + body.accepted);
         if (body.rejected.length > 0) setRejected((r) => [...r, ...body.rejected]);
       }
@@ -120,10 +173,18 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
       setFiles([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      // Le chiffre qui compte quand un envoi casse : combien de pages sont
+      // réellement arrivées. Sans lui, on renvoie le dossier entier « au cas
+      // où » et l'inventaire compte tout en double.
+      setAtterries(arrivees);
     } finally {
       setBusy(false);
     }
   }
+
+  // Le même contrôle que la route, pour ne pas envoyer 2000 pages avant de se
+  // faire refuser. Le client n'est pas la sécurité : la route refuse aussi.
+  const nomInvalide = nomDeLotInvalide(session.trim());
 
   const pct = files.length === 0 ? 0 : Math.round((100 * sent) / files.length);
   const cartes = duplex ? Math.ceil(files.length / 2) : files.length;
@@ -146,7 +207,7 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
           <button
             className="btn btn--primary"
             onClick={() => void upload()}
-            disabled={busy || files.length === 0 || session.trim() === ''}
+            disabled={busy || files.length === 0 || nomInvalide !== null}
           >
             {busy ? `Envoi ${pct} %` : 'Envoyer le lot'}
           </button>
@@ -169,6 +230,11 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
                   className="input"
                   value={session}
                   onChange={(e) => setSession(e.target.value)}
+                  style={
+                    nomInvalide !== null && session.trim() !== ''
+                      ? { borderColor: 'var(--red)' }
+                      : undefined
+                  }
                 />
               </label>
 
@@ -204,6 +270,12 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
                 </select>
               </label>
             </div>
+
+            {nomInvalide !== null && session.trim() !== '' && (
+              <p style={{ color: 'var(--red)', fontSize: 12, margin: 'var(--s3) 0 0' }}>
+                {nomInvalide}
+              </p>
+            )}
 
             <p className="faint" style={{ fontSize: 12, margin: 'var(--s3) 0 0' }}>
               Le variant s&apos;applique à <strong>tout le lot</strong>. Une photo à plat
@@ -323,6 +395,41 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
               onChange={(e) => addFiles(e.target.files)}
             />
           </div>
+
+          {existant !== null && existant.pages > 0 && (
+            <div
+              className={`note note--${existant.status === 'closed' ? 'alarm' : 'warn'}`}
+              style={{ marginTop: 'var(--s3)' }}
+            >
+              {existant.status === 'closed' ? (
+                <>
+                  <strong>Ce lot est fermé.</strong> Il contient {existant.pages} page
+                  {existant.pages > 1 ? 's' : ''} et {existant.scans} carte
+                  {existant.scans > 1 ? 's' : ''}. Y ajouter des photos rouvrirait un
+                  comptage déjà réconcilié — prends plutôt un nouveau nom.
+                </>
+              ) : (
+                <>
+                  <strong>
+                    Ce lot contient déjà {existant.pages} page
+                    {existant.pages > 1 ? 's' : ''}
+                  </strong>{' '}
+                  ({existant.scans} carte{existant.scans > 1 ? 's' : ''} créée
+                  {existant.scans > 1 ? 's' : ''}). Les nouvelles s&apos;ajouteront à la
+                  suite. Renvoyer le même dossier compterait chaque carte deux fois.
+                </>
+              )}
+            </div>
+          )}
+
+          {atterries !== null && (
+            <div className="note note--warn" style={{ marginTop: 'var(--s3)' }}>
+              <strong>{atterries} page{atterries > 1 ? 's' : ''} sont arrivées</strong>{' '}
+              avant l&apos;échec. Ne renvoie pas le dossier entier : retire les{' '}
+              {atterries} premières photos, ou change de nom de lot et réconcilie à la
+              main.
+            </div>
+          )}
 
           {busy && (
             <div className="bar" style={{ marginTop: 'var(--s3)' }}>

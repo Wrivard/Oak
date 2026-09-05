@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { estImage, filesFromDrop, type DropSource, type FsEntry } from '../lib/upload/drop.js';
+import { NOM_DE_LOT_MAX, nomDeLotInvalide } from '../lib/upload/nom-de-lot.js';
 
 /**
  * Glisser le DOSSIER du scanner.
@@ -141,5 +142,35 @@ describe('estImage', () => {
     expect(estImage({ name: 'index.pdf', type: 'application/pdf' })).toBe(false);
     expect(estImage({ name: 'Thumbs.db', type: '' })).toBe(false);
     expect(estImage({ name: 'notes.txt', type: 'text/plain' })).toBe(false);
+  });
+});
+
+describe('nomDeLotInvalide', () => {
+  it('REFUSE ce qui sortirait du répertoire de stockage', () => {
+    // Le nom du lot devient un nom de répertoire : `join(STORE, nom)` avec
+    // « .. » écrit ailleurs sur le disque.
+    expect(nomDeLotInvalide('../evil')).toMatch(/invalide/);
+    expect(nomDeLotInvalide('a/b')).toMatch(/invalide/);
+    expect(nomDeLotInvalide('a\\b')).toMatch(/invalide/);
+    expect(nomDeLotInvalide('..')).toMatch(/invalide/);
+    expect(nomDeLotInvalide('.cache')).toMatch(/invalide/);
+    expect(nomDeLotInvalide('C:nope')).toMatch(/invalide/);
+  });
+
+  it('refuse les caractères de contrôle', () => {
+    expect(nomDeLotInvalide(`lot${String.fromCharCode(0)}`)).toMatch(/invalide/);
+    expect(nomDeLotInvalide(`lot${String.fromCharCode(10)}`)).toMatch(/invalide/);
+  });
+
+  it('accepte les noms qu’on tape vraiment', () => {
+    for (const nom of ['2026-09-05', 'bulk vintage', 'lot_3', 'reverse-holo.2', 'Été 2026']) {
+      expect(nomDeLotInvalide(nom)).toBeNull();
+    }
+  });
+
+  it('refuse le vide et le trop long', () => {
+    expect(nomDeLotInvalide('')).toMatch(/requis/);
+    expect(nomDeLotInvalide('x'.repeat(NOM_DE_LOT_MAX + 1))).toMatch(/trop long/);
+    expect(nomDeLotInvalide('x'.repeat(NOM_DE_LOT_MAX))).toBeNull();
   });
 });
