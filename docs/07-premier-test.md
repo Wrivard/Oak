@@ -23,6 +23,7 @@ vraies cartes. Elles écrivent dans la base : `pnpm reset:data --confirm` après
 ```bash
 pnpm repetition 40            # 80 pages par les VRAIS chemins HTTP, réconciliation
 pnpm edge                     # dix formats de scanner, dont deux fichiers corrompus
+pnpm course                   # six envois simultanés, rien ne doit se perdre
 ```
 
 ---
@@ -36,6 +37,8 @@ l'OCR marche le mieux, donc c'est le meilleur cas et il doit passer.
 2. `/upload` — nomme le lot, choisis le variant, coche **Recto-verso**, et **glisse le
    dossier entier** du scanner (ou « Choisir un dossier »). L'écran affiche
    « Lecture du dossier… » pendant qu'il descend dedans, puis le nombre de photos.
+   Un seul onglet suffit : deux envois simultanés vers le même lot fonctionnent
+   maintenant, mais rien ne t'oblige à les provoquer.
 3. Saisis **50** dans **Cartes comptées** avant d'envoyer. C'est le seul contrôle qui
    rattrape une double-alimentation de l'ADF : deux feuilles passées collées font une
    carte physique sans ligne d'inventaire, et l'écart de comptage est le seul signal

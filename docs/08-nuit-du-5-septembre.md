@@ -3,7 +3,7 @@
 Résumé de la session autonome. À lire avant de commencer les tests — surtout les
 sections **Bugs trouvés** et **Ce qui ne marchera pas**.
 
-> **Il y a une suite : `docs/09-matinee-du-5-septembre.md`.** Elle contient seize
+> **Il y a une suite : `docs/09-matinee-du-5-septembre.md`.** Elle contient vingt et une
 > pannes de plus, dont deux qui te concernent directement — le lanceur ne
 > démarrait pas le worker, et ta base Supabase a une limite de trois à cinq
 > mois. Lis-la après celle-ci.

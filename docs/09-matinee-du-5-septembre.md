@@ -3,7 +3,7 @@
 Suite de `docs/08-nuit-du-5-septembre.md`, à lire après lui.
 
 **Départ :** 196 tests, l'application telle que tu l'as vue en te levant.
-**Arrivée :** 343 tests, 28 commits, et **seize pannes trouvées en exécutant**.
+**Arrivée :** 355 tests, 35 commits, et **vingt et une pannes trouvées en exécutant**.
 
 Aucune n'est venue d'une relecture. Toutes sont venues de faire tourner le
 système contre de vraies données, à volume réel.
@@ -49,7 +49,7 @@ Quand tu t'en approcheras, la décision sera de passer au plan Pro.
 
 ---
 
-## Les seize pannes
+## Les vingt et une pannes
 
 **1. Glisser le dossier du scanner rendait zéro photo.** Un scanner ne produit
 pas des fichiers, il produit un dossier. `dataTransfer.files` est vide quand on
@@ -159,6 +159,44 @@ régénèrent à la demande. Au passage, la liste des extensions d'image était 
 à trois endroits qui divergeaient déjà — une seule source maintenant, parce
 qu'une divergence là crée un fichier accepté que l'appariement ignore.
 
+**17. Deux envois simultanés perdaient les deux tiers des pages.** Le pire de la
+liste. Six paquets envoyés en parallèle vers le même nom de lot :
+
+```
+avant   48 pages acceptées, 16 fichiers sur le disque, 5 lignes de session
+après   48 pages acceptées, 48 fichiers sur le disque, 1 ligne de session
+```
+
+Deux défauts se cumulaient. `openSession` faisait « select puis insert » : deux
+requêtes concurrentes ne trouvent rien, insèrent toutes les deux, et le lot
+existe en double — les scans se répartissent alors entre plusieurs sessions du
+même nom, et la réconciliation compare le comptage attendu à une fraction des
+cartes. Et le rang des fichiers venait d'une lecture du répertoire, donc deux
+requêtes écrivaient les mêmes noms. Le client envoie ses paquets en série, donc
+un seul onglet ne peut pas déclencher ça — **deux onglets suffisent**, et c'est
+un geste normal quand on a deux piles à traiter. `pnpm course` rejoue la course.
+
+**18. Le lanceur pouvait démarrer un second worker.** Double-cliquer une seconde
+fois est un geste normal quand on n'est pas sûr. L'application aurait échoué sur
+le port, bruyamment — le worker serait parti en silence. Or l'appariement alloue
+ses numéros d'ordre par `max(seq) + 1`, ce qui n'est sûr qu'à un seul processus.
+Le lanceur refuse maintenant, avant même de reconstruire.
+
+**19. Dix TIFF de 20 Mo faisaient une requête de 200 Mo.** Le découpage comptait
+les fichiers, pas les octets. À 500 ko la photo c'est 5 Mo par requête ; au
+format par défaut de beaucoup de scanners, c'est deux cents. 16 Mo ou dix
+fichiers, le premier atteint.
+
+**20. Vider le champ « attendu » enregistrait ZÉRO.** `Number('')` vaut zéro. Un
+lot de 50 cartes affichait alors un écart de +50 et refusait de se fermer, sans
+retour en arrière possible — une fois un chiffre saisi, on ne pouvait plus dire
+qu'on ne savait pas.
+
+**21. Deux écrans, deux nets différents pour le même prix.** La review calculait
+son net avec **zéro** port pendant que la grille de prix en comptait un dollar.
+Sur une carte à 1,75 $ : 1,11 $ contre 0,12 $. Deux conclusions opposées sur la
+seule question qui compte à ce niveau de prix, affichées par la même application.
+
 ---
 
 ## Ce qui a changé à l'écran
@@ -170,6 +208,7 @@ qu'une divergence là crée un fichier accepté que l'appariement ignore.
 | **Prix** | l'éditeur JSON est devenu de **vrais champs** : plancher, bandes, condition, canal, garde-fous. Le JSON reste en bas, replié |
 | **Vérifier** | survoler une vignette l'agrandit à 260 px — à 68 px on ne distingue pas un Set de Base d'un Set de Base 2, et c'est l'erreur que cette page existe pour attraper |
 | **Diagnostic** | le taux de lecture se calcule enfin sur les scans qui ont atteint l'OCR |
+| **Lots** | vider le champ « attendu » veut dire « je ne sais pas », plus « zéro » |
 | **Santé** | deux métriques de plus (export TCGplayer, taille de la base), et deux qui ne mentent plus |
 
 ---
@@ -185,7 +224,8 @@ restauration de 15 000 lignes                       2,4 s   (8 min avant)
 répétition complète, 40 cartes                      réconciliation exacte
 dix formats de scanner (TIFF, CMJN, gris, 600 dpi)  8 acceptés, 2 écartés
 deux printings de la MÊME carte, base6-57            2,49 $ contre 162,00 $
-répétition par le lanceur, 30 cartes                réconciliation exacte, 0 job mort
+six envois EN MÊME TEMPS vers le même lot           48 pages envoyées, 48 gardées
+répétition par le lanceur, 25 cartes                réconciliation exacte, 0 job mort
 ```
 
 **L'architecture tient.** Rien dans les écrans ne s'effondre au volume cible, et
@@ -206,6 +246,7 @@ les deux écritures).
 pnpm verify        typecheck + tests + build + smoke, en une fois
 pnpm repetition    le parcours de ta journée par les VRAIS chemins HTTP
 pnpm edge          dix formats de scanner, dont deux fichiers corrompus
+pnpm course        six envois simultanés vers le même lot, rien ne doit se perdre
 pnpm seed:volume   remplit la base au volume cible (--purge pour effacer)
 ```
 
