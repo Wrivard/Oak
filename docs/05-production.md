@@ -448,6 +448,26 @@ les seuils ont été touchés sans passer le golden set.
 
 ---
 
+## 7bis. Le pipeline est testé de bout en bout
+
+Chaque étage avait ses tests ; leur **enchaînement** n'en avait pas. Il vivait
+dans `pnpm repetition`, un script qu'on lance à la main avec un serveur et un
+worker à côté — donc une régression dans le passage de relais entre deux étages
+ne se serait vue qu'en le lançant.
+
+`tests/pipeline.test.ts` fait tourner l'appariement, les empreintes et le
+matching sur de **vraies images de cartes**, à la suite, en quelques secondes :
+
+- quatre pages recto/verso donnent **deux** cartes, pas quatre ;
+- le verso est rattaché et son empreinte enregistrée — c'est ce qui attrape une
+  carte insérée à l'envers ;
+- rejouer l'appariement ne crée pas de doublon ;
+- le chemin écrit en base reste lisible par l'étage suivant (le piège d'ordre
+  qui avait tué 100 % des jobs une fois) ;
+- chaque scan finit sur une issue **terminale** — résolu avec son SKU, sa
+  quantité et son empreinte, ou en review avec des candidats. Jamais en suspens,
+  jamais avec une page blanche à trier.
+
 ## 8. Le lanceur
 
 `Demarrer.bat` reconstruit, démarre le worker puis l'application, attend que
