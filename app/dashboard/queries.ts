@@ -1,4 +1,5 @@
 import { query } from '../../lib/db.js';
+import { computeMix, MANUAL_RATE_ALARM } from '../../lib/metrics/mix.js';
 
 /**
  * Les cinq métriques de docs/05-production.md §1.2.
@@ -20,7 +21,6 @@ export interface Metric {
 const DAILY_REVIEW_CAPACITY = 2400;
 
 /** Le taux de review manuelle est LA métrique économique du projet. */
-const MANUAL_RATE_ALARM = 0.15;
 const QUEUE_DEPTH_ALARM = 5000;
 
 export async function loadMetrics(): Promise<Metric[]> {
@@ -75,6 +75,19 @@ async function workerAlive(): Promise<Metric> {
  *
  * La part `manual` devrait descendre avec le temps, jamais monter : c'est le
  * seul coût marginal par carte qui reste, et il se paie en minutes.
+ *
+ * ELLE SE CALCULE SUR CE QUI A ÉTÉ DÉCIDÉ, pas sur tout ce qui est entré.
+ *
+ * Compter les scans encore en review comme du manuel — ce que faisait cette
+ * fonction — met la métrique en alarme dès le premier lot envoyé, et l'y laisse
+ * tant que la review n'est pas vidée. À 1 700 cartes par jour, l'alarme est
+ * donc allumée en permanence, et une alarme toujours allumée n'est plus une
+ * alarme : on apprend à ne plus la regarder, y compris le jour où elle a
+ * raison.
+ *
+ * L'arriéré n'est pas perdu pour autant : il a sa PROPRE métrique, « Cartes en
+ * review », avec son propre seuil sur la capacité quotidienne. Mélanger les
+ * deux détruisait le signal des deux.
  */
 async function resolutionMix(): Promise<Metric> {
   const { rows } = await query<{ match_source: string | null; n: string }>(
@@ -85,34 +98,23 @@ async function resolutionMix(): Promise<Metric> {
       group by 1`,
   );
 
-  const total = rows.reduce((s, r) => s + Number(r.n), 0);
-  if (total === 0) {
-    return {
-      label: 'Résolution par niveau (7 j)',
-      value: '—',
-      detail: 'aucun scan sur la période',
-      health: 'ok',
-      threshold: `manual > ${MANUAL_RATE_ALARM * 100} %`,
-    };
-  }
-
   const by = (src: string | null) =>
     Number(rows.find((r) => r.match_source === src)?.n ?? 0);
 
-  const own = by('own_history');
-  const cat = by('catalog');
-  const man = by('manual');
-  // Un scan en needs_review non encore traité n'a pas de match_source : il
-  // compte comme du manuel, puisque c'est ce qu'il va coûter.
-  const pending = by(null);
-  const manualRate = (man + pending) / total;
+  const mix = computeMix({
+    own: by('own_history'),
+    catalog: by('catalog'),
+    manual: by('manual'),
+    // Encore en review : pas encore décidé, donc pas encore comptable ici.
+    attente: by(null),
+  });
 
   return {
     label: 'Résolution par niveau (7 j)',
-    value: `${Math.round(manualRate * 100)} % manuel`,
-    detail: `own_history ${own} · catalog ${cat} · manuel ${man + pending} · total ${total}`,
-    health: manualRate > MANUAL_RATE_ALARM ? 'alarm' : manualRate > 0.1 ? 'warn' : 'ok',
-    threshold: `manual > ${MANUAL_RATE_ALARM * 100} %`,
+    value: mix.value,
+    detail: mix.detail,
+    health: mix.health,
+    threshold: `manual > ${MANUAL_RATE_ALARM * 100} % des décidés`,
   };
 }
 

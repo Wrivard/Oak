@@ -31,7 +31,17 @@ Une seule page, cinq métriques. Si elle est verte, tu peux aller dormir.
 
 | Métrique | Seuil d'alarme |
 |---|---|
-| Taux de résolution par niveau (own_history / catalog / manual) | `manual > 15 %` |
+| Taux de résolution par niveau (own_history / catalog / manual) | `manual > 15 %` **des scans décidés** |
+
+> **Mesuré le 5 septembre 2026 :** le calcul comptait les scans encore en review
+> comme du manuel. L'écran affichait « 77 % manuel · Alarme » sur un lot dont
+> onze cartes venaient d'être résolues par le catalogue et trente-sept
+> attendaient la review. À 1 700 cartes par jour, cette alarme serait allumée en
+> permanence — et une alarme toujours allumée n'est plus une alarme. Le taux se
+> calcule maintenant sur les scans **décidés** ; l'arriéré garde sa propre
+> métrique, « Cartes en review », avec son seuil sur la capacité quotidienne.
+> Le calcul vit dans `lib/metrics/mix.ts`, séparé du SQL, parce que c'est lui
+> qui était faux.
 | Profondeur de queue par type de job | `> 5 000` ou croissance monotone 1 h |
 | Jobs `dead` dernières 24 h | `> 0` |
 | Écart de réconciliation eBay | `> 0` |
