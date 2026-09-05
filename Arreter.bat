@@ -9,4 +9,4 @@ powershell -NoProfile -Command ^
   "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -match 'worker.index|next.dist.bin.next' } | ForEach-Object { Write-Host ('  arret ' + $_.ProcessId); Stop-Process -Id $_.ProcessId -Force }"
 
 echo   Termine.
-timeout /t 3 >nul
+ping -n 4 127.0.0.1 >nul

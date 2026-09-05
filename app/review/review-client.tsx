@@ -1,7 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { confirmScan, loadMore, searchCatalog, type SearchHit } from './actions.js';
+import {
+  confirmScan,
+  loadMore,
+  rejectScan,
+  searchCatalog,
+  type SearchHit,
+} from './actions.js';
 import HelpOverlay from './help-overlay.js';
 import type { ReviewScan } from './queries.js';
 import { formatCents, netAfterFees, parseAmount } from '../../lib/pricing/net.js';
@@ -187,6 +193,24 @@ export default function ReviewClient({
       });
   }, [queue]);
 
+  /**
+   * Écarte la carte courante. Optimiste comme l'accept : l'écriture part
+   * derrière, la carte quitte la file tout de suite.
+   */
+  const reject = useCallback(() => {
+    if (!scan) return;
+    const position = cursor;
+    setError(null);
+    setQueue((q) => q.filter((s) => s.id !== scan.id));
+    setUndoStack((u) => [{ scan, at: position }, ...u].slice(0, 10));
+
+    void rejectScan(scan.id).then((res) => {
+      if (res.ok) return;
+      setError(res.error ?? 'échec');
+      setQueue((q) => [...q.slice(0, position), scan, ...q.slice(position)]);
+    });
+  }, [scan, cursor]);
+
   /** Annule la dernière confirmation en la remettant à sa place. */
   const undo = useCallback(() => {
     setUndoStack((u) => {
@@ -328,11 +352,16 @@ export default function ReviewClient({
       if (k === 'u') {
         e.preventDefault();
         undo();
+        return;
+      }
+      if (k === 'r') {
+        e.preventDefault();
+        reject();
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [accept, move, scan, undo]);
+  }, [accept, move, scan, undo, reject]);
 
   function toggleSound() {
     const next = !sound;
@@ -824,6 +853,9 @@ export default function ReviewClient({
         </span>
         <span>
           <kbd>S</kbd> rechercher
+        </span>
+        <span>
+          <kbd>R</kbd> écarter
         </span>
         <span>
           <kbd>U</kbd> annuler

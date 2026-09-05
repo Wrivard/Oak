@@ -46,7 +46,7 @@ echo   Attente du demarrage...
 set /a tentatives=0
 :attendre
 set /a tentatives+=1
-timeout /t 1 /nobreak >nul
+ping -n 2 127.0.0.1 >nul
 curl -s -o nul --max-time 2 http://127.0.0.1:3000/ 2>nul
 if not errorlevel 1 goto :pret
 if %tentatives% lss 60 goto :attendre
@@ -63,14 +63,17 @@ start "" http://localhost:3000
 
 rem L'adresse reseau, pour reviewer depuis un telephone ou une tablette de la
 rem maison. Le serveur ecoute deja sur toutes les interfaces (-H 0.0.0.0).
+rem
+rem On filtre les adresses APIPA (169.254.x) : elles apparaissent dans ipconfig
+rem mais ne menent nulle part, et les afficher a cote des bonnes fait perdre du
+rem temps a essayer la mauvaise.
 echo.
 echo   Sur cette machine   : http://localhost:3000
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
-  for /f "tokens=1" %%b in ("%%a") do echo   Depuis le reseau    : http://%%b:3000
-)
+powershell -NoProfile -Command ^
+  "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch '^(127\.|169\.254\.)' } | ForEach-Object { '  Depuis le reseau    : http://{0}:3000' -f $_.IPAddress }" 
 echo.
 echo   Cette fenetre peut etre fermee. Les deux autres doivent rester ouvertes.
-timeout /t 15 >nul
+ping -n 16 127.0.0.1 >nul
 exit /b 0
 
 :erreur

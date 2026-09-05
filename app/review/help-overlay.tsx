@@ -16,6 +16,7 @@ const RACCOURCIS: { touches: string[]; action: string; note?: string }[] = [
   { touches: ['E'], action: 'Éditer le prix final' },
   { touches: ['X'], action: 'Passer sans résoudre', note: 'la carte reste en file' },
   { touches: ['S'], action: 'Rechercher dans le catalogue' },
+  { touches: ['R'], action: 'Écarter — pas une carte', note: 'intercalaire, page blanche' },
   { touches: ['U'], action: 'Annuler la dernière confirmation' },
   { touches: ['Échap'], action: 'Sortir d’un champ de saisie' },
   { touches: ['?'], action: 'Afficher cette aide' },

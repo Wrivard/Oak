@@ -116,6 +116,39 @@ async function setPrice(sku: string, priceCents: number): Promise<void> {
 }
 
 /**
+ * Écarte un scan qui n'est pas une carte.
+ *
+ * Un intercalaire, une page blanche, une photo ratée : ça arrive dans tout lot
+ * réel, et sans ce chemin ces pages resteraient en review pour toujours à polluer
+ * le compteur.
+ *
+ * `rejected` est un état terminal DISTINCT de `resolved` : la ligne reste, avec sa
+ * trace, mais elle n'entre dans aucun inventaire et n'écrit aucune empreinte. On
+ * ne supprime rien — une page écartée par erreur doit pouvoir être retrouvée.
+ */
+export async function rejectScan(scanId: string, reason = 'pas une carte'): Promise<ActionResult> {
+  const { rows } = await query<{ status: string }>(
+    'select status from scans where id = $1',
+    [scanId],
+  );
+  const status = rows[0]?.status;
+  if (!status) return { ok: false, error: 'scan introuvable' };
+  if (status === 'resolved') {
+    // Rejeter après résolution laisserait une quantité en inventaire sans scan
+    // pour la justifier.
+    return { ok: false, error: 'ce scan est déjà résolu — corrige l’inventaire à la main' };
+  }
+
+  await query(
+    `update scans set status = 'rejected', error = $2, resolved_at = now()
+      where id = $1`,
+    [scanId, reason],
+  );
+  log.info('scan écarté', { scan_id: scanId, raison: reason });
+  return { ok: true };
+}
+
+/**
  * Charge la suite de la file.
  *
  * La page n'en rend que 200 d'un coup — au-delà le DOM et le temps de rendu
