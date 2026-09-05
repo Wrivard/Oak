@@ -98,6 +98,20 @@ une erreur *ambiguë*, pas permanente — il existe une fenêtre entre le commit
 `rename` où le chemin final n'est pas encore en place, et deux tentatives avec backoff
 la couvrent.
 
+**Les ressources partagées ne croisent pas leurs résultats.** Deux composants
+sont mémoïsés en un seul exemplaire et appelés en parallèle par le worker : la
+pipeline CLIP (`fingerprint`, quatre voies) et le worker tesseract (`match`, deux
+voies). Si l'un des deux croisait ses résultats, une carte recevrait l'embedding
+ou le numéro d'une autre — et dans le cas de l'embedding, ce vecteur partirait
+dans `known_fingerprints` où il servirait de vérité à toutes les occurrences
+suivantes. Une erreur qui s'auto-propage, invisible, sur le chemin censé rendre
+le coût marginal nul.
+
+C'est vérifié, pas supposé : `tests/embed-concurrence.test.ts` encode six images
+une par une puis les six en parallèle et exige des vecteurs identiques à
+l'arrondi près ; `tests/ocr-concurrence.test.ts` fait l'équivalent sur les
+numéros.
+
 **L'OCR est sérialisé, et il ne croise pas ses résultats.** `readCardNumbers`
 partage un seul worker tesseract ; le handler `match` tourne à deux voies. Deux
 cartes sont donc lues en même temps par le même worker, sur chaque lot, en
