@@ -126,7 +126,6 @@ async function main(): Promise<void> {
     form.set('variant', 'normal');
     form.set('condition', 'NM');
     form.set('language', 'en');
-    form.set('offset', String(i));
     for (const p of pages.slice(i, i + BATCH)) {
       form.append('files', new File([new Uint8Array(p.buf)], p.nom, { type: 'image/jpeg' }));
     }

@@ -137,7 +137,6 @@ async function main(): Promise<void> {
   form.set('variant', 'normal');
   form.set('condition', 'NM');
   form.set('language', 'en');
-  form.set('offset', '0');
 
   let rang = 0;
   for (const cas of CAS) {

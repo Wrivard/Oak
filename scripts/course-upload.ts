@@ -15,7 +15,7 @@
  *
  * Ce script envoie N paquets EN MÊME TEMPS et compte ce qui a survécu.
  */
-import { readdir } from 'node:fs/promises';
+import { readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { closePool, query } from '../lib/db.js';
@@ -34,6 +34,12 @@ async function image(teinte: number): Promise<Buffer> {
 }
 
 async function nettoyer(): Promise<void> {
+  // Le RÉPERTOIRE aussi : le rang effectif est le maximum entre le compteur de
+  // la session et ce que porte le disque. Laisser les fichiers d'un essai
+  // précédent décale les rangs et fausse le compte — ce qui est justement le
+  // garde-fou qu'on veut, mais pas ce qu'on mesure ici.
+  await rm(join(STORE, SESSION), { recursive: true, force: true });
+
   await query(
     `delete from jobs where payload->>'session_id' in (
        select id::text from sessions where name = $1)`,
@@ -60,7 +66,6 @@ async function main(): Promise<void> {
     form.set('variant', 'normal');
     form.set('condition', 'NM');
     form.set('language', 'en');
-    form.set('offset', '0');
     for (let i = 0; i < PAR_PAQUET; i++) {
       const buf = await image((p * 37 + i * 11) % 255);
       form.append('files', new File([new Uint8Array(buf)], `p${p}-${i}.jpg`, { type: 'image/jpeg' }));

@@ -135,16 +135,13 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
         a.name.localeCompare(b.name, undefined, { numeric: true }),
       );
 
-      let envoyees = 0;
       for (const paquet of enPaquets(ordered)) {
         const form = new FormData();
         form.set('session', session.trim());
         form.set('variant', variant);
         form.set('condition', condition);
         form.set('language', 'en');
-        form.set('offset', String(envoyees));
         for (const f of paquet) form.append('files', f);
-        envoyees += paquet.length;
 
         const res = await fetch('/api/upload', { method: 'POST', body: form });
         if (!res.ok) {

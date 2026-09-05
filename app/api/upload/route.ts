@@ -140,7 +140,6 @@ export async function POST(req: Request): Promise<NextResponse> {
   const variant = String(form.get('variant') ?? '') as CardVariant;
   const condition = String(form.get('condition') ?? '') as CardCondition;
   const language = String(form.get('language') ?? 'en').trim().toLowerCase();
-  const offset = Number(form.get('offset') ?? 0);
   const files = form.getAll('files').filter((f): f is File => f instanceof File);
 
   const mauvaisNom = nomDeLotInvalide(sessionName);
@@ -150,17 +149,15 @@ export async function POST(req: Request): Promise<NextResponse> {
   if (files.length === 0) {
     return NextResponse.json({ error: 'aucun fichier' }, { status: 400 });
   }
-  if (!Number.isInteger(offset) || offset < 0) {
-    return NextResponse.json({ error: 'offset invalide' }, { status: 400 });
-  }
 
   const sessionId = await openSession({ name: sessionName, variant, condition, language });
   const dir = join(STORE, sessionName);
   await mkdir(dir, { recursive: true });
 
-  // Le décalage client sert à ordonner DANS la requête ; le rang absolu est
-  // alloué atomiquement, pour ne jamais écraser un envoi précédent ni
-  // concurrent.
+  // Le rang est alloué atomiquement côté base : le client n'a plus son mot à
+  // dire sur le nommage. Il envoyait autrefois un décalage, qui a été la cause
+  // du premier écrasement silencieux d'un lot — un champ que le serveur n'écoute
+  // plus vaut mieux qu'un champ qu'il pourrait réécouter par distraction.
   const base = await allouerRangs(sessionId, dir, files.length);
 
   let accepted = 0;
