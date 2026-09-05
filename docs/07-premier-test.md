@@ -66,7 +66,19 @@ l'OCR marche le mieux, donc c'est le meilleur cas et il doit passer.
 Sur `/diagnostics`, lis le **taux de numéro lu**.
 
 - **Au-dessus de 85 %** — le niveau 2 tient. Continue.
-- **En dessous** — regarde la ventilation par ère avant toute conclusion. Si une seule
+- **En dessous** — avant toute conclusion, lance la mesure sur **tes** scans :
+
+  ```bash
+  pnpm ocr:bandes chemin/vers/ton/dossier/de/scans 60
+  ```
+
+  Elle essaie neuf géométries de crop sur les mêmes images et classe par nombre
+  de numéros **justes**. Sur des renders officiels, le bas-gauche — la première
+  bande essayée aujourd'hui — n'a rien lu du tout, et descendre la hauteur de
+  0,88 à 0,84 a fait passer le bas-droite de 20 % à 27 %. Si tes scans disent la
+  même chose, la question est tranchée sans deviner.
+
+  Puis regarde la ventilation par ère. Si une seule
   tranche décroche, c'est un problème de crop, pas de conception : la colonne « bande de
   crop qui a réussi » dit laquelle utiliser. Si tout décroche, c'est la qualité des
   photos qu'il faut regarder d'abord — cadrage, netteté du bloc numéro, contraste.

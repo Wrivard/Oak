@@ -177,6 +177,46 @@ Hamming : c'est de **borner le nombre d'empreintes par identité**. La deux
 centième occurrence du même Dracaufeu Set de Base n'apprend plus rien que les
 cinq premières ne disaient déjà.
 
+**La géométrie du crop OCR se mesure maintenant, et le premier résultat surprend.**
+`pnpm ocr:bandes` essaie une grille de géométries sur les mêmes images et compte
+les numéros lus **et justes** — la justesse vient du nom de fichier quand il porte
+un identifiant du catalogue, ce qui est le cas du cache de `pnpm loadtest`. Sur
+60 renders officiels :
+
+```
+                        lus        justes
+bas-gauche  0.88         0 %         0 %
+bas-gauche  0.84         0 %         0 %
+bas-gauche  0.91         0 %         0 %
+bas-droite  0.88        20 %        20 %
+bas-droite  0.84        32 %        27 %     ← le meilleur
+bas-droite  0.91        15 %        15 %
+pleine larg 0.88        22 %        20 %
+pleine larg 0.84        20 %        20 %
+pleine larg 0.80        18 %        17 %
+```
+
+Deux choses en sortent :
+
+- **La bande bas-GAUCHE ne lit rien du tout** sur cet échantillon, aux trois
+  hauteurs. Or c'est la **première** essayée : chaque carte paie une passe OCR
+  pour zéro résultat.
+- **Descendre la hauteur de 0.88 à 0.84 fait passer le bas-droite de 20 % à
+  27 % de lectures justes.** Le bloc numéro est plus haut que ce que la
+  géométrie actuelle suppose.
+
+**Trois réserves, et elles comptent.** Ce sont des *renders officiels* à
+résolution modeste, pas des scans à 300 dpi : les taux absolus n'ont aucune
+valeur, seul le CLASSEMENT entre géométries en a. Le pipeline réel essaie les
+bandes en séquence avec sortie anticipée dès qu'une lecture correspond à une
+vraie carte, donc son taux est celui de l'union, pas d'une bande isolée. Et
+l'échantillon mélange les ères.
+
+**Rien n'a été changé.** Toucher à `THRESHOLDS.ocr.bands` change la logique de
+résolution, et le skill l'interdit tant que le golden set est vide. C'est la
+mesure à refaire sur de vrais scans au premier lot — c'est exactement
+l'expérience 1bis, et elle a maintenant son outil.
+
 **Le niveau 1 attrape un re-scan réaliste, mais pas une carte de travers.**
 C'est tout le modèle économique : la première occurrence coûte une review, les
 suivantes doivent être gratuites. Mesuré le 5 septembre 2026 sur deux cartes
