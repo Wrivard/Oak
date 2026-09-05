@@ -177,45 +177,57 @@ Hamming : c'est de **borner le nombre d'empreintes par identité**. La deux
 centième occurrence du même Dracaufeu Set de Base n'apprend plus rien que les
 cinq premières ne disaient déjà.
 
-**La géométrie du crop OCR se mesure maintenant, et le premier résultat surprend.**
-`pnpm ocr:bandes` essaie une grille de géométries sur les mêmes images et compte
-les numéros lus **et justes** — la justesse vient du nom de fichier quand il porte
-un identifiant du catalogue, ce qui est le cas du cache de `pnpm loadtest`. Sur
-60 renders officiels :
+**La géométrie du crop OCR se mesure maintenant.** `pnpm ocr:bandes` essaie une
+grille de géométries sur les mêmes images et compte les numéros lus **et justes**
+— la justesse vient du nom de fichier quand il porte un identifiant du catalogue.
+Un crop qui lit beaucoup de mauvais numéros est pire qu'un crop qui ne lit rien :
+le niveau 2 résoudrait vers la mauvaise carte avec une confiance élevée.
+
+Mesuré le 5 septembre 2026 sur 60 renders, **toutes ères mélangées** (13 vintage,
+17 BW/XY/SM, 30 modernes) :
 
 ```
-                        lus        justes
-bas-gauche  0.88         0 %         0 %
-bas-gauche  0.84         0 %         0 %
-bas-gauche  0.91         0 %         0 %
-bas-droite  0.88        20 %        20 %
-bas-droite  0.84        32 %        27 %     ← le meilleur
-bas-droite  0.91        15 %        15 %
-pleine larg 0.88        22 %        20 %
-pleine larg 0.84        20 %        20 %
-pleine larg 0.80        18 %        17 %
+                        lus      justes
+pleine largeur 0.84     47 %      45 %     ← le meilleur
+pleine largeur 0.80     43 %      42 %
+pleine largeur 0.88     43 %      40 %
+bas-gauche 0.91         33 %      33 %
+bas-gauche 0.84         27 %      22 %
+bas-droite 0.84         27 %      22 %
+bas-gauche 0.88         23 %      22 %
+bas-droite 0.88         15 %      15 %
+bas-droite 0.91         13 %      13 %
 ```
 
-Deux choses en sortent :
+**Une bande PLEINE LARGEUR bat toutes les demi-bandes sur un corpus mélangé**, et
+0,84 bat 0,88. C'est cohérent : elle contient le numéro quelle que soit l'ère,
+là où une demi-bande ne sert que la sienne.
 
-- **La bande bas-GAUCHE ne lit rien du tout** sur cet échantillon, aux trois
-  hauteurs. Or c'est la **première** essayée : chaque carte paie une passe OCR
-  pour zéro résultat.
-- **Descendre la hauteur de 0.88 à 0.84 fait passer le bas-droite de 20 % à
-  27 % de lectures justes.** Le bloc numéro est plus haut que ce que la
-  géométrie actuelle suppose.
+Et les demi-bandes servent bien leur ère, mesuré séparément :
 
-**Trois réserves, et elles comptent.** Ce sont des *renders officiels* à
-résolution modeste, pas des scans à 300 dpi : les taux absolus n'ont aucune
-valeur, seul le CLASSEMENT entre géométries en a. Le pipeline réel essaie les
-bandes en séquence avec sortie anticipée dès qu'une lecture correspond à une
-vraie carte, donc son taux est celui de l'union, pas d'une bande isolée. Et
-l'échantillon mélange les ères.
+```
+30 cartes modernes      bas-gauche 0.91   67 % justes    bas-droite   0 %
+60 cartes pré-2019      bas-droite 0.84   27 % justes    bas-gauche   0 %
+```
 
-**Rien n'a été changé.** Toucher à `THRESHOLDS.ocr.bands` change la logique de
-résolution, et le skill l'interdit tant que le golden set est vide. C'est la
-mesure à refaire sur de vrais scans au premier lot — c'est exactement
-l'expérience 1bis, et elle a maintenant son outil.
+> **Ce tableau m'a d'abord fait écrire l'inverse.** Le premier échantillon venait
+> du cache de `pnpm loadtest`, qui s'est révélé être **100 % pré-2019** : la
+> bande bas-gauche y sortait à 0 % sur les trois hauteurs, et j'en ai conclu
+> qu'elle ne servait à rien. Elle est en réalité la meilleure sur le moderne, à
+> 67 %. Le script affiche désormais la composition par ère de l'échantillon et
+> avertit quand il n'y en a qu'une — c'est le genre d'erreur qui se corrige une
+> fois, ou se répète indéfiniment.
+
+**Ce que ça ne dit pas.** Ce sont des renders officiels à résolution modeste, pas
+des scans à 300 dpi : les taux absolus n'ont pas de valeur, seul le classement en
+a. Et le pipeline réel essaie les bandes en séquence avec sortie anticipée dès
+qu'une lecture correspond à une vraie carte : son taux est celui de l'union, pas
+d'une bande isolée.
+
+**Rien n'a été changé.** L'ordre et la géométrie des bandes sont de la logique de
+résolution, et le skill l'interdit tant que le golden set est vide. La mesure est
+à refaire sur de vrais scans au premier lot — c'est l'expérience 1bis, et elle a
+maintenant son outil.
 
 **Le niveau 1 attrape un re-scan réaliste, mais pas une carte de travers.**
 C'est tout le modèle économique : la première occurrence coûte une review, les

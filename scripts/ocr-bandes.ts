@@ -19,6 +19,13 @@
  * lit beaucoup de mauvais numéros est pire qu'un crop qui ne lit rien : le
  * niveau 2 résoudrait vers la mauvaise carte avec une confiance élevée.
  *
+ * LA COMPOSITION PAR ÈRE EST AFFICHÉE, et ce n'est pas décoratif. Le bloc numéro
+ * est en bas à GAUCHE sur le moderne et en bas à DROITE sur le vintage : un
+ * échantillon d'une seule ère fait mécaniquement sortir l'autre bande à 0 %, et
+ * on en conclut qu'elle est inutile alors qu'elle est simplement hors sujet.
+ * C'est l'erreur que j'ai commise en lisant le premier tableau avant de regarder
+ * ce qu'il y avait dedans.
+ *
  * ⚠ Ce script NE MODIFIE AUCUN SEUIL. Il produit la mesure ; la décision de
  * changer `THRESHOLDS.ocr.bands` passe par le golden set (skill
  * card-matching-thresholds §1), qui est vide aujourd'hui.
@@ -38,7 +45,7 @@ interface Geometrie {
   width: number;
 }
 
-/** La grille. Les quatre bandes configurées y sont, pour comparer à la référence. */
+/** La grille. Les bandes configurées y sont, pour comparer à la référence. */
 const GRILLE: Geometrie[] = [
   { nom: 'bas-gauche 0.88', top: 0.88, left: 0.0, width: 0.5 },
   { nom: 'bas-droite 0.88', top: 0.88, left: 0.5, width: 0.5 },
@@ -82,8 +89,34 @@ async function verites(ids: readonly string[]): Promise<Map<string, string>> {
   return out;
 }
 
+/** La composition de l'échantillon, par ère. Voir le commentaire de tête. */
+async function composition(ids: readonly string[]): Promise<{ ere: string; n: number }[]> {
+  if (ids.length === 0) return [];
+  const { rows } = await query<{ ere: string; n: string }>(
+    `select case
+              when set_release >= date '2022-01-01' then '4 moderne'
+              when set_release >= date '2019-01-01' then '3 SWSH'
+              when set_release >= date '2011-01-01' then '2 BW/XY/SM'
+              when set_release is not null          then '1 vintage'
+              else '5 inconnue'
+            end as ere,
+            count(*)::text as n
+       from cards where id = any($1::text[])
+      group by 1 order by 1`,
+    [ids],
+  );
+  return rows.map((r) => ({ ere: r.ere, n: Number(r.n) }));
+}
+
+const AVERTISSEMENT_UNE_ERE = [
+  '  ⚠ UNE SEULE ÈRE dans l’échantillon. Le bloc numéro est en bas à GAUCHE sur le',
+  '    moderne et en bas à DROITE sur le vintage : l’autre bande sortira',
+  '    mécaniquement à 0 %, ce qui ne veut PAS dire qu’elle est inutile. Mélange',
+  '    les ères avant de conclure quoi que ce soit sur une bande.',
+].join('\n');
+
 async function main(): Promise<void> {
-  const dossier = process.argv[2] ?? (process.env['LOADTEST_CACHE'] ?? './.loadtest-cache');
+  const dossier = process.argv[2] ?? process.env['LOADTEST_CACHE'] ?? './.loadtest-cache';
   const limite = Number(process.argv[3] ?? 40);
 
   let fichiers: string[];
@@ -111,9 +144,16 @@ async function main(): Promise<void> {
   console.log(`\n  ${fichiers.length} images de ${dossier}`);
   console.log(
     verite.size > 0
-      ? `  ${verite.size} avec un numéro connu du catalogue : la JUSTESSE est mesurable\n`
-      : `  aucun nom de fichier ne correspond à une carte : seul le taux de lecture est mesurable\n`,
+      ? `  ${verite.size} avec un numéro connu du catalogue : la JUSTESSE est mesurable`
+      : '  aucun nom de fichier ne correspond à une carte : seul le taux de lecture est mesurable',
   );
+
+  const eres = await composition(ids);
+  if (eres.length > 0) {
+    console.log(`  composition : ${eres.map((e) => `${e.ere} ${e.n}`).join(' · ')}`);
+    if (eres.length === 1) console.log(AVERTISSEMENT_UNE_ERE);
+  }
+  console.log('');
 
   const w = await createWorker('eng');
   const resultats: { g: Geometrie; lus: number; justes: number }[] = [];
@@ -143,7 +183,7 @@ async function main(): Promise<void> {
       }
 
       resultats.push({ g, lus, justes });
-      const pct = (n: number) => `${Math.round((100 * n) / fichiers.length)} %`;
+      const pct = (n: number): string => `${Math.round((100 * n) / fichiers.length)} %`;
       console.log(
         `  ${g.nom.padEnd(22)} lus ${String(lus).padStart(3)} (${pct(lus).padStart(5)})` +
           (verite.size > 0 ? `   justes ${String(justes).padStart(3)} (${pct(justes)})` : ''),

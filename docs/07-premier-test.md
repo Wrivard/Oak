@@ -72,11 +72,17 @@ Sur `/diagnostics`, lis le **taux de numéro lu**.
   pnpm ocr:bandes chemin/vers/ton/dossier/de/scans 60
   ```
 
-  Elle essaie neuf géométries de crop sur les mêmes images et classe par nombre
-  de numéros **justes**. Sur des renders officiels, le bas-gauche — la première
-  bande essayée aujourd'hui — n'a rien lu du tout, et descendre la hauteur de
-  0,88 à 0,84 a fait passer le bas-droite de 20 % à 27 %. Si tes scans disent la
-  même chose, la question est tranchée sans deviner.
+  Elle essaie neuf géométries de crop sur les mêmes images, affiche la
+  composition par ère de ton échantillon, et classe par nombre de numéros
+  **justes**. Sur des renders officiels toutes ères mélangées, une bande
+  **pleine largeur à 0,84** est ressortie devant toutes les demi-bandes (45 %
+  contre 33 % au mieux). Si tes scans disent la même chose, la question est
+  tranchée sans deviner.
+
+  Prends un échantillon **mélangé**. Le bloc numéro est en bas à gauche sur le
+  moderne et en bas à droite sur le vintage : un lot d'une seule ère fait sortir
+  l'autre bande à 0 %, et on en conclut à tort qu'elle est inutile. Le script
+  t'avertit si c'est le cas.
 
   Puis regarde la ventilation par ère. Si une seule
   tranche décroche, c'est un problème de crop, pas de conception : la colonne « bande de
