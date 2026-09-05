@@ -148,6 +148,16 @@ export default function ReviewClient({
     if (id) rowRefs.current.get(id)?.scrollIntoView({ block: 'nearest' });
   }, [cursor, queue]);
 
+  /**
+   * Image introuvable.
+   *
+   * docs/02 §6 prévoit de supprimer les originaux une fois l'URL eBay obtenue :
+   * une image absente est un cas NORMAL, pas une panne. Elle doit se dire, pas
+   * afficher une icône cassée que personne ne sait interpréter.
+   */
+  const [imageManquante, setImageManquante] = useState(false);
+  useEffect(() => setImageManquante(false), [scan?.id]);
+
   /** Confirmation visuelle brève : on doit SAVOIR que l'appui a été pris. */
   const [flash, setFlash] = useState(false);
   useEffect(() => {
@@ -466,28 +476,54 @@ export default function ReviewClient({
           }}
         >
           <div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/api/scan/${scan?.id}/image`}
-              alt={`scan ${scan?.seq}`}
-              style={{
-                width: '100%',
-                borderRadius: 'var(--r3)',
-                border: `2px solid ${flash ? 'var(--green)' : TIER_COLOR[tier]}`,
-                background: 'var(--surface)',
-                transition: 'border-color 120ms ease-out, opacity 120ms ease-out',
-                opacity: flash ? 0.5 : 1,
-              }}
-            />
-            <a
-              href={`/api/scan/${scan?.id}/image?full=1`}
-              target="_blank"
-              rel="noreferrer"
-              className="faint"
-              style={{ fontSize: 11, display: 'block', marginTop: 6 }}
-            >
-              voir en pleine résolution
-            </a>
+            {imageManquante ? (
+              <div
+                style={{
+                  display: 'grid',
+                  placeItems: 'center',
+                  gap: 'var(--s2)',
+                  aspectRatio: '5 / 7',
+                  padding: 'var(--s4)',
+                  textAlign: 'center',
+                  borderRadius: 'var(--r3)',
+                  border: '2px dashed var(--border)',
+                  background: 'var(--surface)',
+                  color: 'var(--text-faint)',
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Image indisponible</span>
+                <span style={{ fontSize: 11 }}>
+                  Le fichier a été déplacé ou purgé. Les candidats et le numéro lu
+                  restent exploitables.
+                </span>
+              </div>
+            ) : (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/scan/${scan?.id}/image`}
+                  alt={`scan ${scan?.seq}`}
+                  onError={() => setImageManquante(true)}
+                  style={{
+                    width: '100%',
+                    borderRadius: 'var(--r3)',
+                    border: `2px solid ${flash ? 'var(--green)' : TIER_COLOR[tier]}`,
+                    background: 'var(--surface)',
+                    transition: 'border-color 120ms ease-out, opacity 120ms ease-out',
+                    opacity: flash ? 0.5 : 1,
+                  }}
+                />
+                <a
+                  href={`/api/scan/${scan?.id}/image?full=1`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="faint"
+                  style={{ fontSize: 11, display: 'block', marginTop: 6 }}
+                >
+                  voir en pleine résolution
+                </a>
+              </>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)', minWidth: 0 }}>
