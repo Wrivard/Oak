@@ -18,13 +18,35 @@ import { hamming, type Bits64 } from '../fingerprint/hash.js';
  * se trompe, et il compliquait un problème que la position résout.
  */
 
-/** Deux dos du même lot restent très proches, même avec le bruit du scanner. */
+/**
+ * Deux dos du même lot restent très proches, même avec le bruit du scanner.
+ *
+ * MESURÉ le 5 septembre 2026 sur une image texturée — un vrai render de carte,
+ * ce qu'est le dos d'une carte Pokémon :
+ *
+ * ```
+ * rotation 0,5°   4      +8 % de luminosité   0
+ * rotation 1°     4      recompression q60    0
+ * rotation 2°     6      1° + lum + q70       4
+ * rotation 3°    12
+ * ```
+ *
+ * Le seuil tient donc jusqu'à trois degrés de travers, ce qu'un ADF ne produit
+ * pas. La même mesure sur un aplat géométrique donne 16 dès un degré : une
+ * image pauvre en détails voit son spectre DCT bouger énormément pour une
+ * petite rotation. C'est un piège de FIXTURE, pas de seuil — un test qui
+ * fabrique des dos en couleur unie conclura à tort que le seuil est trop serré.
+ */
 export const BACK_SIMILARITY_MAX = 12;
 
 /**
  * Part des pages paires qui doivent se ressembler pour que l'alternance soit
- * jugée saine. En dessous, on refuse d'apparier plutôt que de produire des
- * paires fausses.
+ * jugée saine.
+ *
+ * En dessous, on apparie QUAND MÊME et on signale bruyamment. Refuser
+ * d'apparier laisserait les pages sur le disque sans aucune carte, c'est-à-dire
+ * un lot dont on ne sait plus sortir ; apparier en signalant laisse voir les
+ * cartes et décider. L'anomalie remonte sur `/batches`.
  */
 export const HEALTHY_BACK_SHARE = 0.8;
 

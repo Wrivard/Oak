@@ -177,6 +177,31 @@ Hamming : c'est de **borner le nombre d'empreintes par identité**. La deux
 centième occurrence du même Dracaufeu Set de Base n'apprend plus rien que les
 cinq premières ne disaient déjà.
 
+**Le seuil de ressemblance des dos tient, et la fixture qui disait le contraire
+mentait.** L'appariement vérifie que les pages paires se ressemblent entre elles,
+à 12 de distance de Hamming sur le pHash. Si un ADF introduisait plus de
+variation que ça, **chaque lot** serait signalé comme anormal — une fausse alarme
+permanente sur le contrôle censé attraper une page manquante. Mesuré sur une
+image texturée, c'est-à-dire ce qu'est un vrai dos de carte :
+
+```
+rotation 0,5°   4      +8 % de luminosité   0
+rotation 1°     4      recompression q60    0
+rotation 2°     6      1° + lum + q70       4
+rotation 3°    12
+```
+
+La même mesure sur un **aplat géométrique** donne 16 dès un degré. Une image
+pauvre en détails voit son spectre DCT bouger énormément pour une petite
+rotation ; une image texturée, non. C'est un piège de **fixture**, pas de seuil —
+et c'est la troisième fois que des dos synthétiques en couleur unie induisent en
+erreur sur ce projet. Un test qui en fabrique conclura que le seuil est trop
+serré, et le desserrer masquerait le décalage d'une page.
+
+Note au passage : quand la cohérence tombe sous 80 %, on apparie **quand même**
+et on signale. Refuser d'apparier laisserait les pages sur le disque sans aucune
+carte — un lot dont on ne sait plus sortir.
+
 **Deux envois simultanés vers le même lot.** Mesuré le 5 septembre 2026, six
 paquets envoyés en parallèle vers le même nom de lot :
 
