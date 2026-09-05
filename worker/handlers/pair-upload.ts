@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { query } from '../../lib/db.js';
 import { phash } from '../../lib/fingerprint/hash.js';
-import { registerScan } from '../../lib/ingest/register.js';
+import { registerScan, registerUnreadablePage } from '../../lib/ingest/register.js';
 import { pairPages, type PairMode, type Page } from '../../lib/ingest/pairing.js';
 import { log } from '../../lib/log.js';
 import { PermanentError } from '../queue/errors.js';
@@ -44,6 +44,7 @@ export async function handlePairUpload(job: Job): Promise<void> {
   const seen = new Set(known.map((r) => r.p));
 
   const pages: Page[] = [];
+  const illisibles: { path: string; raison: string }[] = [];
   let index = 0;
   for (const name of files) {
     index += 1;
@@ -53,13 +54,16 @@ export async function handlePairUpload(job: Job): Promise<void> {
     try {
       pages.push({ index, path, phash: await phash(await readFile(path)) });
     } catch (err) {
-      // Une image illisible ne doit pas emporter le lot, mais elle ne disparaît
-      // pas non plus : sans ligne, c'est une carte physique sans inventaire.
+      // Une image illisible ne doit pas emporter le lot. Elle ne disparaît pas
+      // non plus : un `log.error` seul en faisait une carte physique sans
+      // ligne d'inventaire, avec pour unique trace une ligne de journal que
+      // personne ne lit. Elle est enregistrée plus bas comme page écartée.
       log.error('image du lot illisible, non appariée', { path, err });
+      illisibles.push({ path, raison: `image illisible : ${String(err).slice(0, 200)}` });
     }
   }
 
-  if (pages.length === 0) {
+  if (pages.length === 0 && illisibles.length === 0) {
     log.info('lot déjà apparié, rien à faire', { session_id: sessionId, dir });
     return;
   }
@@ -78,6 +82,18 @@ export async function handlePairUpload(job: Job): Promise<void> {
       seq,
       frontPath: pair.front.path,
       backPath: pair.back?.path ?? null,
+    });
+    seq += 1;
+  }
+
+  // Les pages illisibles APRÈS les paires : elles ne participent pas à
+  // l'appariement, mais elles laissent chacune une ligne visible dans le lot.
+  for (const p of illisibles) {
+    await registerUnreadablePage({
+      sessionId,
+      seq,
+      frontPath: p.path,
+      reason: p.raison,
     });
     seq += 1;
   }

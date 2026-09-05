@@ -4,7 +4,12 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closePool, query } from '../lib/db.js';
-import { nextSeq, openSession, registerScan } from '../lib/ingest/register.js';
+import {
+  nextSeq,
+  openSession,
+  registerScan,
+  registerUnreadablePage,
+} from '../lib/ingest/register.js';
 
 /**
  * Chemin d'entrée par upload.
@@ -199,3 +204,108 @@ async function scannedCount(): Promise<number> {
   );
   return rows[0]?.n ?? -1;
 }
+
+describe('registerUnreadablePage', () => {
+  /**
+   * Une page dont le fichier ne se lit pas A EXISTÉ : elle est passée dans le
+   * scanner. Elle était simplement `log.error`-ée puis oubliée — une carte
+   * physique sans ligne d'inventaire, dont la seule trace était une ligne de
+   * journal que personne ne lit. C'est le mode de défaillance que tout le
+   * reste du système est conçu pour empêcher.
+   */
+  async function seqLibre(): Promise<number> {
+    const { rows } = await query<{ next: string }>(
+      'select coalesce(max(seq), 0) + 1 as next from scans where session_id = $1',
+      [sessionId],
+    );
+    return Number(rows[0]?.next);
+  }
+
+  it('LAISSE UNE LIGNE VISIBLE au lieu de disparaître', async () => {
+    const seq = await seqLibre();
+    const res = await registerUnreadablePage({
+      sessionId,
+      seq,
+      frontPath: '/lot/000042.jpg',
+      reason: 'image illisible : premature end of JPEG image',
+    });
+    expect(res.created).toBe(true);
+
+    const { rows } = await query<{ status: string; error: string; path: string }>(
+      'select status::text, error, front_path as path from scans where id = $1',
+      [res.scanId],
+    );
+    expect(rows[0]?.status).toBe('rejected');
+    expect(rows[0]?.error).toMatch(/illisible/);
+    expect(rows[0]?.path).toBe('/lot/000042.jpg');
+  });
+
+  it('N’ENFILE AUCUN JOB — il n’y a rien à traiter', async () => {
+    // Un job voué à mourir polluerait le tableau de santé et ferait croire à
+    // une panne du pipeline là où il n'y a qu'un fichier corrompu.
+    const seq = await seqLibre();
+    const res = await registerUnreadablePage({
+      sessionId,
+      seq,
+      frontPath: '/lot/000043.jpg',
+      reason: 'illisible',
+    });
+
+    const { rows } = await query(
+      `select 1 from jobs where payload->>'scan_id' = $1`,
+      [res.scanId],
+    );
+    expect(rows).toHaveLength(0);
+  });
+
+  it('COMPTE dans la session — sinon l’écart de comptage se masque', async () => {
+    const avant = await query<{ n: number }>(
+      'select scanned_count as n from sessions where id = $1',
+      [sessionId],
+    );
+    const seq = await seqLibre();
+    await registerUnreadablePage({
+      sessionId,
+      seq,
+      frontPath: '/lot/000044.jpg',
+      reason: 'illisible',
+    });
+    const apres = await query<{ n: number }>(
+      'select scanned_count as n from sessions where id = $1',
+      [sessionId],
+    );
+    expect(Number(apres.rows[0]?.n)).toBe(Number(avant.rows[0]?.n) + 1);
+  });
+
+  it('n’écrit ni inventaire ni empreinte', async () => {
+    const seq = await seqLibre();
+    const res = await registerUnreadablePage({
+      sessionId,
+      seq,
+      frontPath: '/lot/000045.jpg',
+      reason: 'illisible',
+    });
+    const fp = await query('select 1 from known_fingerprints where source_scan = $1', [
+      res.scanId,
+    ]);
+    expect(fp.rows).toHaveLength(0);
+  });
+
+  it('rejouer le même seq ne crée pas une seconde ligne', async () => {
+    const seq = await seqLibre();
+    const a = await registerUnreadablePage({
+      sessionId,
+      seq,
+      frontPath: '/lot/000046.jpg',
+      reason: 'illisible',
+    });
+    const b = await registerUnreadablePage({
+      sessionId,
+      seq,
+      frontPath: '/lot/000046.jpg',
+      reason: 'illisible',
+    });
+    expect(b.created).toBe(false);
+    expect(b.scanId).toBe(a.scanId);
+  });
+});

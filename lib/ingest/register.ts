@@ -64,6 +64,55 @@ export async function registerScan(input: RegisterInput): Promise<RegisterResult
 }
 
 /**
+ * Une page dont le fichier ne se lit pas.
+ *
+ * Elle a existé physiquement : elle est passée dans le scanner. La faire
+ * disparaître d'un `log.error` est le pire mode de défaillance du système —
+ * une carte sans ligne d'inventaire, qu'on ne vend pas et qu'on ne retrouve
+ * jamais, alors que le seul signal serait une ligne de log que personne ne lit.
+ *
+ * On enregistre donc une ligne `rejected`, l'état terminal qui n'entre dans
+ * aucun inventaire et n'écrit aucune empreinte, mais qui reste VISIBLE dans le
+ * lot et compte dans la réconciliation. Aucun job n'est enfilé : il n'y a rien
+ * à traiter, et un job voué à mourir polluerait le tableau de santé.
+ */
+export async function registerUnreadablePage(input: {
+  sessionId: string;
+  seq: number;
+  frontPath: string;
+  reason: string;
+}): Promise<RegisterResult> {
+  return withTransaction(async (client) => {
+    const ins = await client.query<{ id: string; inserted: boolean }>(
+      `insert into scans (session_id, seq, front_path, status, error, resolved_at)
+       values ($1, $2, $3, 'rejected', $4, now())
+       on conflict (session_id, seq) do update set front_path = excluded.front_path
+       returning id, (xmax = 0) as inserted`,
+      [input.sessionId, input.seq, input.frontPath, input.reason],
+    );
+    const scan = ins.rows[0];
+    if (!scan) throw new Error('insertion de la page illisible impossible');
+
+    if (scan.inserted) {
+      // Elle compte : une feuille est bien passée dans le scanner. Ne pas la
+      // compter masquerait l'écart que la réconciliation cherche à voir.
+      await client.query(
+        `update sessions set scanned_count = scanned_count + 1 where id = $1`,
+        [input.sessionId],
+      );
+    }
+
+    log.warn('page illisible enregistrée comme écartée', {
+      session_id: input.sessionId,
+      path: input.frontPath,
+      raison: input.reason,
+    });
+
+    return { scanId: scan.id, created: scan.inserted };
+  });
+}
+
+/**
  * Prochain numéro d'ordre libre dans une session.
  *
  * L'upload n'a pas de compteur de feuilles comme un ADF : on prend la suite de

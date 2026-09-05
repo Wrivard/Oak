@@ -98,6 +98,19 @@ une erreur *ambiguë*, pas permanente — il existe une fenêtre entre le commit
 `rename` où le chemin final n'est pas encore en place, et deux tentatives avec backoff
 la couvrent.
 
+**Une page illisible laisse une ligne.** Mesuré le 5 septembre 2026 : `pair_upload`
+attrapait l'échec de décodage, écrivait un `log.error` et passait à la suivante. La
+page disparaissait — une feuille passée physiquement dans le scanner, sans aucune ligne
+en base, dont la seule trace était une entrée de journal que personne ne lit. C'est
+exactement le mode de défaillance que tout le reste du système est conçu à empêcher, et
+le commentaire au-dessus du code affirmait déjà qu'il ne fallait pas le faire.
+
+`registerUnreadablePage()` écrit maintenant une ligne `rejected` : état terminal, aucun
+inventaire, aucune empreinte, aucun job enfilé — mais visible dans le lot et **comptée
+dans la réconciliation**, parce que la feuille est bien passée. Vérifié par
+`pnpm edge` : un JPEG tronqué et un fichier texte renommé `.jpg` produisent deux lignes
+écartées portant l'erreur de sharp, et zéro job mort.
+
 **La session n'est jamais créée à la volée.** Le watcher résout `{session}` en UUID par
 son nom ; si elle n'existe pas ou est fermée, le fichier part en `rejected/`, jamais
 supprimé. Créer la session impliquerait de deviner `default_variant`, qui encode la
