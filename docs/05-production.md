@@ -312,6 +312,27 @@ fonctionne à côté.
 pooler ne rend rien plus rapide : ça déplace l'attente du pool applicatif vers un
 refus du serveur.
 
+**Les voies inactives reculent.** Le worker ouvre une voie par slot de concurrence :
+quatre `fingerprint`, deux `match`, une pour chacun des trois autres types, soit neuf.
+À 500 ms fixes, ça faisait **18 réclamations par seconde en permanence, pour rien** —
+et ces requêtes à vide se disputaient les cinq connexions du pool avec le travail réel.
+
+Le délai croît de ×1,6 à chaque réclamation vide et repart au minimum dès qu'un job est
+trouvé : un lot arrive rarement seul, la carte suivante ne doit pas attendre. Mesuré :
+500, 800, 1280, puis plafond — **2,6 s d'inactivité** avant qu'une voie ne passe au
+sondage plafonné.
+
+Le plafond est par type, dans `worker/index.ts` : deux secondes sur ce qu'un humain
+attend (`fingerprint`, `match`, `pair_upload`), dix secondes sur le travail de fond
+(`price_refresh`, `tcg_export`). Le sondage à vide tombe de ~18 à ~3,7 requêtes par
+seconde, pour au pire deux secondes de latence sur un chemin où l'écran se rafraîchit
+déjà toutes les cinq.
+
+La boucle elle-même est couverte par `tests/worker-loop.test.ts` : enfiler un job, le
+laisser finir, laisser la voie atteindre son plafond, en enfiler un second et vérifier
+qu'il part aussi. Une voie qui s'endort et ne se réveille plus arrêterait le pipeline
+sans une seule erreur dans les journaux.
+
 **La mémoire du worker ne fuit pas.** Sur 800 cartes en quatre lots successifs dans
 le même process : 725 → 806 → 525 → 518 Mo. Elle oscille entre 500 et 800 Mo et
 redescend — c'est le ramasse-miettes, pas une fuite. Le poids vient du modèle CLIP
