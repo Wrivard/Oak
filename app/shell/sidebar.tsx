@@ -76,15 +76,39 @@ const ICONS: Record<string, ReactNode> = {
   ),
 };
 
+/**
+ * Trois groupes, dans l'ordre où on les traverse.
+ *
+ * Huit entrées à la file se lisent comme une liste ; trois groupes se lisent
+ * comme une organisation, et surtout ils disent où chercher. Le découpage
+ * suit le trajet d'une carte : elle ENTRE (envoi, lot, review, vérification),
+ * elle devient du STOCK (inventaire, prix), et le reste sert à savoir si la
+ * machine tourne.
+ */
 const NAV = [
-  { href: '/upload', label: 'Envoyer', icon: 'upload' },
-  { href: '/batches', label: 'Lots', icon: 'batches' },
-  { href: '/review', label: 'Review', icon: 'review' },
-  { href: '/audit', label: 'Vérifier', icon: 'audit' },
-  { href: '/inventory', label: 'Inventaire', icon: 'inventory' },
-  { href: '/pricing', label: 'Prix', icon: 'pricing' },
-  { href: '/diagnostics', label: 'Diagnostic', icon: 'diagnostics' },
-  { href: '/dashboard', label: 'Santé', icon: 'dashboard' },
+  {
+    titre: 'Flux',
+    items: [
+      { href: '/upload', label: 'Envoyer', icon: 'upload' },
+      { href: '/batches', label: 'Lots', icon: 'batches' },
+      { href: '/review', label: 'Review', icon: 'review' },
+      { href: '/audit', label: 'Vérifier', icon: 'audit' },
+    ],
+  },
+  {
+    titre: 'Stock',
+    items: [
+      { href: '/inventory', label: 'Inventaire', icon: 'inventory' },
+      { href: '/pricing', label: 'Prix', icon: 'pricing' },
+    ],
+  },
+  {
+    titre: 'Machine',
+    items: [
+      { href: '/diagnostics', label: 'Diagnostic', icon: 'diagnostics' },
+      { href: '/dashboard', label: 'Santé', icon: 'dashboard' },
+    ],
+  },
 ] as const;
 
 export default function Shell({ counts, children }: Props) {
@@ -144,7 +168,12 @@ export default function Shell({ counts, children }: Props) {
         </div>
 
         <nav className="sidebar-nav">
-          {NAV.map((item) => {
+          {NAV.map((groupe) => (
+            <div key={groupe.titre} className="nav-groupe">
+              {/* Le titre disparaît avec les libellés quand le menu se réduit ;
+                  la marge du groupe suffit alors à séparer les icônes. */}
+              <span className="nav-groupe-titre nav-label">{groupe.titre}</span>
+              {groupe.items.map((item) => {
             const active = pathname === item.href;
             const attendu = enRoute === item.href && !active;
             const badge =
@@ -174,7 +203,9 @@ export default function Shell({ counts, children }: Props) {
                 )}
               </Link>
             );
-          })}
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar-foot">

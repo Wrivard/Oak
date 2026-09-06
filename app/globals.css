@@ -308,6 +308,28 @@ a:hover {
   overflow-y: auto;
 }
 
+/* Un groupe de navigation. L'espace entre les groupes fait le travail que
+   ferait un filet, sans ajouter de trait dans une colonne qui en a déjà. */
+.nav-groupe {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-groupe + .nav-groupe {
+  margin-top: var(--s4);
+}
+.nav-groupe-titre {
+  padding: 0 var(--s3);
+  margin-bottom: 4px;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+}
+/* Réduit en rail, le titre part avec les libellés — mais l'écart entre groupes
+   reste, et c'est lui qui garde le regroupement lisible sur des icônes seules. */
+.shell[data-collapsed='true'] .nav-groupe + .nav-groupe {
+  margin-top: var(--s3);
+}
+
 .nav-item {
   position: relative;
   display: flex;
