@@ -1713,6 +1713,17 @@ kbd,
 .table th:first-child {
   text-align: left;
 }
+/* Une colonne triable se signale au survol. Sans ça, seul le curseur le disait,
+   c'est-à-dire seulement après avoir posé la souris dessus par hasard. */
+.th-tri {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--vite);
+}
+.th-tri:hover,
+.th-tri[aria-sort]:not([aria-sort='none']) {
+  color: var(--text-dim);
+}
 .table td {
   padding: 7px var(--s3);
   text-align: right;

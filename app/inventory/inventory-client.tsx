@@ -143,12 +143,32 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
                      plus cher, le plus nombreux, mais les noms de A à Z. */
                   <th
                     key={c.key}
-                    style={{ textAlign: c.align ?? 'left', cursor: 'pointer' }}
+                    className="th-tri"
+                    style={{ textAlign: c.align ?? 'left' }}
+                    /* Une colonne triable se pilote AUSSI au clavier : ailleurs
+                       dans cette application tout se fait sans souris, et un
+                       en-tête qui n'obéit qu'au clic est une exception qu'on
+                       découvre en la cherchant. `aria-sort` dit le sens en
+                       cours plutôt que de le laisser à la flèche seule. */
+                    tabIndex={0}
+                    role="columnheader"
+                    aria-sort={
+                      sort === c.key
+                        ? dir === 'desc'
+                          ? 'descending'
+                          : 'ascending'
+                        : 'none'
+                    }
                     title={
                       sort === c.key
                         ? 'Cliquer pour inverser le sens'
                         : `Trier par ${c.label.toLowerCase()}`
                     }
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter' && e.key !== ' ') return;
+                      e.preventDefault();
+                      e.currentTarget.click();
+                    }}
                     onClick={() =>
                       navigate({
                         sort: c.key,
