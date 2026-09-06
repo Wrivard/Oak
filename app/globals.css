@@ -3,6 +3,47 @@
    Un composant qui n'utilise pas ces classes est un bug, pas une variante.
    =========================================================================== */
 
+/* --- La police ---------------------------------------------------------------
+   `system-ui` donne Segoe UI sous Windows. Segoe est une bonne police, mais
+   c'est LA police du système : une interface qui l'utilise se lit comme un
+   utilitaire livré avec l'OS, quel que soit le soin mis au reste. C'est la
+   remarque « ça fait pas fini » avant même qu'on ait lu un mot.
+
+   Inter est dessinée pour les interfaces : hauteur d'x généreuse, terminaisons
+   nettes, chiffres tabulaires — ce qui compte sur des écrans qui sont à 80 %
+   des tableaux de nombres.
+
+   Elle est SERVIE DEPUIS LE DISQUE, pas depuis un CDN. Le pipeline tourne à
+   côté d'un scanner, parfois sans réseau ; une police qui dépend d'une requête
+   externe fait clignoter toute l'application au premier chargement hors ligne.
+   Deux fichiers variables, 133 Ko au total, licence SIL OFL 1.1 — voir
+   `public/fonts/Inter-LICENSE.txt`.
+
+   `font-display: swap` : le texte s'affiche tout de suite en Segoe et bascule
+   quand la police arrive. Jamais de page blanche en attendant une police. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 :root {
   /* --- Surfaces -------------------------------------------------------------
      Une RAMPE, pas trois gris voisins. L'ancienne allait de #171717 à #2e2e2e :
@@ -38,8 +79,15 @@
   --red-border: #522427;
 
   --font:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, monospace;
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+  /* Consolas est nommée explicitement : c'est ce que Windows sert quand
+     Cascadia n'est pas installée, et la laisser tomber dans `monospace`
+     donnait Courier New sur une machine nue — des chiffres à empattements au
+     milieu d'un tableau de prix. */
+  --mono:
+    ui-monospace, 'Cascadia Mono', 'Cascadia Code', 'SF Mono', Menlo, Consolas,
+    monospace;
 
   --s1: 4px;
   --s2: 8px;
@@ -94,6 +142,11 @@ body {
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* `cv11` donne un « l » à empattement et un « 1 » sans pied : dans une file
+     de noms de cartes, « Alolan » et « A1olan » cessent de se ressembler.
+     `ss03` remplace le « a » à double étage par sa forme simple, plus lisible
+     à 11 px, qui est la taille de la moitié de cette interface. */
+  font-feature-settings: 'cv11', 'ss03';
 }
 
 a {
