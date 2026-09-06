@@ -100,6 +100,16 @@ export default function ReviewClient({
   const [searching, setSearching] = useState(false);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * L'avertissement d'annulation, qui SURVIT au changement de carte.
+   *
+   * `U` remet la carte en file mais n'annule pas l'écriture déjà partie en
+   * base. Ce message-là doit rester lisible : il passait par `error`, que la
+   * réinitialisation de carte efface — or `U` change justement de carte, si
+   * bien que l'avertissement disparaissait dans le même rendu que son
+   * apparition. Un avertissement qu'on ne voit jamais ne protège de rien.
+   */
+  const [avis, setAvis] = useState<string | null>(null);
   const [sound, setSound] = useState(false);
   /** Cartes parties en optimiste, gardées pour pouvoir les remettre. */
   const [undoStack, setUndoStack] = useState<{ scan: ReviewScan; at: number }[]>([]);
@@ -304,6 +314,7 @@ export default function ReviewClient({
     if (!scan) return;
     const position = cursor;
     setError(null);
+    setAvis(null);
     setQueue((q) => q.filter((s) => s.id !== scan.id));
     setUndoStack((u) => [{ scan, at: position }, ...u].slice(0, 10));
 
@@ -322,7 +333,7 @@ export default function ReviewClient({
       setQueue((q) => [...q.slice(0, last.at), last.scan, ...q.slice(last.at)]);
       setCursor(last.at);
       setTreated((n) => Math.max(0, n - 1));
-      setError(
+      setAvis(
         'Carte remise en file. La confirmation déjà partie n’est PAS annulée en base — corrige-la à la main si besoin.',
       );
       return rest;
@@ -368,6 +379,7 @@ export default function ReviewClient({
     };
 
     setError(null);
+    setAvis(null);
     setFlash(true);
     setQueue((q) => q.filter((s) => s.id !== scan.id));
     setUndoStack((u) => [{ scan, at: position }, ...u].slice(0, 10));
@@ -1043,6 +1055,7 @@ export default function ReviewClient({
             </section>
 
             {error && <div className="note note--alarm">{error}</div>}
+            {avis && <div className="note note--warn">{avis}</div>}
           </div>
         </main>
       </div>
