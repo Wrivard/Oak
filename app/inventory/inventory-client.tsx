@@ -3,7 +3,8 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatCents } from '../../lib/pricing/net.js';
-import type { InventoryPage, SortKey, StockFilter } from './queries.js';
+import type { InventoryPage } from './queries.js';
+import { SENS_PAR_DEFAUT, type SortDir, type SortKey, type StockFilter } from './tri.js';
 
 /**
  * Table d'inventaire. Voir docs/06-ui.md.
@@ -31,6 +32,7 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
   const params = useSearchParams();
 
   const sort = (params.get('sort') ?? 'value') as SortKey;
+  const dir = (params.get('dir') ?? SENS_PAR_DEFAUT[sort]) as SortDir;
   const filter = (params.get('filter') ?? 'in_stock') as StockFilter;
   const [search, setSearch] = useState(params.get('q') ?? '');
   const [pending, setPending] = useState(false);
@@ -133,13 +135,35 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
             <thead>
               <tr>
                 {COLONNES.map((c) => (
+                  /* Recliquer la colonne active INVERSE le sens. Sans ça,
+                     « la moins chère » était inaccessible : on ne pouvait
+                     trier que du plus cher au moins cher, alors que trouver le
+                     bulk sans valeur est exactement ce qu'on cherche avant un
+                     export. Une autre colonne part dans SON sens naturel — le
+                     plus cher, le plus nombreux, mais les noms de A à Z. */
                   <th
                     key={c.key}
                     style={{ textAlign: c.align ?? 'left', cursor: 'pointer' }}
-                    onClick={() => navigate({ sort: c.key, page: '1' })}
+                    title={
+                      sort === c.key
+                        ? 'Cliquer pour inverser le sens'
+                        : `Trier par ${c.label.toLowerCase()}`
+                    }
+                    onClick={() =>
+                      navigate({
+                        sort: c.key,
+                        dir:
+                          sort === c.key
+                            ? dir === 'desc'
+                              ? 'asc'
+                              : 'desc'
+                            : SENS_PAR_DEFAUT[c.key],
+                        page: '1',
+                      })
+                    }
                   >
                     {c.label}
-                    {sort === c.key && ' ↓'}
+                    {sort === c.key && (dir === 'desc' ? ' ↓' : ' ↑')}
                   </th>
                 ))}
                 <th>Prix</th>

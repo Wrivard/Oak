@@ -1,4 +1,5 @@
 import { query } from '../../lib/db.js';
+import { SENS_PAR_DEFAUT, type SortDir, type SortKey, type StockFilter } from './tri.js';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
 
 /**
@@ -10,8 +11,7 @@ import type { CardCondition, CardVariant } from '../../lib/sku.js';
  */
 export const PAGE_SIZE = 50;
 
-export type SortKey = 'value' | 'qty' | 'name' | 'recent';
-export type StockFilter = 'all' | 'in_stock' | 'out' | 'unpriced' | 'unlisted';
+export type { SortDir, SortKey, StockFilter } from './tri.js';
 
 export interface InventoryRow {
   sku: string;
@@ -49,15 +49,43 @@ export interface InventoryParams {
   page?: number;
   search?: string;
   sort?: SortKey;
+  dir?: SortDir;
   filter?: StockFilter;
 }
 
-const ORDER: Record<SortKey, string> = {
-  value: 'i.value_estimate desc nulls last, i.sku',
-  qty: 'i.qty_on_hand desc, i.sku',
-  name: 'c.name, i.sku',
-  recent: 'i.created_at desc, i.sku',
+/**
+ * Les deux sens de chaque colonne, écrits en toutes lettres.
+ *
+ * Pas de concaténation d'un `dir` venu de l'URL dans le SQL : c'est la même
+ * table qui sert de garde. Et pas de `desc` générique non plus — `nulls last`
+ * n'a de sens que dans un sens, et une carte sans valeur estimée doit rester en
+ * bas quel que soit le tri, jamais en tête d'une liste qu'on trie justement par
+ * valeur.
+ *
+ * Le second critère est toujours `i.sku` : sans lui, deux lignes de même valeur
+ * changent de place d'une page à l'autre et la pagination en oublie ou en
+ * répète.
+ */
+export const ORDER: Record<SortKey, Record<SortDir, string>> = {
+  value: {
+    desc: 'i.value_estimate desc nulls last, i.sku',
+    asc: 'i.value_estimate asc nulls last, i.sku',
+  },
+  qty: {
+    desc: 'i.qty_on_hand desc, i.sku',
+    asc: 'i.qty_on_hand asc, i.sku',
+  },
+  name: {
+    asc: 'c.name asc, i.sku',
+    desc: 'c.name desc, i.sku',
+  },
+  recent: {
+    desc: 'i.created_at desc, i.sku',
+    asc: 'i.created_at asc, i.sku',
+  },
 };
+
+
 
 const WHERE: Record<StockFilter, string> = {
   all: 'true',
@@ -95,6 +123,7 @@ const cents = (v: string | null): number | null =>
 export async function loadInventory(params: InventoryParams = {}): Promise<InventoryPage> {
   const page = Math.max(1, params.page ?? 1);
   const sort = params.sort ?? 'value';
+  const dir = params.dir ?? SENS_PAR_DEFAUT[sort];
   const filter = params.filter ?? 'in_stock';
   const search = (params.search ?? '').trim();
 
@@ -117,7 +146,7 @@ export async function loadInventory(params: InventoryParams = {}): Promise<Inven
       where ${WHERE[filter]}
         and ($1 = '' or c.name_normalized like '%' || lower(immutable_unaccent($1)) || '%'
              or i.sku like '%' || $1 || '%')
-      order by ${ORDER[sort]}
+      order by ${ORDER[sort][dir]}
       limit $2 offset $3`,
     [search, PAGE_SIZE, (page - 1) * PAGE_SIZE],
   );
