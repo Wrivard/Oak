@@ -36,7 +36,12 @@ export default async function DashboardPage() {
       </header>
 
       <div className="page-body">
-        <div className="narrow" style={{ display: 'grid', gap: 'var(--s3)' }}>
+        {/* DEUX COLONNES. Huit cartes empilées dans une colonne étroite font
+            neuf cents pixels : il fallait FAIRE DÉFILER un tableau de bord,
+            c'est-à-dire regarder à deux reprises ce qui doit se voir d'un coup
+            d'oeil. En deux colonnes, tout tient au-dessus de la ligne de
+            flottaison. */}
+        <div className="large sante">
           {metrics.map((m) => (
             <article
               key={m.label}
@@ -63,7 +68,12 @@ export default async function DashboardPage() {
               <div
                 className="num"
                 style={{
-                  fontSize: 26,
+                  /* La taille suit la LONGUEUR, pas l'importance. « 0 » mérite
+                     vingt-huit pixels, « au repos » n'est pas trois fois plus
+                     important qu'un nombre parce qu'il compte huit lettres — il
+                     écrasait sa propre carte. */
+                  fontSize: m.value.length <= 4 ? 28 : m.value.length <= 9 ? 19 : 15,
+                  whiteSpace: 'nowrap',
                   color:
                     m.health === 'ok'
                       ? 'var(--text)'

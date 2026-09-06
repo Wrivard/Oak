@@ -11,6 +11,63 @@ import type { AuditRow } from './queries.js';
  * tout ce dont on a besoin pour trancher, et ça se fait en une seconde par ligne
  * — un tableau de noms demanderait de connaître chaque carte.
  */
+/**
+ * Une vignette qui sait DISPARAÎTRE proprement.
+ *
+ * docs/02 §6 prévoit de supprimer les originaux une fois l'URL eBay obtenue :
+ * sur cette page, une image de scan absente est le cas NORMAL passé quelques
+ * jours, pas une panne. Sans gestion d'erreur, chaque ligne affichait l'icône
+ * d'image cassée du navigateur et le mot « scan » en travers — un écran qui a
+ * l'air en panne alors qu'il fonctionne.
+ *
+ * Le remplacement garde exactement les mêmes dimensions : une ligne dont la
+ * hauteur dépend de la présence du fichier fait onduler toute la liste.
+ */
+function Vignette({ src, alt, titre }: { src: string; alt: string; titre: string }) {
+  const [cassee, setCassee] = useState(false);
+  const dimensions = {
+    width: 68,
+    height: 94,
+    borderRadius: 'var(--r1)',
+    background: 'var(--surface-2)',
+  } as const;
+
+  if (cassee) {
+    return (
+      <span
+        title={titre}
+        style={{
+          ...dimensions,
+          display: 'grid',
+          placeItems: 'center',
+          fontSize: 9,
+          lineHeight: 1.2,
+          textAlign: 'center',
+          color: 'var(--text-faint)',
+          border: '1px dashed var(--border-lit)',
+        }}
+      >
+        image
+        <br />
+        purgée
+      </span>
+    );
+  }
+
+  return (
+    <span className="zoom" tabIndex={0}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        onError={() => setCassee(true)}
+        style={{ ...dimensions, objectFit: 'cover', objectPosition: 'top' }}
+      />
+    </span>
+  );
+}
+
 export default function AuditClient({ rows }: { rows: AuditRow[] }) {
   const [corrigees, setCorrigees] = useState<Set<string>>(new Set());
   const [erreur, setErreur] = useState<string | null>(null);
@@ -75,39 +132,17 @@ export default function AuditClient({ rows }: { rows: AuditRow[] }) {
               {/* Survoler agrandit : à 68 px on distingue un Dracaufeu d'un
                   Pikachu, pas un Set de Base d'un Set de Base 2 — or c'est
                   exactement l'erreur que cette page existe pour attraper. */}
-              <span className="zoom" tabIndex={0}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/api/scan/${r.scanId}/image`}
-                  alt="scan"
-                  loading="lazy"
-                  style={{
-                    width: 68,
-                    height: 94,
-                    objectFit: 'cover',
-                    objectPosition: 'top',
-                    borderRadius: 'var(--r1)',
-                    background: 'var(--surface-2)',
-                  }}
-                />
-              </span>
+              <Vignette
+                src={`/api/scan/${r.scanId}/image`}
+                alt="scan"
+                titre="Le scan a été purgé du disque après publication."
+              />
               {r.cardImage ? (
-                <span className="zoom" tabIndex={0}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={r.cardImage}
-                    alt={r.cardName}
-                    loading="lazy"
-                    style={{
-                      width: 68,
-                      height: 94,
-                      objectFit: 'cover',
-                      objectPosition: 'top',
-                      borderRadius: 'var(--r1)',
-                      background: 'var(--surface-2)',
-                    }}
-                  />
-                </span>
+                <Vignette
+                  src={r.cardImage}
+                  alt={r.cardName}
+                  titre="Image du catalogue indisponible."
+                />
               ) : (
                 <span
                   style={{
