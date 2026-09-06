@@ -735,6 +735,13 @@ a:hover {
   padding: var(--s4);
   padding-bottom: var(--s3);
 }
+/* Une colonne plus étroite que la colonne de lecture : quatre champs étalés sur
+   760 px laissent « NOM DU LOT » démesuré et les trois autres tassés à droite. */
+.colonne-envoi {
+  max-width: 620px;
+  margin: 0 auto;
+  width: 100%;
+}
 
 /* La bascule recto-verso : une LIGNE, pas un panneau à elle seule. Elle porte
    un réglage, pas une section. */
@@ -766,38 +773,60 @@ a:hover {
    Le pointillé reste — il dit « on peut déposer ici », et aucun aplat ne le
    dit aussi vite. */
 .depot {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: var(--s2);
-  padding: var(--s6) var(--s5) var(--s5);
+  /* De la HAUTEUR. Une zone de dépôt basse se lit comme le bas d'une carte, pas
+     comme une cible : le geste consiste à lâcher un dossier dessus, et une
+     cible se vise. */
+  min-height: 240px;
+  padding: var(--s5);
+  margin: 0 var(--s4) var(--s4);
   text-align: center;
   cursor: pointer;
   background: var(--bg);
-  border-top: 1px solid var(--border);
-  transition: background-color var(--vite), box-shadow var(--vite);
-  /* Le pointillé est dessiné en fond plutôt qu'en bordure : une bordure en
-     pointillé sur un bloc à angle droit coupe le trait dans les coins. */
-  box-shadow: inset 0 0 0 1px transparent;
+  border-radius: var(--r3);
+  transition: background-color var(--vite);
+}
+/* Le POINTILLÉ dit « on peut lâcher ici » plus vite qu'aucun aplat. Il est
+   dessiné en SVG de fond plutôt qu'en `border: dashed` : une bordure en
+   pointillé sur un bloc arrondi coupe le trait dans les coins, et le rythme des
+   tirets saute d'un côté à l'autre. */
+.depot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r3);
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Crect width='100%25' height='100%25' rx='11' ry='11' fill='none' stroke='%2331383f' stroke-width='2' stroke-dasharray='7 6'/%3E%3C/svg%3E");
+  transition: opacity var(--vite);
 }
 .depot:hover {
   background: var(--surface);
 }
 .depot--survol {
   background: var(--green-bg);
-  box-shadow: inset 0 0 0 2px var(--green-dim);
+}
+.depot--survol::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Crect width='100%25' height='100%25' rx='11' ry='11' fill='none' stroke='%2346d197' stroke-width='2' stroke-dasharray='7 6'/%3E%3C/svg%3E");
 }
 .depot--pret {
   background: var(--surface);
+}
+.depot--pret::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Crect width='100%25' height='100%25' rx='11' ry='11' fill='none' stroke='%231c4b37' stroke-width='2' stroke-dasharray='7 6'/%3E%3C/svg%3E");
 }
 
 .depot-icone {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 46px;
-  margin-bottom: var(--s1);
+  width: 54px;
+  height: 54px;
+  margin-bottom: var(--s2);
   border-radius: 50%;
   color: var(--text-dim);
   background: var(--surface-2);
@@ -805,8 +834,8 @@ a:hover {
   transition: color var(--vite), background-color var(--vite), border-color var(--vite);
 }
 .depot-icone svg {
-  width: 22px;
-  height: 22px;
+  width: 25px;
+  height: 25px;
 }
 .depot:hover .depot-icone {
   color: var(--text);
@@ -820,9 +849,10 @@ a:hover {
 }
 
 .depot-titre {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
+  color: var(--text);
 }
 .depot-sous {
   font-size: 12px;
@@ -832,6 +862,72 @@ a:hover {
   display: flex;
   gap: var(--s2);
   margin-top: var(--s3);
+}
+
+/* --- Derniers lots ---------------------------------------------------------
+   Une liste DENSE, pas des cartes. Quatre lignes de 26 px disent en un coup
+   d'oeil ce qu'un tableau complet dirait en un écran, et c'est un rappel — le
+   vrai tableau est sur /batches. */
+.recents {
+  margin-top: var(--s5);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--border);
+}
+.recents-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s2);
+}
+.recent {
+  display: grid;
+  grid-template-columns: 1fr auto 120px auto 56px;
+  align-items: center;
+  gap: var(--s3);
+  height: 28px;
+  padding: 0 var(--s2);
+  font-size: 12.5px;
+  color: var(--text-dim);
+  border-radius: var(--r1);
+  transition: background-color var(--vite);
+}
+.recent:hover {
+  background: var(--surface);
+}
+.recent-nom {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-weight: 500;
+}
+.recent-date,
+.recent-compte {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.recent-barre {
+  display: flex;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.recent-barre > i {
+  display: block;
+  height: 100%;
+}
+.recent-etat {
+  justify-self: end;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+.recent-etat--clos {
+  color: var(--text-faint);
 }
 
 /* Le champ en erreur : rouge, mais SANS crier. Une bordure suffit — un fond

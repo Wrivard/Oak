@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
 import { estImage, filesFromDrop, type DropSource } from '../../lib/upload/drop.js';
 import { nomDeLotInvalide } from '../../lib/upload/nom-de-lot.js';
@@ -17,10 +17,25 @@ import { enPaquets } from '../../lib/upload/paquets.js';
  * lib/upload/paquets.ts. Dix TIFF de 20 Mo faisaient une requête de 200 Mo.
  */
 
+/** Un lot récent, réduit à ce qui se lit d'un coup d'oeil. */
+export interface LotRecent {
+  id: string;
+  name: string;
+  openedAt: string;
+  status: string;
+  resolved: number;
+  review: number;
+  pending: number;
+  rejected: number;
+}
+
 interface Props {
   variants: readonly CardVariant[];
   conditions: readonly CardCondition[];
   defaultSession: string;
+  derniers: LotRecent[];
+  /** Rendu côté serveur : un `Link` ne traverse pas la frontière client. */
+  lienLots: ReactNode;
 }
 
 interface Rejected {
@@ -34,7 +49,13 @@ interface Existant {
   status: 'open' | 'closed' | null;
 }
 
-export default function UploadClient({ variants, conditions, defaultSession }: Props) {
+export default function UploadClient({
+  variants,
+  conditions,
+  defaultSession,
+  derniers,
+  lienLots,
+}: Props) {
   const [session, setSession] = useState(defaultSession);
   const [variant, setVariant] = useState<CardVariant>('normal');
   const [condition, setCondition] = useState<CardCondition>('NM');
@@ -226,7 +247,7 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
       </header>
 
       <div className="page-body">
-        <div className="narrow">
+        <div className="colonne-envoi">
           {/*
             UN SEUL OBJET, pas trois panneaux empilés de poids égal.
 
@@ -238,7 +259,7 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
           */}
           <section className="panel panel--flush">
             <div className="reglages">
-              <label className="field" style={{ flex: '1 1 200px' }}>
+              <label className="field" style={{ flex: '1 1 170px' }}>
                 <span className="label">Nom du lot</span>
                 <input
                   className={`input${nomInvalide !== null && session.trim() !== '' ? ' input--erreur' : ''}`}
@@ -429,6 +450,47 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
                 </>
               )}
             </p>
+          )}
+
+          {/*
+            LES DERNIERS LOTS. Après avoir envoyé, la question suivante est
+            toujours « et alors, qu'est-ce qu'elles deviennent ». Les avoir ici
+            évite un aller-retour vers /batches à chaque envoi — et l'écran
+            cesse d'être une carte seule au milieu du vide.
+          */}
+          {derniers.length > 0 && (
+            <section className="recents">
+              <div className="recents-tete">
+                <span className="label">Derniers lots</span>
+                {lienLots}
+              </div>
+              {derniers.map((b) => {
+                const total = b.resolved + b.review + b.pending + b.rejected;
+                const part = (n: number): string =>
+                  total === 0 ? '0%' : `${(100 * n) / total}%`;
+                return (
+                  <div key={b.id} className="recent">
+                    <span className="recent-nom">{b.name}</span>
+                    <span className="recent-date mono">{b.openedAt}</span>
+                    {/* La barre porte l'information, pas un pourcentage : ce
+                        qui compte n'est pas « combien c'est avancé » mais
+                        « combien va coûter du temps humain ». */}
+                    <span className="recent-barre" title={`${b.resolved} résolues · ${b.review} en review · ${b.pending} en cours`}>
+                      <i style={{ width: part(b.resolved), background: 'var(--green)' }} />
+                      <i style={{ width: part(b.review), background: 'var(--amber)' }} />
+                      <i style={{ width: part(b.rejected), background: 'var(--text-faint)' }} />
+                      <i style={{ width: part(b.pending), background: 'var(--border-strong)' }} />
+                    </span>
+                    <span className="recent-compte mono">
+                      {total === 0 ? '—' : `${total} carte${total > 1 ? 's' : ''}`}
+                    </span>
+                    <span className={`recent-etat${b.status === 'open' ? '' : ' recent-etat--clos'}`}>
+                      {b.status === 'open' ? 'ouvert' : 'fermé'}
+                    </span>
+                  </div>
+                );
+              })}
+            </section>
           )}
 
           {existant !== null && existant.pages > 0 && (
