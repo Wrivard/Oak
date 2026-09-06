@@ -619,7 +619,19 @@ a:hover {
 
 .review-grid {
   display: grid;
-  grid-template-columns: minmax(300px, 580px) minmax(280px, 1fr) minmax(230px, 300px);
+  /* Des PARTS, pas des maximums fixes. Avec `minmax(300px, 580px)` sur la
+     comparaison, un écran de 2560 px donnait tout le surplus à la liste des
+     candidats : des lignes de mille pixels avec la distance perdue à droite,
+     pendant que les deux cartes à comparer restaient petites. C'est l'inverse
+     de ce qu'on veut d'un grand écran.
+
+     `max-width` borne l'ensemble : au-delà, la mise en page cesse de s'étirer
+     et se centre. Une application qui s'étale sur toute la largeur d'un 27
+     pouces ne paraît pas plus riche, elle paraît non finie. */
+  max-width: 1760px;
+  width: 100%;
+  margin-inline: auto;
+  grid-template-columns: minmax(300px, 1.55fr) minmax(260px, 1fr) minmax(230px, 300px);
   gap: var(--s4);
   padding: var(--s4);
   min-height: 0;
