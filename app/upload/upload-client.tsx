@@ -5,6 +5,7 @@ import type { CardCondition, CardVariant } from '../../lib/sku.js';
 import { estImage, filesFromDrop, type DropSource } from '../../lib/upload/drop.js';
 import { nomDeLotInvalide } from '../../lib/upload/nom-de-lot.js';
 import { enPaquets } from '../../lib/upload/paquets.js';
+import { progression } from '../../lib/upload/progression.js';
 
 /**
  * Envoi d'un lot de photos. Voir docs/06-ui.md.
@@ -66,6 +67,17 @@ export default function UploadClient({
   const [sent, setSent] = useState(0);
   const [rejected, setRejected] = useState<Rejected[]>([]);
   const [busy, setBusy] = useState(false);
+  /**
+   * L'instant du premier octet, pour mesurer le débit RÉEL.
+   *
+   * Il ne s'estime pas d'avance : les paquets sont bornés en octets et non en
+   * nombre de fichiers, et un dossier de TIFF n'avance pas au rythme d'un
+   * dossier de JPEG.
+   */
+  const [depart, setDepart] = useState<number | null>(null);
+  /** Réveil régulier pendant l'envoi : sans lui, le temps restant se fige
+      entre deux paquets, et un paquet peut prendre plusieurs secondes. */
+  const [, setTic] = useState(0);
   const [done, setDone] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -124,6 +136,20 @@ export default function UploadClient({
     };
   }, [session, done]);
 
+  /**
+   * Une seconde de battement pendant l'envoi.
+   *
+   * Le temps restant se recalcule au rendu, et le rendu n'arrive qu'à la fin
+   * d'un paquet. Un paquet de 16 Mo peut prendre plusieurs secondes sur une
+   * connexion domestique : sans ce réveil, le compte à rebours reste figé
+   * pendant ce temps-là, ce qui est exactement le moment où on le regarde.
+   */
+  useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(() => setTic((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [busy]);
+
   const onDrop = useCallback(
     async (dt: DropSource) => {
       // Descendre dans un dossier de 2000 pages prend plusieurs secondes. Sans
@@ -143,6 +169,7 @@ export default function UploadClient({
   async function upload() {
     if (files.length === 0 || nomInvalide !== null) return;
     setBusy(true);
+    setDepart(Date.now());
     setError(null);
     setSent(0);
     setRejected([]);
@@ -218,7 +245,12 @@ export default function UploadClient({
       ? null
       : Number(attendues.trim());
 
-  const pct = files.length === 0 ? 0 : Math.round((100 * sent) / files.length);
+  const avancement = progression(
+    sent,
+    files.length,
+    depart === null ? 0 : Date.now() - depart,
+  );
+  const pct = avancement.pct;
   const cartes = duplex ? Math.ceil(files.length / 2) : files.length;
 
   return (
@@ -529,8 +561,29 @@ export default function UploadClient({
           )}
 
           {busy && (
-            <div className="bar" style={{ marginTop: 'var(--s3)' }}>
-              <i style={{ width: `${pct}%` }} />
+            <div style={{ marginTop: 'var(--s3)' }}>
+              <div className="bar">
+                <i style={{ width: `${pct}%` }} />
+              </div>
+              {/* Le COMPTE et le temps restant, pas seulement un pourcentage.
+                  Un dossier de nuit fait deux mille pages : une barre sans
+                  chiffre ne dit pas si l'envoi prend trente secondes ou dix
+                  minutes, et une opération dont on ignore la durée paraît plus
+                  lente qu'elle ne l'est. */}
+              <div
+                className="mono faint"
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: 11,
+                  marginTop: 5,
+                }}
+              >
+                <span>
+                  {sent.toLocaleString('fr')} / {files.length.toLocaleString('fr')} pages
+                </span>
+                {avancement.eta !== null && <span>{avancement.eta} restantes</span>}
+              </div>
             </div>
           )}
 
