@@ -227,32 +227,33 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
 
       <div className="page-body">
         <div className="narrow">
-          <section className="panel">
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 170px 100px 120px',
-                gap: 'var(--s3)',
-              }}
-            >
-              <label className="field">
+          {/*
+            UN SEUL OBJET, pas trois panneaux empilés de poids égal.
+
+            L'écran présentait les réglages, le recto-verso et la zone de dépôt
+            comme trois cartes identiques : rien ne disait par où commencer, et
+            l'action — déposer un dossier — se retrouvait la plus basse et la
+            plus vide des trois. Ici les réglages sont une barre d'outils, et le
+            corps de la carte EST la zone de dépôt.
+          */}
+          <section className="panel panel--flush">
+            <div className="reglages">
+              <label className="field" style={{ flex: '1 1 200px' }}>
                 <span className="label">Nom du lot</span>
                 <input
-                  className="input"
+                  className={`input${nomInvalide !== null && session.trim() !== '' ? ' input--erreur' : ''}`}
                   value={session}
                   onChange={(e) => setSession(e.target.value)}
-                  style={
-                    nomInvalide !== null && session.trim() !== ''
-                      ? { borderColor: 'var(--red)' }
-                      : undefined
-                  }
                 />
               </label>
 
               {/* Le variant est l'erreur la plus coûteuse du système : 5 à 20x
-                  d'écart de prix. Il est demandé, jamais deviné. */}
-              <label className="field">
-                <span className="label">Variant du lot</span>
+                  d'écart de prix. Il est demandé, jamais deviné — et il vire à
+                  l'ambre dès qu'il quitte « normal », pour qu'un lot de reverse
+                  holo ne parte pas sans qu'on l'ait vu. */}
+              <label className="field" style={{ flex: '0 0 168px' }}
+                     title="S'applique à TOUT le lot. Une photo à plat ne distingue pas un reverse holo d'un normal : trie-les à part.">
+                <span className="label">Variant</span>
                 <select
                   className={`select${variant !== 'normal' ? ' select--warn' : ''}`}
                   value={variant}
@@ -266,7 +267,7 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
                 </select>
               </label>
 
-              <label className="field">
+              <label className="field" style={{ flex: '0 0 84px' }}>
                 <span className="label">Condition</span>
                 <select
                   className="select"
@@ -281,171 +282,154 @@ export default function UploadClient({ variants, conditions, defaultSession }: P
                 </select>
               </label>
 
-              {/* Le seul contrôle qui rattrape une double-alimentation de
-                  l'ADF. Sans lui, une carte physiquement scannée sans ligne
+              {/* Le seul contrôle qui rattrape une double-alimentation de l'ADF.
+                  Sans lui, une carte physiquement scannée sans ligne
                   d'inventaire ne se signale JAMAIS. */}
-              <label className="field">
-                <span className="label">Cartes comptées</span>
+              <label className="field" style={{ flex: '0 0 110px' }}
+                     title="Le nombre de cartes réellement mises dans le scanner. Sans lui, la réconciliation ne vérifie rien.">
+                <span className="label">Comptées</span>
                 <input
                   className="input mono"
                   inputMode="numeric"
-                  placeholder="optionnel"
+                  placeholder="—"
                   value={attendues}
                   onChange={(e) => setAttendues(e.target.value.replace(/[^0-9]/g, ''))}
                 />
               </label>
             </div>
 
-            <p
-              className={attenduesNombre === null ? 'faint' : 'dim'}
-              style={{ fontSize: 12, margin: 'var(--s3) 0 0' }}
+            <label className="bascule" title="L'appariement se fait par la position. L'empreinte des dos vérifie ensuite l'alternance : si une page manque, le lot est signalé au lieu de décaler toutes les cartes suivantes.">
+              <input
+                type="checkbox"
+                className="check"
+                checked={duplex}
+                onChange={(e) => setDuplex(e.target.checked)}
+              />
+              <span>
+                <strong>Recto-verso</strong>
+                <span className="faint"> — image0001 recto, image0002 verso</span>
+              </span>
+            </label>
+
+            {/* LA ZONE DE DÉPÔT, dans la même carte et sur toute sa largeur.
+                C'est l'action de l'écran : elle en occupe le corps. */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                // Les types DOM scindent FileSystemEntry en sous-types fichier
+                // et dossier ; l'objet réel porte bien `file` ou `createReader`
+                // selon ce que disent `isFile` / `isDirectory`. Le cast dit ça.
+                void onDrop(e.dataTransfer as unknown as DropSource);
+              }}
+              onClick={() => dirRef.current?.click()}
+              className={`depot${dragging ? ' depot--survol' : ''}${files.length > 0 ? ' depot--pret' : ''}`}
             >
+              <span className="depot-icone" aria-hidden>
+                {files.length > 0 ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                    <path d="M4 12.5l5 5L20 6.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                    <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" strokeLinecap="round" />
+                  </svg>
+                )}
+              </span>
+
+              <span className="depot-titre">
+                {lecture
+                  ? 'Lecture du dossier…'
+                  : files.length === 0
+                    ? 'Glisse le dossier du scanner'
+                    : `${files.length} photo${files.length > 1 ? 's' : ''} prête${files.length > 1 ? 's' : ''}`}
+              </span>
+
+              <span className="depot-sous">
+                {files.length === 0
+                  ? 'ou choisis-le ci-dessous · JPEG, PNG, WebP, TIFF · 25 Mo par photo'
+                  : `~${cartes} carte${cartes > 1 ? 's' : ''} ${duplex ? 'en recto-verso' : 'en recto seul'} · prêtes à envoyer`}
+              </span>
+
+              <span className="depot-actions">
+                <button
+                  className="btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dirRef.current?.click();
+                  }}
+                >
+                  Choisir un dossier
+                </button>
+                <button
+                  className="btn btn--ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    inputRef.current?.click();
+                  }}
+                >
+                  Choisir des fichiers
+                </button>
+              </span>
+
+              <input
+                ref={inputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                hidden
+                onChange={(e) => addFiles(e.target.files)}
+              />
+              {/* `webkitdirectory` n'est pas dans les types React : il est posé
+                  par ref. C'est ce qui fait que « Choisir un dossier » ouvre un
+                  sélecteur de DOSSIER et non de fichiers. */}
+              <input
+                ref={(el) => {
+                  dirRef.current = el;
+                  if (el) el.setAttribute('webkitdirectory', '');
+                }}
+                type="file"
+                multiple
+                hidden
+                onChange={(e) => addFiles(e.target.files)}
+              />
+            </div>
+          </section>
+
+          {/* Les explications SOUS la carte, en une ligne chacune. Elles étaient
+              deux paragraphes au milieu du formulaire : on ne lit pas un mode
+              d'emploi entre deux champs, on le saute — et il pousse l'action
+              hors de l'écran. Le détail vit dans les infobulles des champs. */}
+          {nomInvalide !== null && session.trim() !== '' ? (
+            <p className="hint" style={{ color: 'var(--red)', marginTop: 'var(--s3)' }}>
+              {nomInvalide}
+            </p>
+          ) : (
+            <p className="hint" style={{ marginTop: 'var(--s3)' }}>
               {attenduesNombre === null ? (
                 <>
-                  Sans <strong>cartes comptées</strong>, la réconciliation ne peut rien
-                  vérifier : deux feuilles passées collées font une carte sans ligne
-                  d&apos;inventaire, et l&apos;écart de comptage est le seul signal
-                  qu&apos;elle a existé.
+                  Renseigne <strong>Comptées</strong> pour que la réconciliation puisse
+                  vérifier le lot : deux feuilles passées collées font une carte sans
+                  ligne d’inventaire, et l’écart de comptage est le seul signal.
                 </>
               ) : (
                 <>
-                  Le lot ne se fermera que si {attenduesNombre} carte
+                  Le lot ne se fermera que si <strong>{attenduesNombre}</strong> carte
                   {attenduesNombre > 1 ? 's' : ''} en sortent
-                  {cartes > 0 && attenduesNombre !== cartes ? (
-                    <>
-                      {' '}
-                      — les photos sélectionnées en annoncent {cartes}
-                    </>
-                  ) : null}
+                  {cartes > 0 && attenduesNombre !== cartes
+                    ? ` — les photos sélectionnées en annoncent ${cartes}`
+                    : ''}
                   .
                 </>
               )}
             </p>
-
-            {nomInvalide !== null && session.trim() !== '' && (
-              <p style={{ color: 'var(--red)', fontSize: 12, margin: 'var(--s3) 0 0' }}>
-                {nomInvalide}
-              </p>
-            )}
-
-            <p className="faint" style={{ fontSize: 12, margin: 'var(--s3) 0 0' }}>
-              Le variant s&apos;applique à <strong>tout le lot</strong>. Une photo à plat
-              ne permet pas de distinguer un reverse holo d&apos;un normal — trie-les à
-              part et fais-en un lot séparé.
-            </p>
-          </section>
-
-          <section className="panel">
-            <label
-              style={{ display: 'flex', gap: 'var(--s3)', alignItems: 'flex-start', cursor: 'pointer' }}
-            >
-              <input
-                type="checkbox"
-                checked={duplex}
-                onChange={(e) => setDuplex(e.target.checked)}
-                style={{ marginTop: 3, accentColor: 'var(--green)' }}
-              />
-              <span>
-                <strong>Recto-verso</strong>
-                <span className="dim"> — image0001 recto, image0002 verso, etc.</span>
-                <br />
-                <span className="faint" style={{ fontSize: 12 }}>
-                  L&apos;appariement se fait par la position. L&apos;empreinte des dos
-                  vérifie ensuite l&apos;alternance : si une page manque, le lot est
-                  signalé au lieu de décaler toutes les cartes suivantes.
-                </span>
-              </span>
-            </label>
-          </section>
-
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragging(false);
-              // Les types DOM scindent FileSystemEntry en sous-types fichier et
-              // dossier ; l'objet réel porte bien `file` ou `createReader` selon
-              // ce que disent `isFile` / `isDirectory`. Le cast dit ça.
-              void onDrop(e.dataTransfer as unknown as DropSource);
-            }}
-            onClick={() => inputRef.current?.click()}
-            className="panel"
-            style={{
-              marginTop: 'var(--s3)',
-              padding: 'var(--s6)',
-              textAlign: 'center',
-              cursor: 'pointer',
-              borderStyle: 'dashed',
-              borderColor: dragging ? 'var(--green)' : 'var(--border)',
-              background: dragging ? 'var(--green-bg)' : 'var(--surface)',
-              transition: 'border-color 120ms ease, background 120ms ease',
-            }}
-          >
-            <div style={{ fontWeight: 600, fontSize: 15 }}>
-              {lecture
-                ? 'Lecture du dossier…'
-                : files.length === 0
-                  ? 'Glisse le dossier du scanner ici'
-                  : `${files.length} photo${files.length > 1 ? 's' : ''} prête${files.length > 1 ? 's' : ''}`}
-            </div>
-            <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>
-              dossier ou fichiers · JPEG, PNG, WebP, TIFF · 25 Mo par photo
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                gap: 'var(--s2)',
-                justifyContent: 'center',
-                marginTop: 'var(--s3)',
-              }}
-            >
-              <button
-                className="btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  dirRef.current?.click();
-                }}
-              >
-                Choisir un dossier
-              </button>
-              <button
-                className="btn btn--ghost"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  inputRef.current?.click();
-                }}
-              >
-                Choisir des fichiers
-              </button>
-            </div>
-
-            <input
-              ref={inputRef}
-              type="file"
-              multiple
-              accept="image/*"
-              hidden
-              onChange={(e) => addFiles(e.target.files)}
-            />
-            {/* `webkitdirectory` n'est pas dans les types React : il est posé
-                par ref. C'est ce qui fait que « Choisir un dossier » ouvre un
-                sélecteur de DOSSIER et non de fichiers. */}
-            <input
-              ref={(el) => {
-                dirRef.current = el;
-                if (el) el.setAttribute('webkitdirectory', '');
-              }}
-              type="file"
-              multiple
-              hidden
-              onChange={(e) => addFiles(e.target.files)}
-            />
-          </div>
+          )}
 
           {existant !== null && existant.pages > 0 && (
             <div

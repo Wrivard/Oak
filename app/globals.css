@@ -4,26 +4,38 @@
    =========================================================================== */
 
 :root {
-  --bg: #171717;
-  --surface: #1e1e1e;
-  --surface-2: #252525;
-  --surface-3: #2e2e2e;
-  --border: #2f2f2f;
-  --border-lit: #454545;
+  /* --- Surfaces -------------------------------------------------------------
+     Une RAMPE, pas trois gris voisins. L'ancienne allait de #171717 à #2e2e2e :
+     un panneau posé sur le fond ne se distinguait presque pas, et l'écran
+     paraissait plat quel que soit le soin mis au reste. Chaque niveau monte
+     maintenant d'un cran net, et une bordure claire sépare le contenu du vide.
 
-  --text: #ededed;
-  --text-dim: #a1a1a1;
-  --text-faint: #6e6e6e;
+     Les valeurs sont légèrement DÉSATURÉES VERS LE BLEU (#0f1113 plutôt que
+     #171717). Un gris parfaitement neutre paraît sale sur un écran calibré ;
+     une pointe de froid le fait lire comme un choix. */
+  --bg: #0f1113;
+  --surface: #16191d;
+  --surface-2: #1c2025;
+  --surface-3: #242930;
+  --border: #23282e;
+  --border-lit: #313841;
+  --border-strong: #3d454f;
 
-  --green: #3ecf8e;
-  --green-dim: #2a9d6b;
-  --green-bg: #10241b;
-  --green-border: #1d4d38;
+  --text: #e8eaed;
+  --text-dim: #9aa3ad;
+  --text-faint: #656d77;
 
-  --amber: #e0a340;
-  --amber-bg: #2a2010;
-  --red: #e5484d;
-  --red-bg: #2c1416;
+  --green: #46d197;
+  --green-dim: #2ea172;
+  --green-bg: #0d2119;
+  --green-border: #1c4b37;
+
+  --amber: #e5a83f;
+  --amber-bg: #2a1f0e;
+  --amber-border: #4a3818;
+  --red: #ec5a5f;
+  --red-bg: #2c1517;
+  --red-border: #522427;
 
   --font:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -35,14 +47,35 @@
   --s4: 16px;
   --s5: 24px;
   --s6: 32px;
+  --s7: 48px;
 
   --r1: 4px;
-  --r2: 6px;
-  --r3: 10px;
+  --r2: 7px;
+  --r3: 11px;
+  --r4: 16px;
 
-  --rail: 224px;
+  /* --- Élévation -------------------------------------------------------------
+     Une ombre portée SEULE fait flotter sans donner de matière. Le liseré clair
+     en haut (`inset 0 1px 0`) imite la lumière qui accroche une arête : c'est
+     lui qui fait qu'une surface paraît solide plutôt que peinte. */
+  --lift-1: inset 0 1px 0 rgb(255 255 255 / 4%);
+  --lift-2:
+    inset 0 1px 0 rgb(255 255 255 / 5%),
+    0 1px 2px rgb(0 0 0 / 40%);
+  --lift-3:
+    inset 0 1px 0 rgb(255 255 255 / 6%),
+    0 8px 24px -6px rgb(0 0 0 / 55%);
+
+  /* Une seule durée pour tout ce qui réagit au curseur. Plus long paraît mou,
+     plus court paraît saccadé. */
+  --vite: 110ms cubic-bezier(0.2, 0, 0.1, 1);
+
+  --rail: 232px;
   --rail-collapsed: 56px;
-  --header: 52px;
+  --header: 54px;
+  /* Largeur de la colonne de lecture. Au-delà, une ligne de texte devient
+     pénible à suivre et un formulaire s'étire pour rien. */
+  --colonne: 760px;
 
   color-scheme: dark;
 }
@@ -92,11 +125,14 @@ a:hover {
   color: var(--text-faint);
 }
 .label {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-faint);
+  /* Le chiffre et la lettre à la même hauteur : sans ça, « NOM DU LOT 2026 »
+     danse d'un caractère à l'autre en petites capitales. */
+  font-variant-numeric: tabular-nums;
 }
 .num {
   font-family: var(--mono);
@@ -119,7 +155,10 @@ a:hover {
 .sidebar {
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  /* PLUS SOMBRE que la zone de contenu, pas plus claire. Une navigation qui
+     recule laisse le travail au premier plan ; l'inverse fait regarder le
+     menu. */
+  background: #0c0e10;
   border-right: 1px solid var(--border);
   overflow: hidden;
 }
@@ -133,16 +172,33 @@ a:hover {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
+/* Un carré vert plein se lit comme un espace réservé qu'on a oublié de
+   remplir. Une carte inclinée, à la même échelle, dit ce que fait
+   l'application — et coûte le même pixel. */
 .sidebar-mark {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
-  border-radius: var(--r1);
-  background: linear-gradient(135deg, var(--green), var(--green-dim));
+  border-radius: 7px;
+  background: linear-gradient(150deg, var(--green), var(--green-dim));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 22%),
+    0 1px 3px rgb(0 0 0 / 45%);
+  position: relative;
+  overflow: hidden;
+}
+.sidebar-mark::after {
+  content: '';
+  position: absolute;
+  inset: 6px 7px;
+  border-radius: 2px;
+  background: rgb(8 19 14 / 78%);
+  transform: rotate(-12deg);
 }
 .sidebar-name {
   font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: 14px;
+  letter-spacing: -0.015em;
   white-space: nowrap;
 }
 
@@ -150,22 +206,25 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--s3) var(--s2);
+  padding: var(--s3);
   flex: 1;
   overflow-y: auto;
 }
 
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--s3);
   height: 34px;
-  padding: 0 var(--s2);
+  padding: 0 var(--s3);
   border-radius: var(--r2);
   color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
   /* Pas de transition sur la position : rien ne bouge sous le curseur. */
-  transition: background-color 100ms ease, color 100ms ease;
+  transition: background-color var(--vite), color var(--vite);
 }
 .nav-item:hover {
   background: var(--surface-2);
@@ -173,13 +232,31 @@ a:hover {
   text-decoration: none;
 }
 .nav-item[aria-current='page'] {
-  background: var(--green-bg);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+}
+/* Un LISERÉ à gauche, pas un aplat teinté. L'aplat vert sur fond sombre était
+   à peine plus clair que le fond : on ne voyait pas où on était. Une barre de
+   deux pixels se voit du coin de l'oeil, sans colorer toute la ligne. */
+.nav-item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--green);
+}
+.nav-item[aria-current='page'] svg {
   color: var(--green);
 }
 .nav-item svg {
   width: 17px;
   height: 17px;
   flex-shrink: 0;
+  opacity: 0.9;
 }
 .nav-label {
   flex: 1;
@@ -253,26 +330,46 @@ a:hover {
   display: flex;
   align-items: center;
   gap: var(--s3);
-  height: var(--header);
+  min-height: var(--header);
   padding: 0 var(--s5);
   border-bottom: 1px solid var(--border);
+  background: var(--surface);
   flex-shrink: 0;
 }
 .page-title {
   font-size: 15px;
   font-weight: 600;
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
+/* Séparé du titre par une barre plutôt qu'un simple espace : « Envoyer des
+   photos aucune photo sélectionnée » se lisait comme une seule phrase bancale. */
 .page-sub {
   font-size: 12px;
   color: var(--text-faint);
+  padding-left: var(--s3);
+  border-left: 1px solid var(--border);
+  line-height: 1.2;
 }
 .page-actions {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: var(--s3);
+  gap: var(--s2);
+}
+
+/* --- Typographie de contenu ------------------------------------------------
+   Le texte explicatif d'un écran de travail doit être LISIBLE et DISCRET à la
+   fois. Sans règle, chaque page réinventait sa taille et son interligne. */
+.hint {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-faint);
+  margin: 0;
+}
+.hint strong {
+  color: var(--text-dim);
+  font-weight: 600;
 }
 
 .page-body {
@@ -284,8 +381,24 @@ a:hover {
 .page-body--flush {
   padding: 0;
 }
+
+/* --- La colonne de lecture -------------------------------------------------
+   Elle était `max-width: 780px` et rien d'autre : sur un écran de 1500 px, tout
+   le contenu se tassait dans le coin haut-gauche avec les deux tiers de la page
+   vides à droite. Ça ne se lit pas comme une mise en page, ça se lit comme une
+   page inachevée.
+
+   Centrée, la colonne devient une décision. Le vide qui l'entoure aussi. */
 .narrow {
-  max-width: 780px;
+  max-width: var(--colonne);
+  margin: 0 auto;
+  width: 100%;
+}
+/* Pour les écrans qui ont vraiment besoin de la largeur — inventaire, prix. */
+.large {
+  max-width: 1180px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 /* --- Grille de la review ---------------------------------------------------
@@ -343,6 +456,44 @@ a:hover {
   min-height: 0;
   overflow: auto;
 }
+/* --- Écran étroit ------------------------------------------------------------
+   Le lanceur affiche l'adresse réseau pour reviewer depuis un téléphone, et
+   c'est un vrai usage. Sur 375 px, une barre latérale de 224 px mange 60 % de
+   l'écran — et elle ne se réduisait d'elle-même que sur `/review`.
+
+   Sous 900 px, le rail d'icônes s'impose partout : la préférence enregistrée
+   pilote le confort sur un grand écran, pas la survie sur un petit.
+
+   Les grilles de formulaire passent en colonne. Elles étaient en pixels fixes,
+   ce qui déborde avant de se réorganiser. */
+@media (max-width: 900px) {
+  .shell,
+  .shell[data-collapsed='false'] {
+    grid-template-columns: var(--rail-collapsed) 1fr;
+  }
+  .sidebar .nav-label,
+  .sidebar .sidebar-name,
+  .sidebar .collapse-label {
+    display: none;
+  }
+  .page-head {
+    flex-wrap: wrap;
+    height: auto;
+    padding-top: var(--s2);
+    padding-bottom: var(--s2);
+  }
+  .page-body {
+    padding: var(--s3);
+  }
+  /* Les tableaux gardent leur largeur et défilent DANS leur cadre, plutôt que
+     de faire défiler la page entière de côté. */
+  .table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 1200px) {
   .review-grid {
     grid-template-columns: minmax(160px, 220px) 1fr;
@@ -371,15 +522,162 @@ a:hover {
   border: 1px solid var(--border);
   border-radius: var(--r3);
   padding: var(--s4);
+  /* Le liseré clair en haut de bordure fait qu'un panneau paraît POSÉ sur le
+     fond plutôt que découpé dedans. C'est un pixel, et c'est la différence
+     entre une maquette et une application. */
+  box-shadow: var(--lift-2);
 }
 .panel + .panel {
   margin-top: var(--s3);
 }
 .panel-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--s2);
   margin-bottom: var(--s3);
+  min-height: 22px;
+}
+/* Un en-tête de panneau qui porte une action la pousse à droite sans qu'on ait
+   à écrire `marginLeft: auto` à chaque fois. */
+.panel-head > .btn:last-child,
+.panel-head > .label + .faint,
+.panel-head > *:last-child:not(:first-child) {
+  margin-left: auto;
+}
+
+/* Séparateur interne. Une bordure pleine largeur DANS un panneau à bords
+   arrondis doit mordre les côtés, sinon elle flotte. */
+.panel-sep {
+  height: 1px;
+  background: var(--border);
+  margin: var(--s4) calc(-1 * var(--s4));
+}
+
+/* --- La carte d'envoi ------------------------------------------------------
+   Un panneau dont le corps va bord à bord : les réglages sont une barre
+   d'outils, la zone de dépôt en est le plancher. Le `--flush` retire le
+   rembourrage du panneau pour que la zone puisse toucher les bords. */
+.panel--flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.reglages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  padding: var(--s4);
+  padding-bottom: var(--s3);
+}
+
+/* La bascule recto-verso : une LIGNE, pas un panneau à elle seule. Elle porte
+   un réglage, pas une section. */
+.bascule {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin: 0 var(--s4) var(--s4);
+  padding: var(--s3);
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  cursor: pointer;
+  transition: border-color var(--vite);
+}
+.bascule:hover {
+  border-color: var(--border-lit);
+}
+.bascule:has(.check:checked) {
+  border-color: var(--green-border);
+}
+
+/* --- Zone de dépôt ---------------------------------------------------------
+   C'est L'ACTION de l'écran, et elle était le troisième panneau d'une pile de
+   trois : le plus bas, le plus vide, celui qu'on regarde en dernier. Ici elle
+   occupe le corps de la carte, sur toute sa largeur.
+
+   Le pointillé reste — il dit « on peut déposer ici », et aucun aplat ne le
+   dit aussi vite. */
+.depot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s6) var(--s5) var(--s5);
+  text-align: center;
+  cursor: pointer;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  transition: background-color var(--vite), box-shadow var(--vite);
+  /* Le pointillé est dessiné en fond plutôt qu'en bordure : une bordure en
+     pointillé sur un bloc à angle droit coupe le trait dans les coins. */
+  box-shadow: inset 0 0 0 1px transparent;
+}
+.depot:hover {
+  background: var(--surface);
+}
+.depot--survol {
+  background: var(--green-bg);
+  box-shadow: inset 0 0 0 2px var(--green-dim);
+}
+.depot--pret {
+  background: var(--surface);
+}
+
+.depot-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: var(--s1);
+  border-radius: 50%;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--border-lit);
+  transition: color var(--vite), background-color var(--vite), border-color var(--vite);
+}
+.depot-icone svg {
+  width: 22px;
+  height: 22px;
+}
+.depot:hover .depot-icone {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.depot--survol .depot-icone,
+.depot--pret .depot-icone {
+  color: var(--green);
+  background: var(--green-bg);
+  border-color: var(--green-border);
+}
+
+.depot-titre {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.depot-sous {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.depot-actions {
+  display: flex;
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+
+/* Le champ en erreur : rouge, mais SANS crier. Une bordure suffit — un fond
+   rouge sur un champ qu'on est en train de corriger rend la saisie illisible. */
+.input--erreur {
+  border-color: var(--red);
+}
+.input--erreur:focus {
+  border-color: var(--red);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 25%),
+    0 0 0 3px rgb(236 90 95 / 16%);
 }
 
 /* --- Contrôles ------------------------------------------------------------ */
@@ -389,88 +687,236 @@ a:hover {
   align-items: center;
   justify-content: center;
   gap: var(--s2);
-  height: 32px;
-  padding: 0 var(--s3);
+  height: 34px;
+  padding: 0 var(--s4);
   font: inherit;
   font-size: 13px;
   font-weight: 500;
+  letter-spacing: -0.005em;
   color: var(--text);
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-lit);
   border-radius: var(--r2);
+  box-shadow: var(--lift-1);
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 100ms ease, border-color 100ms ease;
+  user-select: none;
+  transition:
+    background-color var(--vite),
+    border-color var(--vite),
+    transform var(--vite),
+    box-shadow var(--vite);
 }
 .btn:hover:not(:disabled) {
   background: var(--surface-3);
-  border-color: var(--border-lit);
+  border-color: var(--border-strong);
+}
+/* Un enfoncement d'UN pixel. Le geste doit être senti, pas regardé : plus que
+   ça et le bouton a l'air de rebondir. */
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
 }
 .btn:disabled {
   color: var(--text-faint);
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: none;
   cursor: not-allowed;
 }
+
 .btn--primary {
-  background: var(--green-bg);
-  border-color: var(--green-border);
-  color: var(--green);
+  /* Le vert PLEIN, pas une teinte sourde sur fond sombre. L'action principale
+     d'un écran doit se trouver sans la chercher, et un fond #0d2119 avec un
+     texte vert ne se distingue pas d'un bouton secondaire du coin de l'oeil. */
+  background: var(--green-dim);
+  border-color: var(--green-dim);
+  color: #08130e;
+  font-weight: 600;
 }
 .btn--primary:hover:not(:disabled) {
-  background: var(--green-border);
+  background: var(--green);
+  border-color: var(--green);
 }
+.btn--primary:disabled {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-faint);
+}
+
 .btn--ghost {
   background: none;
   border-color: transparent;
+  box-shadow: none;
+  color: var(--text-dim);
 }
 .btn--ghost:hover:not(:disabled) {
   background: var(--surface-2);
   border-color: var(--border);
+  color: var(--text);
+}
+
+.btn--danger {
+  color: var(--red);
+  border-color: var(--red-border);
+}
+.btn--danger:hover:not(:disabled) {
+  background: var(--red-bg);
+  border-color: var(--red);
+}
+
+/* Petite taille, pour les actions de ligne d'un tableau. */
+.btn--sm {
+  height: 26px;
+  padding: 0 var(--s3);
+  font-size: 12px;
 }
 
 .field {
   display: grid;
-  gap: 5px;
+  gap: 6px;
+  min-width: 0;
 }
+
+/* --- Champs ----------------------------------------------------------------
+   `appearance: none` sur le `select` est le changement qui compte le plus dans
+   toute cette feuille. Un menu déroulant au style du système, posé au milieu
+   d'une interface sombre dessinée à la main, annonce « application non finie »
+   avant qu'on ait lu un seul mot. Le chevron est un SVG en `background-image`,
+   à la couleur du texte atténué.
+
+   Le fond des champs est PLUS SOMBRE que le panneau qui les porte : un champ
+   est un creux, pas une pastille. C'est ce qui fait qu'on voit où écrire sans
+   avoir à chercher la bordure. */
 .input,
-.select {
-  height: 32px;
-  padding: 0 var(--s2);
+.select,
+.textarea {
   font: inherit;
   font-size: 13px;
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r2);
-  transition: border-color 100ms ease;
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 25%);
+  transition:
+    border-color var(--vite),
+    box-shadow var(--vite),
+    background-color var(--vite);
 }
+.input,
+.select {
+  height: 34px;
+  padding: 0 var(--s3);
+  min-width: 0;
+}
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa3ad' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+/* Le menu ouvert reste dessiné par le système : on lui donne au moins les
+   bonnes couleurs plutôt qu'un rectangle blanc en plein écran sombre. */
+.select option {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 .input:hover,
-.select:hover {
+.select:hover,
+.textarea:hover {
   border-color: var(--border-lit);
 }
 .input:focus,
-.select:focus {
-  border-color: var(--green);
+.select:focus,
+.textarea:focus {
+  border-color: var(--green-dim);
+  /* Un halo, pas seulement un trait : à 1 px la bordure focalisée se confond
+     avec la bordure au survol, et on ne sait plus où on est au clavier. */
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 25%),
+    0 0 0 3px rgb(70 209 151 / 14%);
   outline: none;
 }
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--text-faint);
+}
+.input:disabled,
+.select:disabled {
+  color: var(--text-faint);
+  background: var(--surface);
+  cursor: not-allowed;
+}
+
 .input--warn,
 .select--warn {
-  border-color: var(--amber);
+  border-color: var(--amber-border);
   color: var(--amber);
 }
+.input--warn:focus,
+.select--warn:focus {
+  border-color: var(--amber);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 25%),
+    0 0 0 3px rgb(229 168 63 / 14%);
+}
+
 .textarea {
   font-family: var(--mono);
   font-size: 12px;
-  line-height: 1.6;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--r2);
+  line-height: 1.65;
   padding: var(--s3);
   resize: none;
 }
-.textarea:focus {
-  border-color: var(--green);
+
+/* --- Case à cocher ---------------------------------------------------------
+   Même raison que le `select` : une case système au milieu d'une interface
+   dessinée trahit le reste. On garde l'`input` réel — il porte l'accessibilité
+   et le clavier — et on dessine par-dessus. */
+.check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  flex: none;
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  background: var(--bg);
+  border: 1px solid var(--border-lit);
+  border-radius: 5px;
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 25%);
+  cursor: pointer;
+  transition:
+    background-color var(--vite),
+    border-color var(--vite);
+}
+.check:hover {
+  border-color: var(--border-strong);
+}
+.check:checked {
+  background: var(--green-dim);
+  border-color: var(--green-dim);
+  box-shadow: none;
+}
+/* Le crochet est dessiné en `background-image` pour rester net à toute échelle
+   et ne coûter aucun élément supplémentaire. */
+.check:checked::after {
+  content: '';
+  width: 11px;
+  height: 11px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f1113' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12.5l5 5L20 6.5'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+.check:focus-visible {
   outline: none;
+  box-shadow: 0 0 0 3px rgb(70 209 151 / 22%);
 }
 
 kbd,
@@ -541,50 +987,128 @@ kbd,
   background: var(--red);
 }
 
+/* --- Notes -----------------------------------------------------------------
+   Le texte reste CLAIR, seule la bordure gauche porte la couleur. Un message
+   entièrement ambre sur fond ambre se lit mal, et un avertissement qu'on lit
+   mal n'avertit de rien. Le liseré de 3 px suffit à classer d'un coup d'oeil. */
 .note {
-  padding: var(--s2) var(--s3);
+  padding: var(--s3);
+  padding-left: var(--s4);
   border-radius: var(--r2);
   font-size: 13px;
-  border: 1px solid;
+  line-height: 1.55;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  background: var(--surface);
+}
+.note strong {
+  color: var(--text);
+  font-weight: 600;
 }
 .note--warn {
   background: var(--amber-bg);
-  border-color: var(--amber);
+  border-color: var(--amber-border);
+  border-left-color: var(--amber);
+}
+.note--warn strong {
   color: var(--amber);
 }
 .note--alarm {
   background: var(--red-bg);
-  border-color: var(--red);
+  border-color: var(--red-border);
+  border-left-color: var(--red);
+}
+.note--alarm strong {
   color: var(--red);
 }
 .note--ok {
   background: var(--green-bg);
   border-color: var(--green-border);
+  border-left-color: var(--green);
+}
+.note--ok strong {
   color: var(--green);
 }
 
+/* --- État vide -------------------------------------------------------------
+   Un écran vide est un écran qu'on lira SOUVENT : c'est celui du lundi matin
+   et celui d'après chaque lot terminé. Il mérite d'être dessiné. */
 .empty {
   display: grid;
   place-items: center;
+  align-content: center;
   gap: var(--s2);
+  min-height: 260px;
   height: 100%;
+  padding: var(--s6) var(--s5);
   text-align: center;
   color: var(--text-dim);
+}
+.empty-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--s2);
+  border-radius: 50%;
+  color: var(--text-faint);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.empty-icone svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* --- Barre de progression -------------------------------------------------- */
 
 .bar {
-  height: 5px;
-  background: var(--surface-3);
-  border-radius: 3px;
+  height: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
   overflow: hidden;
 }
 .bar > i {
   display: block;
   height: 100%;
-  background: var(--green);
-  transition: width 200ms ease-out;
+  background: linear-gradient(90deg, var(--green-dim), var(--green));
+  /* Le remplissage suit le chiffre avec un léger retard : c'est ce retard qui
+     fait qu'on VOIT avancer, au lieu de voir sauter. */
+  transition: width 260ms cubic-bezier(0.3, 0, 0.1, 1);
+}
+
+/* --- Bandes de sélection ---------------------------------------------------
+   Une ligne cliquable dans une liste : file de review, candidats, lots. Elle a
+   besoin d'un état de survol ET d'un état sélectionné qui ne se confondent
+   pas — sinon on ne sait plus où on est après avoir bougé la souris. */
+.rangee {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  padding: var(--s2) var(--s3);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r2);
+  cursor: pointer;
+  transition: background-color var(--vite), color var(--vite), border-color var(--vite);
+}
+.rangee:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.rangee[data-actif='true'] {
+  background: var(--surface-2);
+  border-color: var(--border-lit);
+  color: var(--text);
+  font-weight: 500;
 }
 
 /* --- Défilement discret ---------------------------------------------------- */
@@ -599,8 +1123,14 @@ kbd,
 }
 *::-webkit-scrollbar-thumb {
   background: var(--surface-3);
-  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--border-lit);
+  background: var(--border-strong);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }

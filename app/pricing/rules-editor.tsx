@@ -286,6 +286,7 @@ export default function RulesEditor({ cfg, error, text, onChange }: Props) {
                 >
                   <input
                     type="checkbox"
+                    className="check"
                     checked={b.flag_review === true}
                     onChange={(e) =>
                       patch((d) => {
@@ -295,7 +296,6 @@ export default function RulesEditor({ cfg, error, text, onChange }: Props) {
                         else delete cible.flag_review;
                       })
                     }
-                    style={{ accentColor: 'var(--green)' }}
                   />
                   <span className="dim">à valider avant publication</span>
                 </label>
@@ -404,9 +404,9 @@ export default function RulesEditor({ cfg, error, text, onChange }: Props) {
           >
             <input
               type="checkbox"
+              className="check"
               checked={cfg.graded_bypass}
               onChange={(e) => patch((d) => { d.graded_bypass = e.target.checked; })}
-              style={{ accentColor: 'var(--green)' }}
             />
             <span>Les gradées échappent aux bandes</span>
           </label>
