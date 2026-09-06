@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   confirmScan,
   loadMore,
@@ -611,8 +611,15 @@ export default function ReviewClient({
             <span className="label">{queue.length} en attente</span>
           </div>
           {queue.map((s, i) => (
+            <Fragment key={s.id}>
+              {/* Le nom du LOT quand il change. On revoit lot par lot : sans
+                  cette ligne, cent scans de trois lots différents se suivent
+                  sans frontière, et on ne sait pas si on a fini le lot du soir
+                  ou si on a déjà entamé le suivant. */}
+              {s.session_name !== queue[i - 1]?.session_name && (
+                <div className="file-lot">{s.session_name}</div>
+              )}
             <button
-              key={s.id}
               ref={(el) => {
                 if (el) rowRefs.current.set(s.id, el);
                 else rowRefs.current.delete(s.id);
@@ -629,6 +636,7 @@ export default function ReviewClient({
                 <span className="dot dot--alarm" title="conflit de variant" />
               )}
             </button>
+            </Fragment>
           ))}
         </aside>
 

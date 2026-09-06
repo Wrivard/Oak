@@ -871,6 +871,26 @@ a:hover {
   background: #0c0e10;
   border-bottom: 1px solid var(--border);
 }
+/* Le nom du lot, en tête de ses scans. Assez sombre pour ne pas concurrencer
+   les lignes, assez lisible pour marquer la frontière. */
+.file-lot {
+  padding: var(--s3) var(--s3) 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Le premier ne porte pas de filet : il touche déjà l'en-tête de la file. */
+.file-tete + .file-lot {
+  border-top: none;
+  padding-top: var(--s2);
+}
+
 .file-ligne {
   position: relative;
   display: flex;
