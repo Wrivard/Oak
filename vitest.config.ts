@@ -7,6 +7,9 @@ export default defineConfig({
     // Le seed du catalogue est lent et les tests tapent une vraie base.
     testTimeout: 30_000,
     hookTimeout: 60_000,
+    // Balayage de fin : les jobs dont le scan a disparu. Voir le fichier, la
+    // course est expliquée là-bas.
+    globalSetup: ['tests/global-teardown.ts'],
     // Une seule connexion à la fois : les tests partagent la même base.
     fileParallelism: false,
     //
