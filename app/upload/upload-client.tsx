@@ -6,6 +6,7 @@ import { estImage, filesFromDrop, type DropSource } from '../../lib/upload/drop.
 import { nomDeLotInvalide } from '../../lib/upload/nom-de-lot.js';
 import { enPaquets } from '../../lib/upload/paquets.js';
 import { progression } from '../../lib/upload/progression.js';
+import AutoRefresh from '../shell/auto-refresh.js';
 
 /**
  * Envoi d'un lot de photos. Voir docs/06-ui.md.
@@ -483,6 +484,20 @@ export default function UploadClient({
               )}
             </p>
           )}
+
+          {/*
+            Après un envoi, les barres des derniers lots se remplissent pendant
+            que le worker travaille. Sans rafraîchissement, elles restent figées
+            sur l'état d'il y a une minute et il faut recharger pour savoir si
+            quelque chose avance — sur l'écran d'où l'on vient justement de
+            lancer le travail.
+
+            PAS pendant l'envoi : `router.refresh()` toutes les douze secondes
+            au milieu d'un dossier de deux mille pages ajoute des rendus là où
+            on a besoin de la bande passante. Et pas avant d'avoir envoyé quoi
+            que ce soit : il n'y a rien à regarder bouger.
+          */}
+          {done > 0 && !busy && <AutoRefresh seconds={12} />}
 
           {/*
             LES DERNIERS LOTS. Après avoir envoyé, la question suivante est

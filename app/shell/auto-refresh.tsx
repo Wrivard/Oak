@@ -4,7 +4,11 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 /**
- * Rafraîchit les données du dashboard sans recharger la page.
+ * Rafraîchit les données SERVEUR d'un écran sans recharger la page.
+ *
+ * Il vivait sous `app/dashboard/` et trois écrans l'importaient de là :
+ * importer un composant « dashboard » dans l'écran d'envoi dit quelque chose de
+ * faux sur ce qu'il fait.
  *
  * Un `<meta refresh>` rechargerait aussi la barre latérale et ferait clignoter
  * tout l'écran. `router.refresh()` ne renouvelle que les données serveur : les

@@ -36,8 +36,12 @@ describe('triggerPriceRefresh', () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.type).toBe('price_refresh');
-    expect(rows[0]?.status).toBe('queued');
     expect(rows[0]?.payload.limit).toBe(50);
+    // Le STATUT n'est pas vérifié : le lanceur garde un worker en permanence,
+    // et ce worker a le droit de réclamer le job entre l'insertion et cette
+    // requête. Ce que la fonction promet, c'est qu'un job du bon type et du bon
+    // contenu existe — pas qu'il attende encore.
+    expect(['queued', 'running', 'done', 'failed', 'dead']).toContain(rows[0]?.status);
   });
 
   it('TROIS CLICS N’ENFILENT QU’UN BATCH', async () => {

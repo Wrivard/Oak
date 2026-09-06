@@ -1,4 +1,4 @@
-import AutoRefresh from './auto-refresh.js';
+import AutoRefresh from '../shell/auto-refresh.js';
 import { loadMetrics, type Health } from './queries.js';
 
 /**

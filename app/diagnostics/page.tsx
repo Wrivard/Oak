@@ -1,5 +1,5 @@
 import { query } from '../../lib/db.js';
-import AutoRefresh from '../dashboard/auto-refresh.js';
+import AutoRefresh from '../shell/auto-refresh.js';
 
 /**
  * Diagnostic du matching — l'expérience 1bis de PROMPTS.md, en continu.

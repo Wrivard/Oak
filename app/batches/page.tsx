@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import AutoRefresh from '../dashboard/auto-refresh.js';
+import AutoRefresh from '../shell/auto-refresh.js';
 import BatchActions from './batch-row.js';
 import { loadAnomalies, loadBatches, type Batch } from './queries.js';
 
