@@ -159,6 +159,23 @@ describe('pruneJobs', () => {
     return Number(rows[0]?.n);
   }
 
+  /**
+   * Les LIGNES qui existent encore, quel que soit leur statut.
+   *
+   * Une purge se juge sur ce qu'elle supprime, pas sur des statuts : si un
+   * worker tourne pendant les tests — le lanceur en garde un en permanence — il
+   * réclame légitimement un job `queued` et le passe à `running` puis à `dead`.
+   * La version précédente comptait par statut et échouait alors sur une
+   * machine où l'application tournait, ce qui est le cas normal.
+   */
+  async function lignes(): Promise<number> {
+    const { rows } = await query<{ n: string }>(
+      `select count(*)::text as n from jobs where idempotency_key like $1`,
+      [`${MARQUEUR}:%`],
+    );
+    return Number(rows[0]?.n);
+  }
+
   beforeEach(async () => {
     await query(`delete from jobs where idempotency_key like $1`, [`${MARQUEUR}:%`]);
   });
@@ -185,9 +202,10 @@ describe('pruneJobs', () => {
     await poser('failed', 90, 6);
 
     await pruneJobs(14);
-    expect(await reste('queued')).toBe(1);
-    expect(await reste('running')).toBe(1);
-    expect(await reste('failed')).toBe(1);
+    // Trois lignes posées, trois lignes restantes. On ne vérifie pas les
+    // statuts : un worker en marche a le droit de faire avancer un job pendant
+    // le test, et ce n'est pas ce que la purge promet.
+    expect(await lignes()).toBe(3);
   });
 
   it('respecte le délai qu’on lui donne', async () => {
