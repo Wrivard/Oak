@@ -44,10 +44,12 @@ const worker = new Worker(env.WORKER_ID, {
   // sans rendre l'allocation atomique d'abord.
   pair_upload: { handler: handlePairUpload, concurrency: 1 },
   // Source externe avec quota : une seule voie, jamais de parallélisme.
-  price_refresh: { handler: handlePriceRefresh, concurrency: 1 },
+  // Travail de fond, déclenché par le cron ou par un clic dont on n'attend
+  // pas le résultat à l'écran : dix secondes de latence ne se voient pas.
+  price_refresh: { handler: handlePriceRefresh, concurrency: 1, idleMaxMs: 10_000 },
   // Un seul fichier par jour : jamais deux exports concurrents, quelqu'un
   // finirait par uploader les deux et appliquer le delta en double.
-  tcg_export: { handler: handleTcgExport, concurrency: 1 },
+  tcg_export: { handler: handleTcgExport, concurrency: 1, idleMaxMs: 10_000 },
 });
 
 const watcher = startWatcher({ inbox: INBOX, processed: PROCESSED, rejected: REJECTED });

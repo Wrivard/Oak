@@ -1,4 +1,5 @@
 import { log } from '../../lib/log.js';
+import { ATTENTE_MIN_MS, prochaineAttente } from './attente.js';
 import { CircuitOpen } from './breaker.js';
 import { claim, complete, defer, fail, reclaimStale, type Job } from './queue.js';
 
@@ -8,9 +9,18 @@ export interface TypeConfig {
   handler: Handler;
   /** Jobs de ce type traités simultanément. */
   concurrency: number;
+  /**
+   * Attente maximale entre deux réclamations vides, en millisecondes.
+   *
+   * C'est le délai qu'un job de ce type peut passer dans la file avant qu'une
+   * voie ne le voie, quand rien ne tournait avant lui. Court pour ce qu'un
+   * humain attend, long pour le travail de fond. Voir `attente.ts`.
+   */
+  idleMaxMs?: number;
 }
 
-const IDLE_POLL_MS = 500;
+/** Défaut : le chemin qu'on regarde. Deux secondes au pire. */
+const IDLE_MAX_DEFAUT_MS = 2000;
 const REAP_EVERY_MS = 60_000;
 
 /**
@@ -47,7 +57,7 @@ export class Worker {
     const lanes: Promise<void>[] = [];
     for (const [type, cfg] of Object.entries(this.types)) {
       for (let i = 0; i < cfg.concurrency; i++) {
-        lanes.push(this.lane(type, cfg.handler));
+        lanes.push(this.lane(type, cfg.handler, cfg.idleMaxMs ?? IDLE_MAX_DEFAUT_MS));
       }
     }
     await Promise.all(lanes);
@@ -57,7 +67,11 @@ export class Worker {
   }
 
   /** Une voie = un slot de concurrence sur un type. */
-  private async lane(type: string, handler: Handler): Promise<void> {
+  private async lane(type: string, handler: Handler, idleMaxMs: number): Promise<void> {
+    // Chaque voie garde SON attente : deux voies du même type n'ont pas de
+    // raison de se réveiller ensemble, et les décaler étale les requêtes.
+    let attente = ATTENTE_MIN_MS;
+
     while (!this.stopping) {
       let job: Job | null;
       try {
@@ -65,14 +79,19 @@ export class Worker {
       } catch (err) {
         // Base injoignable : on ne veut ni boucler à vide ni mourir.
         log.error('réclamation impossible', { job_type: type, err });
-        await sleep(IDLE_POLL_MS * 4);
+        await sleep(Math.max(attente, ATTENTE_MIN_MS) * 4);
         continue;
       }
 
       if (!job) {
-        await sleep(IDLE_POLL_MS);
+        await sleep(attente);
+        attente = prochaineAttente(attente, idleMaxMs);
         continue;
       }
+
+      // Du travail : on redevient réactif. Un lot arrive rarement seul, et la
+      // carte suivante ne doit pas attendre le plafond.
+      attente = ATTENTE_MIN_MS;
 
       const started = Date.now();
       const task = this.execute(job, handler, started);
