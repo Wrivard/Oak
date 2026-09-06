@@ -492,13 +492,99 @@ a:hover {
   right: -6px;
 }
 
+.review-body {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-height: 0;
+}
+
 .review-grid {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(300px, 1fr) minmax(280px, 360px);
+  grid-template-columns: minmax(300px, 580px) minmax(280px, 1fr) minmax(230px, 300px);
   gap: var(--s4);
   padding: var(--s4);
   min-height: 0;
   overflow: auto;
+  /* CENTRÉ verticalement. Le contenu de cet écran fait quatre cents pixels dans
+     une zone qui en fait neuf cents : accroché en haut, il laissait un demi-
+     écran de vide sous lui et l'application avait l'air inachevée. Le mot-clé
+     `safe` compte : sans lui, un contenu plus haut que la zone déborde par le
+     haut, hors d'atteinte du défilement. */
+  align-content: safe center;
+}
+
+/* Variant / Condition, puis Prix final / Net. Deux colonnes FIXES : avec un
+   `flex-wrap`, le retour à la ligne dépendait de la largeur restante et « Prix
+   final » changeait de place d'une fenêtre à l'autre. Un champ qui se déplace
+   se cherche à chaque carte. */
+.reglages-review {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  align-items: end;
+}
+/* Les champs ne s'étirent pas indéfiniment. Un menu déroulant de quatre cents
+   pixels pour choisir « NM » a l'air d'un formulaire mal fini, et la cible
+   n'est pas plus facile à viser pour autant. */
+.reglages-review .select,
+.reglages-review .input {
+  max-width: 220px;
+}
+
+/* --- La comparaison --------------------------------------------------------
+   Le scan et le candidat sélectionné, à la MÊME taille, côte à côte. C'est la
+   décision de l'écran : « est-ce bien cette édition-là ». Elle se prend en
+   regardant le symbole d'extension, le cadre et le fond d'illustration — trois
+   choses invisibles sur une vignette de 42 px.
+
+   Deux colonnes égales et un `align-items: start` : les deux images gardent le
+   même ratio, donc la même hauteur, et le couple reste aligné même quand l'une
+   des deux manque. */
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  align-items: start;
+}
+.compare-vue {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
+}
+.compare-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+  min-height: 14px;
+}
+.compare-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  object-fit: contain;
+  border-radius: var(--r3);
+  /* La bordure est TOUJOURS là, transparente au repos : sans ça, le passage en
+     vert à la confirmation décale l'image de deux pixels et l'écran tressaute
+     sur chaque carte acceptée. */
+  border: 2px solid transparent;
+  background: var(--surface);
+  transition:
+    border-color 120ms ease-out,
+    opacity 120ms ease-out;
+}
+.compare-vide {
+  display: grid;
+  place-content: center;
+  gap: var(--s2);
+  aspect-ratio: 5 / 7;
+  padding: var(--s4);
+  text-align: center;
+  color: var(--text-faint);
+  background: var(--surface);
+  border: 2px dashed var(--border);
+  border-radius: var(--r3);
 }
 /* --- Écran étroit ------------------------------------------------------------
    Le lanceur affiche l'adresse réseau pour reviewer depuis un téléphone, et
@@ -539,16 +625,27 @@ a:hover {
 }
 
 @media (max-width: 1200px) {
+  /* La comparaison ET les candidats gardent chacun une moitié : c'est le couple
+     qui porte la décision. Ce sont les réglages qui passent dessous — on y
+     touche une fois sur dix cartes. */
   .review-grid {
-    grid-template-columns: minmax(160px, 220px) 1fr;
+    grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+    align-content: safe start;
   }
   .review-side {
     grid-column: 1 / -1;
   }
 }
-@media (max-width: 720px) {
+/* Sous 880 px, la comparaison et les candidats ne tiennent plus côte à côte :
+   deux colonnes de 260 px plus la file de 200 px débordaient de quelques
+   pixels, et le débordement coupait la distance des candidats à droite. La file
+   se resserre aussi — sur un téléphone, 200 px sur 375 en font la moitié. */
+@media (max-width: 880px) {
   .review-grid {
     grid-template-columns: 1fr;
+  }
+  .review-body {
+    grid-template-columns: 148px 1fr;
   }
 }
 

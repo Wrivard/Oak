@@ -522,10 +522,10 @@ export default function ReviewClient({
         </div>
       </header>
 
-      <div
-        className="page-body page-body--flush"
-        style={{ display: 'grid', gridTemplateColumns: '200px 1fr', minHeight: 0 }}
-      >
+      {/* La largeur de la file est en CSS et non en style en ligne : sur un
+          écran étroit elle doit se réduire, et un style en ligne ne se laisse
+          pas surcharger par une media query. */}
+      <div className="page-body page-body--flush review-body">
         {/* File compacte : 30 px par ligne. On en voit le plus possible sans que
             les cibles deviennent difficiles à viser. Elle RECULE — c'est un
             index, pas le travail. */}
@@ -556,55 +556,92 @@ export default function ReviewClient({
         </aside>
 
         <main className="review-grid">
-          <div>
-            {imageManquante ? (
-              <div
-                style={{
-                  display: 'grid',
-                  placeItems: 'center',
-                  gap: 'var(--s2)',
-                  aspectRatio: '5 / 7',
-                  padding: 'var(--s4)',
-                  textAlign: 'center',
-                  borderRadius: 'var(--r3)',
-                  border: '2px dashed var(--border)',
-                  background: 'var(--surface)',
-                  color: 'var(--text-faint)',
-                }}
-              >
-                <span style={{ fontSize: 13, fontWeight: 600 }}>Image indisponible</span>
-                <span style={{ fontSize: 11 }}>
-                  Le fichier a été déplacé ou purgé. Les candidats et le numéro lu
-                  restent exploitables.
-                </span>
-              </div>
-            ) : (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/*
+            LA COMPARAISON. La décision de cet écran est visuelle : « est-ce
+            bien CETTE édition-là ». Elle se prend en posant les deux images
+            côte à côte, à la MÊME taille — un scan de 240 px contre une
+            vignette de candidat de 42 px ne se compare pas, on ne voit ni le
+            symbole d'extension, ni le cadre, ni le fond d'illustration, et ce
+            sont exactement les trois choses qui séparent deux réimpressions.
+
+            À droite, la carte SÉLECTIONNÉE, pas la première : appuyer sur 1-5
+            change l'image de droite, et comparer devient une seule touche.
+          */}
+          <div className="compare">
+            <figure className="compare-vue">
+              <figcaption className="compare-tete">
+                <span className="label">Scan</span>
+                {!imageManquante && (
+                  <a
+                    href={`/api/scan/${scan?.id}/image?full=1`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="faint"
+                    style={{ fontSize: 11 }}
+                  >
+                    pleine résolution
+                  </a>
+                )}
+              </figcaption>
+              {imageManquante ? (
+                <div className="compare-vide">
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Image indisponible</span>
+                  <span style={{ fontSize: 11 }}>
+                    Le fichier a été déplacé ou purgé. Les candidats et le numéro lu
+                    restent exploitables.
+                  </span>
+                </div>
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={`/api/scan/${scan?.id}/image`}
                   alt={`scan ${scan?.seq}`}
                   onError={() => setImageManquante(true)}
+                  className="compare-img"
                   style={{
-                    width: '100%',
-                    borderRadius: 'var(--r3)',
-                    border: `2px solid ${flash ? 'var(--green)' : TIER_COLOR[tier]}`,
-                    background: 'var(--surface)',
-                    transition: 'border-color 120ms ease-out, opacity 120ms ease-out',
+                    borderColor: flash ? 'var(--green)' : TIER_COLOR[tier],
                     opacity: flash ? 0.5 : 1,
                   }}
                 />
-                <a
-                  href={`/api/scan/${scan?.id}/image?full=1`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="faint"
-                  style={{ fontSize: 11, display: 'block', marginTop: 6 }}
-                >
-                  voir en pleine résolution
-                </a>
-              </>
-            )}
+              )}
+            </figure>
+
+            <figure className="compare-vue">
+              <figcaption className="compare-tete">
+                <span className="label">
+                  {candidate ? `Candidat ${chosen + 1}` : 'Candidat'}
+                </span>
+                {candidate?.number && (
+                  <span
+                    className="mono"
+                    style={{
+                      fontSize: 11,
+                      color: chosen === indiceNumero ? 'var(--green)' : 'var(--text-faint)',
+                    }}
+                  >
+                    {candidate.number}/{candidate.printedTotal ?? '—'}
+                  </span>
+                )}
+              </figcaption>
+              {candidate?.image ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={candidate.image}
+                  alt={candidate.name}
+                  loading="eager"
+                  decoding="async"
+                  className="compare-img"
+                />
+              ) : (
+                <div className="compare-vide">
+                  <span style={{ fontSize: 12 }}>
+                    {scan?.candidates.length === 0
+                      ? 'Aucun candidat proposé'
+                      : 'Pas d’image au catalogue'}
+                  </span>
+                </div>
+              )}
+            </figure>
           </div>
 
           {/* Colonne du milieu : LA DÉCISION. Rien d'autre ne doit s'y trouver. */}
@@ -815,7 +852,12 @@ export default function ReviewClient({
           {/* Colonne de droite : LES RÉGLAGES ET LES CHIFFRES. Séparés de la
               décision pour que l'œil n'ait pas à faire le tri. */}
           <div className="review-col review-side">
-            <section style={{ display: 'flex', gap: 'var(--s3)', flexWrap: 'wrap' }}>
+            {/* Deux colonnes fixes plutôt qu'un `flex-wrap` : le retour à la
+                ligne dépendait de la largeur restante, si bien que « Prix
+                final » passait sous « Variant » ou restait à côté selon la
+                fenêtre. Un champ qui change de place d'un écran à l'autre se
+                cherche à chaque carte. */}
+            <section className="reglages-review">
               {/* Le variant est l'erreur la plus coûteuse : il change de couleur
                   dès qu'il diverge du défaut de session. */}
               <label className="field">
@@ -860,7 +902,7 @@ export default function ReviewClient({
                   onChange={(e) => setPriceText(e.target.value)}
                   onBlur={() => setEditing(false)}
                   style={{
-                    width: 100,
+                    width: '100%',
                     // Une saisie illisible était ignorée en silence : on croyait
                     // avoir mis un prix et la carte partait sans.
                     borderColor: prixIllisible
@@ -872,7 +914,7 @@ export default function ReviewClient({
                 />
               </label>
 
-              <div className="field" style={{ marginLeft: 'auto', textAlign: 'right' }}>
+              <div className="field" style={{ textAlign: 'right' }}>
                 <span className="label">
                   Net · port {formatCents(FEES.shippingCents)}
                 </span>
@@ -900,10 +942,15 @@ export default function ReviewClient({
 
             <section className="panel" style={{ padding: 'var(--s3)' }}>
               <div className="panel-head">
-                <span className="label">Prix — totaux port compris</span>
+                {/* « totaux port compris » tenait sur deux lignes dans une
+                    colonne de 300 px, et « taux de frais non vérifiés » sur
+                    deux autres : quatre lignes d'en-tête au-dessus d'un tableau
+                    de quatre. Le port est rappelé dans le champ Net juste
+                    au-dessus, le titre n'a pas à le répéter. */}
+                <span className="label">Prix · port compris</span>
                 {!feesVerified && (
-                  <span className="faint" style={{ fontSize: 11 }}>
-                    taux de frais non vérifiés
+                  <span className="faint" style={{ fontSize: 11 }} title="Les taux de frais eBay et TCGplayer n'ont pas été vérifiés contre une facture réelle.">
+                    frais non vérifiés
                   </span>
                 )}
               </div>
