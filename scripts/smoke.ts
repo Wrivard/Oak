@@ -15,6 +15,7 @@
  * Sans argument, démarre le serveur de prod lui-même sur un port libre.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
+import { readFile, stat } from 'node:fs/promises';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { createRequire } from 'node:module';
 
@@ -101,12 +102,65 @@ async function waitFor(base: string, timeoutMs = 60_000): Promise<void> {
   throw new Error(`serveur injoignable sur ${base} après ${timeoutMs / 1000}s`);
 }
 
+/**
+ * `.next` contient-il un build de production UTILISABLE ?
+ *
+ * Deux façons de ne pas en avoir, et elles ne se disent pas pareil :
+ *
+ *  - il n'y a jamais eu de build. `BUILD_ID` manque.
+ *  - il y en a eu un, mais `next dev` a tourné depuis et a réécrit une partie
+ *    des fichiers par-dessus. `BUILD_ID` est toujours là, le build est mort.
+ *    C'est le cas courant après une session de mise au point : `next start`
+ *    meurt alors sur un `Cannot find module './vendor-chunks/…'` de quarante
+ *    lignes suivi de neuf pages en 500 — un diagnostic qui ressemble à une
+ *    application cassée alors qu'il manque seulement une commande.
+ *
+ * Le marqueur du second cas est `.next/static/development`, que seul le mode
+ * dev crée.
+ */
+type EtatBuild = 'ok' | 'absent' | 'ecrase-par-dev';
+
+async function etatDuBuild(): Promise<EtatBuild> {
+  for (const f of ['.next/BUILD_ID', '.next/routes-manifest.json']) {
+    try {
+      await readFile(f);
+    } catch {
+      return 'absent';
+    }
+  }
+  try {
+    await stat('.next/static/development');
+    return 'ecrase-par-dev';
+  } catch {
+    return 'ok';
+  }
+}
+
 async function main(): Promise<void> {
   const given = process.argv[2];
   let child: ChildProcess | undefined;
   let base = given ?? '';
 
   if (!given) {
+    // `next dev` et `next build` partagent `.next`. Après une session de dev,
+    // il n'y a plus de build de production dedans et `next start` meurt sur un
+    // MODULE_NOT_FOUND de quarante lignes, suivi de neuf pages en 500 — un
+    // diagnostic qui ressemble à une application cassée alors qu'il manque
+    // seulement une commande.
+    const etat = await etatDuBuild();
+    if (etat !== 'ok') {
+      console.error('');
+      console.error(
+        etat === 'absent'
+          ? '  Pas de build de production dans .next.'
+          : '  Le build de .next a été écrasé par `next dev`.',
+      );
+      console.error('  Arrête le serveur de dev, puis relance `pnpm build`.');
+      console.error('');
+      process.exitCode = 1;
+      return;
+    }
+
     const port = 3200 + Math.floor(Math.random() * 400);
     base = `http://127.0.0.1:${port}`;
     // On lance `next` par son point d'entrée Node, pas par `node_modules/.bin/next`
