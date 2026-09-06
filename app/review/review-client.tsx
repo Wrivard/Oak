@@ -133,13 +133,28 @@ export default function ReviewClient({
     }
   }, []);
 
-  // Réinitialise l'édition à chaque changement de carte : garder un prix saisi
-  // d'une carte sur l'autre est le meilleur moyen de mal étiqueter une pile.
-  //
-  // La sélection part du candidat que le NUMÉRO désigne, et non du premier de
-  // la liste. Le premier de la liste est simplement le plus proche au sens
-  // CLIP, ce qui ne départage justement pas deux réimpressions du même
-  // artwork. La ligne est badgée à l'écran : on voit pourquoi elle est choisie.
+  /**
+   * Réinitialise l'édition quand LA CARTE change — pas quand le curseur bouge.
+   *
+   * La différence n'est pas théorique. `accept` retire la carte de la file et
+   * laisse le curseur où il est : la position ne change pas, la carte sous le
+   * curseur, si. Avec `[cursor]` en dépendance, la réinitialisation ne partait
+   * donc PAS après une acceptation — un prix tapé pour la carte N restait dans
+   * le champ pour la carte N+1, et un second appui sur `A` l'écrivait en base
+   * sur la mauvaise carte. C'est exactement ce que ce bloc existait pour
+   * empêcher.
+   *
+   * `indiceNumero` n'est volontairement pas une dépendance : l'effet se ferme
+   * sur la valeur du rendu où la carte a changé, qui est la bonne. L'ajouter
+   * ferait repartir la réinitialisation quand on choisit une carte par la
+   * recherche — l'objet du scan est recréé, la liste des candidats change, et
+   * on effacerait la sélection que l'utilisateur vient de faire.
+   *
+   * La sélection part du candidat que le NUMÉRO désigne, et non du premier de
+   * la liste. Le premier de la liste est simplement le plus proche au sens
+   * CLIP, ce qui ne départage justement pas deux réimpressions du même
+   * artwork. La ligne est badgée à l'écran : on voit pourquoi elle est choisie.
+   */
   useEffect(() => {
     setChosen(indiceNumero ?? 0);
     setVariant(null);
@@ -149,7 +164,8 @@ export default function ReviewClient({
     setSearching(false);
     setHits([]);
     setError(null);
-  }, [cursor, indiceNumero]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scan?.id]);
 
   const tier = useMemo(() => tierOf(scan?.valueCents ?? null, thresholds), [scan, thresholds]);
 
