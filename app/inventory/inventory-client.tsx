@@ -101,15 +101,21 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
       <div className="page-body">
         <div className="large">
         <div style={{ display: 'flex', gap: 'var(--s2)', marginBottom: 'var(--s3)' }}>
-          {FILTRES.map((f) => (
-            <button
-              key={f.key}
-              className={`btn${filter === f.key ? ' btn--primary' : ''}`}
-              onClick={() => navigate({ filter: f.key, page: '1' })}
-            >
-              {f.label}
-            </button>
-          ))}
+          {/* Un seul réglage à cinq positions. Voir `.segmente` dans la feuille
+              de style : le segment actif est soulevé et non coloré, le vert
+              restant aux actions qui écrivent quelque chose. */}
+          <div className="segmente">
+            {FILTRES.map((f) => (
+              <button
+                key={f.key}
+                className="seg"
+                data-actif={filter === f.key ? 'true' : undefined}
+                onClick={() => navigate({ filter: f.key, page: '1' })}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           {totals.sansPrix > 0 && filter !== 'unpriced' && (
             <span
               className="note note--warn"

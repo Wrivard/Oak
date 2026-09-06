@@ -25,5 +25,18 @@ export default defineConfig({
     //
     // Un statut FINAL — `rejected`, `resolved`, `dead` — reste vérifiable : le
     // worker ne les fait pas repartir en arrière.
+    //
+    // ET IL FAUT DE LA PLACE DANS LE POOLER. Le pooler de session Supabase
+    // plafonne à quinze clients TOUS PROCESSUS CONFONDUS. Le lanceur en tient
+    // déjà dix — cinq pour l'application, cinq pour le worker. La suite ouvre
+    // les siens par-dessus, et les tests de concurrence, qui lancent dix
+    // appels simultanés, sont les premiers à s'y casser :
+    // `EMAXCONNSESSION` remonte en échec de test sans rapport avec ce qui est
+    // testé. Observé deux fois pendant une session où un second serveur de
+    // développement tournait à côté.
+    //
+    // Avant de conclure qu'un test de concurrence est cassé : compter les
+    // process Node qui parlent à la base, ou lancer le serveur de mise au
+    // point avec `PG_POOL_MAX=2`.
   },
 });

@@ -57,28 +57,34 @@ export default async function AuditPage({
           {data.pages > 1 && ` · page ${data.page} / ${data.pages}`}
         </span>
         <div className="page-actions">
-          <Link href={lien({ source: undefined, page: undefined })}
-                className={`btn${source === undefined ? ' btn--primary' : ''}`}>
-            Toutes
-          </Link>
-          <Link href={lien({ source: 'catalog', page: undefined })}
-                className={`btn${source === 'catalog' ? ' btn--primary' : ''}`}>
-            Catalogue
-          </Link>
-          <Link href={lien({ source: 'own_history', page: undefined })}
-                className={`btn${source === 'own_history' ? ' btn--primary' : ''}`}>
-            Empreinte
-          </Link>
+          {/* Un SEUL réglage à quatre positions, pas quatre boutons : en
+              choisir un désélectionne les autres, et un segmenté le dit sans
+              qu'on ait à l'apprendre. */}
+          <div className="segmente">
+            <Link href={lien({ source: undefined, page: undefined })}
+                  className="seg" data-actif={source === undefined ? 'true' : undefined}>
+              Toutes
+            </Link>
+            <Link href={lien({ source: 'catalog', page: undefined })}
+                  className="seg" data-actif={source === 'catalog' ? 'true' : undefined}>
+              Catalogue
+            </Link>
+            <Link href={lien({ source: 'own_history', page: undefined })}
+                  className="seg" data-actif={source === 'own_history' ? 'true' : undefined}>
+              Empreinte
+            </Link>
           {/* Hors de la vue par défaut : les résolutions manuelles sont
               majoritaires au début et noieraient celles que la machine a
               décidées seule. Mais un humain se trompe aussi, et l'empreinte
               qu'il écrit fait autorité — sans ce filtre, aucun chemin
               n'existait pour retrouver et corriger une erreur de review. */}
-          <Link href={lien({ source: 'manual', page: undefined })}
-                className={`btn${source === 'manual' ? ' btn--primary' : ' btn--ghost'}`}
-                title="Tes propres décisions de review. Une erreur y écrit une empreinte qui fait autorité.">
-            Les miennes
-          </Link>
+            <Link href={lien({ source: 'manual', page: undefined })}
+                  className="seg"
+                  data-actif={source === 'manual' ? 'true' : undefined}
+                  title="Tes propres décisions de review. Une erreur y écrit une empreinte qui fait autorité.">
+              Les miennes
+            </Link>
+          </div>
           {/* Regarder les soixante plus RÉCENTES sur les huit cents d'une
               journée, c'est regarder 7 % du lot au hasard. Les soixante MOINS
               SÛRES, ce sont celles où la machine a le plus de chances de s'être

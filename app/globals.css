@@ -1776,6 +1776,54 @@ kbd,
   border-bottom: none;
 }
 
+/* --- Un groupe de filtres exclusifs ----------------------------------------
+   Cinq boutons côte à côte se lisent comme cinq ACTIONS. Un segmenté se lit
+   comme un seul réglage à plusieurs positions — ce qu'il est. La différence
+   n'est pas décorative : elle dit qu'en choisir un désélectionne les autres,
+   ce qu'aucune rangée de boutons ne dit.
+
+   Le segment actif est SOULEVÉ, pas coloré. Le vert reste au petit nombre
+   d'actions qui écrivent quelque chose — envoyer un lot, enregistrer des
+   règles. Un filtre en vert vif le met au même rang, et on finit par ne plus
+   voir ni l'un ni l'autre. */
+.segmente {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+}
+.seg {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 11px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-faint);
+  white-space: nowrap;
+  border: none;
+  background: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    background-color var(--vite),
+    color var(--vite);
+}
+.seg:hover {
+  color: var(--text-dim);
+  background: var(--surface-2);
+  text-decoration: none;
+}
+.seg[data-actif='true'] {
+  color: var(--text);
+  background: var(--surface-3);
+  box-shadow: var(--lift-2);
+}
+
 /* --- Statuts -------------------------------------------------------------- */
 
 .dot {
