@@ -28,7 +28,9 @@ function Progress({ b }: { b: Batch }) {
         <span style={{ width: pct(b.rejected), background: 'var(--text-faint)' }} />
         <span style={{ width: pct(b.pending), background: 'var(--border-lit)' }} />
       </div>
-      <div className="mono faint" style={{ fontSize: 11, marginTop: 3 }}>
+      {/* Sur une seule ligne : ce détail passait sur deux dans une fenêtre
+          étroite et déséquilibrait la hauteur des lignes du tableau. */}
+      <div className="mono faint" style={{ fontSize: 11, marginTop: 3, whiteSpace: 'nowrap' }}>
         {b.resolved} résolues · {b.review} en review
         {b.rejected > 0 && ` · ${b.rejected} écartées`}
         {b.pending > 0 && ` · ${b.pending} en cours`}
@@ -110,16 +112,28 @@ export default async function BatchesPage() {
 
                 return (
                   <tr key={b.id}>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{b.name}</div>
-                      <div className="faint" style={{ fontSize: 11 }}>
+                    {/* Largeur BORNÉE et texte coupé à l'ellipse. Sur une
+                        fenêtre étroite, « 2026-09-06 05:14 · reverseHolofoil ·
+                        NM · adf » passait sur trois lignes et cette ligne du
+                        tableau devenait une fois et demie plus haute que ses
+                        voisines. Un tableau qui ondule se relit à chaque coup
+                        d'oeil. */}
+                    <td style={{ maxWidth: 320 }}>
+                      <div className="tronque" style={{ fontWeight: 500 }}>
+                        {b.name}
+                      </div>
+                      <div
+                        className="faint tronque"
+                        style={{ fontSize: 11 }}
+                        title={`${b.openedAt} · ${b.variant} · ${b.condition} · ${b.lane}`}
+                      >
                         {b.openedAt} · {b.variant} · {b.condition} · {b.lane}
                       </div>
                     </td>
                     <td style={{ textAlign: 'left' }}>
                       <Progress b={b} />
                     </td>
-                    <td className="mono faint" style={{ fontSize: 11 }}>
+                    <td className="mono faint" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
                       {b.ownHistory > 0 && <div>{b.ownHistory} empreinte</div>}
                       {b.catalog > 0 && <div>{b.catalog} catalogue</div>}
                       {b.manual > 0 && <div>{b.manual} manuel</div>}

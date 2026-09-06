@@ -1453,6 +1453,14 @@ kbd,
    Ce qui rend un tableau dense LISIBLE n'est pas l'espace, c'est l'alignement —
    les nombres à droite en chiffres tabulaires, le texte à gauche, et une seule
    règle horizontale par ligne. */
+/* Une ligne qui préfère se couper plutôt que de pousser sa rangée sur deux
+   hauteurs. Le texte complet reste dans l'infobulle. */
+.tronque {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* --- L'écran des prix ------------------------------------------------------
    À gauche les règles, à droite l'effet des règles. Le couple est la raison
    d'être de l'écran : changer un multiplicateur et voir les prix bouger dans la
@@ -1541,7 +1549,13 @@ kbd,
   border: 1px solid var(--border);
   border-radius: var(--r3);
   box-shadow: var(--lift-2);
-  overflow: hidden;
+  /* Le tableau défile DANS son cadre plutôt que de pousser la page de côté.
+     Une page qui défile horizontalement emmène l'en-tête et la navigation avec
+     elle ; un cadre qui défile ne bouge que ses colonnes. `overflow-y: clip`
+     garde les coins arrondis sans créer un second ascenseur vertical à
+     l'intérieur d'une page qui en a déjà un. */
+  overflow-x: auto;
+  overflow-y: clip;
 }
 /* Un cadre DANS un panneau ne porte pas d'ombre : deux élévations empilées
    font une bordure double, pas une profondeur. Il monte d'un cran de gris à la
@@ -1552,6 +1566,29 @@ kbd,
 }
 .panel .cadre .table th {
   background: var(--surface-3);
+}
+
+/* La DERNIÈRE colonne reste visible quand le tableau défile de côté.
+   C'est celle qui porte les actions ou le montant net — la colonne pour
+   laquelle on est venu. Sans ça, sur une fenêtre étroite, « Fermer » et
+   « Réparer » sortaient de l'écran et il fallait défiler pour cliquer sur ce
+   qu'on regardait déjà.
+
+   Elle a besoin d'un fond opaque, sinon les colonnes défilent AU TRAVERS ; il
+   doit suivre le survol de la ligne, sinon elle reste un rectangle immobile au
+   milieu d'une ligne qui s'éclaire. */
+.cadre .table th:last-child,
+.cadre .table td:last-child {
+  position: sticky;
+  right: 0;
+  background: var(--surface);
+}
+.cadre .table th:last-child {
+  background: var(--surface-2);
+  z-index: 2;
+}
+.cadre .table tbody tr:hover td:last-child {
+  background: var(--surface-2);
 }
 
 /* L'en-tête monte d'un cran pour se détacher du corps, et les cellules de bord
