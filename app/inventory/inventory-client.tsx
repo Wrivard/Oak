@@ -97,6 +97,7 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
       </header>
 
       <div className="page-body">
+        <div className="large">
         <div style={{ display: 'flex', gap: 'var(--s2)', marginBottom: 'var(--s3)' }}>
           {FILTRES.map((f) => (
             <button
@@ -284,6 +285,7 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
             </button>
           </div>
         )}
+        </div>
       </div>
     </>
   );

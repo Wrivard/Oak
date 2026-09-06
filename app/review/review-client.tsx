@@ -509,16 +509,11 @@ export default function ReviewClient({
         style={{ display: 'grid', gridTemplateColumns: '200px 1fr', minHeight: 0 }}
       >
         {/* File compacte : 30 px par ligne. On en voit le plus possible sans que
-            les cibles deviennent difficiles à viser. */}
-        <aside
-          style={{
-            overflowY: 'auto',
-            borderRight: '1px solid var(--border)',
-            background: 'var(--surface)',
-          }}
-        >
-          <div className="label" style={{ padding: 'var(--s3) var(--s3) var(--s2)' }}>
-            {queue.length} en attente
+            les cibles deviennent difficiles à viser. Elle RECULE — c'est un
+            index, pas le travail. */}
+        <aside className="file">
+          <div className="file-tete">
+            <span className="label">{queue.length} en attente</span>
           </div>
           {queue.map((s, i) => (
             <button
@@ -528,37 +523,16 @@ export default function ReviewClient({
                 else rowRefs.current.delete(s.id);
               }}
               onClick={() => setCursor(i)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--s2)',
-                width: '100%',
-                height: 30,
-                padding: '0 var(--s3)',
-                border: 'none',
-                borderLeft: `2px solid ${i === cursor ? 'var(--green)' : 'transparent'}`,
-                background: i === cursor ? 'var(--surface-2)' : 'transparent',
-                color: i === cursor ? 'var(--text)' : 'var(--text-dim)',
-                textAlign: 'left',
-                cursor: 'pointer',
-                font: 'inherit',
-                fontSize: 12,
-              }}
+              className="file-ligne"
+              data-actif={i === cursor}
             >
-              <span className="mono faint" style={{ fontSize: 11 }}>
+              <span className="mono" style={{ fontSize: 11, opacity: 0.6 }}>
                 {s.seq}
               </span>
-              <span
-                style={{
-                  flex: 1,
-                  overflow: 'hidden',
-                  whiteSpace: 'nowrap',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {s.candidates[0]?.name ?? 'inconnue'}
-              </span>
-              {s.variant_conflict && <span className="dot dot--alarm" />}
+              <span className="file-nom">{s.candidates[0]?.name ?? 'inconnue'}</span>
+              {s.variant_conflict && (
+                <span className="dot dot--alarm" title="conflit de variant" />
+              )}
             </button>
           ))}
         </aside>
@@ -671,22 +645,8 @@ export default function ReviewClient({
                   <button
                     key={c.card_id}
                     onClick={() => setChosen(i)}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '20px 42px 1fr auto',
-                      gap: 'var(--s2)',
-                      alignItems: 'center',
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '5px var(--s2)',
-                      font: 'inherit',
-                      fontSize: 13,
-                      color: 'var(--text)',
-                      cursor: 'pointer',
-                      background: i === chosen ? 'var(--green-bg)' : 'var(--surface)',
-                      border: `1px solid ${i === chosen ? 'var(--green-border)' : 'var(--border)'}`,
-                      borderRadius: 'var(--r2)',
-                    }}
+                    className="candidat"
+                    data-choisi={i === chosen}
                   >
                     <kbd>{i + 1}</kbd>
                     {c.image ? (
@@ -726,17 +686,7 @@ export default function ReviewClient({
                       />
                     )}
                     <span style={{ minWidth: 0 }}>
-                      <span
-                        style={{
-                          display: 'block',
-                          fontWeight: 500,
-                          overflow: 'hidden',
-                          whiteSpace: 'nowrap',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
-                        {c.name}
-                      </span>
+                      <span className="candidat-nom">{c.name}</span>
                       <span className="faint" style={{ fontSize: 11 }}>
                         {c.set_name}
                         {c.number && (

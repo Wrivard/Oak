@@ -62,6 +62,7 @@ export default async function BatchesPage() {
       </header>
 
       <div className="page-body">
+        <div className="large">
         {anomalies.length > 0 && (
           <div className="note note--warn" style={{ marginBottom: 'var(--s4)' }}>
             <strong>
@@ -142,6 +143,7 @@ export default async function BatchesPage() {
             </tbody>
           </table>
         )}
+        </div>
       </div>
     </>
   );

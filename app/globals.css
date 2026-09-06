@@ -508,6 +508,128 @@ a:hover {
   }
 }
 
+/* --- Un candidat -----------------------------------------------------------
+   C'est LA surface de décision de l'application : on la regarde des heures, et
+   chaque hésitation d'un dixième de seconde se paie sur un budget de trois.
+
+   L'état choisi doit se voir SANS être relu. Un fond vert sombre sur un panneau
+   sombre ne suffit pas — le liseré vert à gauche et la touche mise en évidence
+   font le travail du coin de l'oeil. */
+.candidat {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px 42px 1fr auto;
+  gap: var(--s2);
+  align-items: center;
+  width: 100%;
+  padding: 5px var(--s2) 5px var(--s3);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  cursor: pointer;
+  overflow: visible;
+  transition:
+    background-color var(--vite),
+    border-color var(--vite),
+    color var(--vite);
+}
+.candidat:hover {
+  background: var(--surface-2);
+  border-color: var(--border-lit);
+  color: var(--text);
+}
+.candidat[data-choisi='true'] {
+  background: var(--surface-2);
+  border-color: var(--green-border);
+  color: var(--text);
+}
+.candidat[data-choisi='true']::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--green);
+}
+.candidat[data-choisi='true'] kbd {
+  color: #08130e;
+  background: var(--green);
+  border-color: var(--green);
+}
+.candidat-nom {
+  display: block;
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* --- La file de review -----------------------------------------------------
+   Trente pixels par ligne : on en voit le plus possible sans que les cibles
+   deviennent difficiles à viser. Elle recule comme la barre latérale — c'est un
+   index, pas le travail. */
+.file {
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: #0c0e10;
+  padding-bottom: var(--s4);
+}
+.file-tete {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--s3) var(--s3) var(--s2);
+  background: #0c0e10;
+  border-bottom: 1px solid var(--border);
+}
+.file-ligne {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  height: 30px;
+  padding: 0 var(--s3);
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--vite), color var(--vite);
+}
+.file-ligne:hover {
+  background: var(--surface);
+  color: var(--text-dim);
+}
+.file-ligne[data-actif='true'] {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 500;
+}
+.file-ligne[data-actif='true']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--green);
+}
+.file-nom {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .review-col {
   display: flex;
   flex-direction: column;
@@ -924,49 +1046,89 @@ kbd,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
   font-family: var(--mono);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1;
   color: var(--text-dim);
   background: var(--surface-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-lit);
+  /* Une arête basse plus épaisse : une touche a une hauteur, et c'est ce
+     millimètre de fausse perspective qui la fait lire comme une touche. */
   border-bottom-width: 2px;
-  border-radius: var(--r1);
+  border-radius: 5px;
+  box-shadow: var(--lift-1);
+  transition: background-color var(--vite), color var(--vite), border-color var(--vite);
+}
+
+/* --- Pastilles d'état ------------------------------------------------------
+   Un point de 7 px sur fond sombre disparaît. Le halo de la même couleur le
+   fait exister sans l'agrandir — c'est ce qu'on repère au bout de la barre
+   latérale sans avoir à le chercher. */
+.dot--ok {
+  box-shadow: 0 0 0 3px rgb(70 209 151 / 16%);
+}
+.dot--warn {
+  box-shadow: 0 0 0 3px rgb(229 168 63 / 16%);
+}
+.dot--alarm {
+  box-shadow: 0 0 0 3px rgb(236 90 95 / 18%);
 }
 
 /* --- Tableaux ------------------------------------------------------------- */
 
+/* --- Tableaux --------------------------------------------------------------
+   Denses par choix : on lit un inventaire de 15 000 lignes, pas une brochure.
+   Ce qui rend un tableau dense LISIBLE n'est pas l'espace, c'est l'alignement —
+   les nombres à droite en chiffres tabulaires, le texte à gauche, et une seule
+   règle horizontale par ligne. */
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
 }
 .table th {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-faint);
   text-align: right;
-  padding: 0 var(--s2) var(--s2);
-  border-bottom: 1px solid var(--border);
+  padding: var(--s2) var(--s3);
+  white-space: nowrap;
+  /* L'en-tête reste visible quand la liste défile. Un fond OPAQUE est
+     obligatoire : sans lui, les lignes défilent au travers. */
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-lit);
 }
 .table th:first-child {
   text-align: left;
 }
 .table td {
-  padding: 6px var(--s2);
+  padding: 7px var(--s3);
   text-align: right;
   border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
 }
 .table td:first-child {
   text-align: left;
+  font-variant-numeric: normal;
+}
+.table tbody tr {
+  transition: background-color var(--vite);
 }
 .table tbody tr:hover {
-  background: var(--surface);
+  background: var(--surface-2);
+}
+.table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 /* --- Statuts -------------------------------------------------------------- */

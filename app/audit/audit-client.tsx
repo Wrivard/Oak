@@ -43,6 +43,7 @@ export default function AuditClient({ rows }: { rows: AuditRow[] }) {
 
   return (
     <div className="page-body">
+      <div className="large">
       {erreur && (
         <div className="note note--alarm" style={{ marginBottom: 'var(--s3)' }}>
           {erreur}
@@ -153,6 +154,7 @@ export default function AuditClient({ rows }: { rows: AuditRow[] }) {
             </article>
           );
         })}
+      </div>
       </div>
     </div>
   );
