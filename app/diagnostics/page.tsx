@@ -227,7 +227,7 @@ export default async function DiagnosticsPage() {
                 </p>
               </section>
 
-              <section className="panel">
+              <section className="panel" style={{ marginTop: 'var(--s3)' }}>
                 <div className="panel-head">
                   <span className="label">Bande de crop qui a réussi</span>
                 </div>

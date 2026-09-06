@@ -932,9 +932,18 @@ a:hover {
      entre une maquette et une application. */
   box-shadow: var(--lift-2);
 }
-.panel + .panel {
-  margin-top: var(--s3);
-}
+/* PAS de marge automatique entre panneaux.
+   `\.panel + \.panel { margin-top }` datait d'une époque où ils s'empilaient
+   toujours dans une colonne. Depuis, ils vivent dans des grilles qui portent
+   leur propre `gap` : la marge s'ajoutait au gap — 28 px là où on en voulait
+   16 sur l'écran des prix — et surtout elle décalait de douze pixels vers le
+   bas tout panneau qui n'était pas le premier du DOM. Sur le tableau de santé
+   et sur le diagnostic, la carte de droite ne s'alignait pas avec celle de
+   gauche, et c'est exactement le genre de désalignement qu'on voit sans savoir
+   le nommer.
+
+   L'espacement appartient au conteneur, qui seul sait s'il empile ou s'il
+   range côte à côte. */
 .panel-head {
   display: flex;
   align-items: center;
