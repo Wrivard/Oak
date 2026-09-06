@@ -237,7 +237,22 @@ export default function Shell({ counts, children }: Props) {
             <span className="mono">node --import tsx worker/index.ts</span>
           </div>
         )}
-        {children}
+        {/*
+          L'écran apparaît en fondu, une seule fois par navigation.
+
+          Le contenu SURGISSAIT : la page précédente disparaît, la suivante est
+          là. Sur une application dont chaque écran est rendu par le serveur,
+          ce saut est le dernier morceau qui trahit qu'on a changé de document.
+          Cent vingt millisecondes suffisent à le lisser ; au-delà, on attend
+          l'animation au lieu du contenu.
+
+          La clé est le chemin : sans elle, React réutilise le noeud et
+          l'animation ne repart jamais. Rien ne bouge en position — docs/06 §1
+          interdit ce qui se déplace sous le curseur — c'est l'opacité seule.
+        */}
+        <div key={pathname} className="page-entree">
+          {children}
+        </div>
       </div>
     </div>
   );

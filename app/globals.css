@@ -545,6 +545,26 @@ a:hover {
   padding: 0;
 }
 
+/* Le fondu d'arrivée d'un écran. `contents` : le conteneur ne doit surtout pas
+   créer une boîte, sinon il casse la mise en page en colonne de la coquille et
+   les hauteurs à 100 % des écrans qui défilent. */
+.page-entree {
+  display: contents;
+}
+.page-entree > * {
+  animation: page-entree 120ms ease-out;
+}
+@keyframes page-entree {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-entree > * {
+    animation: none;
+  }
+}
+
 /* --- La colonne de lecture -------------------------------------------------
    Elle était `max-width: 780px` et rien d'autre : sur un écran de 1500 px, tout
    le contenu se tassait dans le coin haut-gauche avec les deux tiers de la page
