@@ -45,7 +45,10 @@ interface Props {
  * la grille dépassait la colonne de gauche et le panneau se coupait en plein
  * mot — un écran de réglages tronqué se lit comme un écran cassé.
  */
-const COLONNES = '84px 100px 84px 100px 64px 24px';
+/* 456 px de colonnes + 40 de gouttières + 32 de marge intérieure de panneau +
+   2 de bordure = 530, pour 528 disponibles dans la colonne de 560. Deux pixels,
+   et une barre de défilement horizontale en bas d'un écran de réglages. */
+const COLONNES = '84px 104px 84px 100px 64px 24px';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'] as const;
 const CANAUX = [

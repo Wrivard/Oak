@@ -162,28 +162,17 @@ export default function PricingClient({
         </div>
       </header>
 
-      {/* 520 px ne suffisaient pas : la grille des bandes en demandait 556 et
-          le panneau se coupait en plein mot. */}
-      <div
-        className="page-body page-body--flush"
-        style={{ display: 'grid', gridTemplateColumns: '560px 1fr', minHeight: 0 }}
-      >
-        <section
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 0,
-            padding: 'var(--s4)',
-            borderRight: '1px solid var(--border)',
-            gap: 'var(--s2)',
-          }}
-        >
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+      {/* Les largeurs sont en CSS et non en style en ligne : sous 1250 px les
+          deux colonnes ne tiennent plus, et une media query ne surcharge pas un
+          style en ligne. */}
+      <div className="page-body page-body--flush prix-body">
+        <section className="prix-regles">
+          <div className="prix-defile">
             <RulesEditor cfg={parsed.cfg} error={parsed.error} text={text} onChange={setText} />
           </div>
         </section>
 
-        <section style={{ minHeight: 0, overflow: 'auto', padding: 'var(--s4)' }}>
+        <section className="prix-apercu">
           {synthetic && (
             <div className="note note--warn" style={{ marginBottom: 'var(--s3)' }}>
               Aucun SKU en stock — la preview tourne sur une échelle de valeurs

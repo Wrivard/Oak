@@ -164,6 +164,50 @@ a:hover {
   border-radius: var(--r1);
 }
 
+/* --- Les barres de défilement ------------------------------------------------
+   Celles du système sont CLAIRES. Sur une application entièrement sombre, une
+   barre gris pâle à droite de la file de review est la chose la plus lumineuse
+   de l'écran, et elle est posée pile à côté de ce qu'on regarde.
+
+   Elles sont fines et prennent la couleur des bordures : présentes quand on les
+   cherche, invisibles le reste du temps. Firefox et Safari via les propriétés
+   standard, Chrome via les pseudo-éléments — les deux sont nécessaires, aucun
+   navigateur ne comprend les deux jeux. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-lit);
+  /* La bordure transparente creuse la barre : le curseur paraît flotter dans
+     sa gouttière au lieu d'y être collé. */
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* La sélection de texte par défaut est le BLEU du système. Sur une interface
+   dont l'accent est vert, sélectionner un SKU pour le copier faisait apparaître
+   la seule tache bleue de l'application. */
+::selection {
+  background: var(--green-border);
+  color: var(--text);
+}
+
 /* --- Typographie ---------------------------------------------------------- */
 
 .mono {
@@ -1409,6 +1453,69 @@ kbd,
    Ce qui rend un tableau dense LISIBLE n'est pas l'espace, c'est l'alignement —
    les nombres à droite en chiffres tabulaires, le texte à gauche, et une seule
    règle horizontale par ligne. */
+/* --- L'écran des prix ------------------------------------------------------
+   À gauche les règles, à droite l'effet des règles. Le couple est la raison
+   d'être de l'écran : changer un multiplicateur et voir les prix bouger dans la
+   même seconde.
+
+   560 px pour les règles, c'est la largeur de la grille des bandes. En dessous
+   de 1250 px, il ne reste pas de quoi afficher les six colonnes de la preview :
+   elle se coupait à droite en plein milieu d'un montant, ce qu'aucune barre de
+   défilement horizontale ne rachète sur un tableau de prix. Les deux blocs
+   passent alors l'un sous l'autre, chacun sur toute la largeur. */
+.prix-body {
+  display: grid;
+  /* 580 et pas 560 : la colonne défile, donc une barre verticale lui prend une
+     dizaine de pixels, et la grille des bandes passait alors 12 px au-dessus de
+     la place restante. Résultat, une barre de défilement HORIZONTALE en bas
+     d'un écran de réglages — le genre de détail qui fait qu'une interface a
+     l'air bricolée sans qu'on sache dire pourquoi. */
+  grid-template-columns: 580px 1fr;
+  min-height: 0;
+}
+.prix-regles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-height: 0;
+  padding: var(--s4);
+  border-right: 1px solid var(--border);
+}
+.prix-defile {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.prix-apercu {
+  min-height: 0;
+  overflow: auto;
+  padding: var(--s4);
+}
+@media (max-width: 1250px) {
+  /* Empilés, les deux blocs défilent AVEC la page et non chacun dans son cadre :
+     deux ascenseurs imbriqués pour un écran qui n'en demande qu'un.
+
+     `min-height: auto` est ce qui compte ici. Avec `min-height: 0`, la grille
+     autorise chaque rangée à devenir plus courte que son contenu ; combiné à
+     `overflow: visible`, le bloc des règles débordait par le bas et se dessinait
+     PAR-DESSUS le tableau de preview. */
+  .prix-body {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+  .prix-body,
+  .prix-regles,
+  .prix-apercu,
+  .prix-defile {
+    min-height: auto;
+    overflow: visible;
+  }
+  .prix-regles {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
 /* --- Le tableau de bord ----------------------------------------------------
    Une grille qui se remplit d'elle-même : `auto-fit` place deux colonnes sur un
    écran large, une seule sur un portable, sans qu'aucune valeur de rupture ne
