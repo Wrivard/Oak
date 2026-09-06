@@ -128,6 +128,7 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
             </div>
           </div>
         ) : (
+          <div className="cadre">
           <table className="table" style={{ opacity: pending ? 0.55 : 1, transition: 'opacity 120ms' }}>
             <thead>
               <tr>
@@ -255,6 +256,7 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
               ))}
             </tbody>
           </table>
+          </div>
         )}
 
         {data.pages > 1 && (

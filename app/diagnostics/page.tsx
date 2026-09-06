@@ -175,6 +175,7 @@ export default async function DiagnosticsPage() {
                     sous {SEUIL_ERE} % sur une ère : crop era-aware obligatoire
                   </span>
                 </div>
+                <div className="cadre">
                 <table className="table">
                   <thead>
                     <tr>
@@ -218,6 +219,7 @@ export default async function DiagnosticsPage() {
                     })}
                   </tbody>
                 </table>
+                </div>
                 <p className="faint" style={{ fontSize: 11, marginTop: 'var(--s2)' }}>
                   L’ère est déduite de la date de sortie du set, donc connue seulement
                   pour les cartes résolues. Les non résolues comptent dans « date
@@ -232,6 +234,7 @@ export default async function DiagnosticsPage() {
                 {/* Si le vintage ne sort que de la bande 1 et le moderne de la
                     bande 0, la question du crop era-aware est tranchée sans
                     avoir à deviner. */}
+                <div className="cadre">
                 <table className="table">
                   <thead>
                     <tr>
@@ -256,6 +259,7 @@ export default async function DiagnosticsPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </section>
             </>
           )}

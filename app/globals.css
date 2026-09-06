@@ -1159,6 +1159,17 @@ a:hover {
   gap: 6px;
   min-width: 0;
 }
+/* Un champ REMPLIT la largeur qu'on lui donne.
+   Sans cette règle, `<input>` garde la largeur par défaut du navigateur —
+   environ 180 px, dictée par l'attribut `size` — et déborde de son étiquette.
+   Sur l'écran des prix, cinq champs de 78 px se recouvraient en une seule
+   barre continue, et le paragraphe d'à côté passait DERRIÈRE le champ : on
+   lisait « ...mais publié sous ce prix » sans le début de la phrase. */
+.field .input,
+.field .select,
+.field .textarea {
+  width: 100%;
+}
 
 /* --- Champs ----------------------------------------------------------------
    `appearance: none` sur le `select` est le changement qui compte le plus dans
@@ -1345,6 +1356,35 @@ kbd,
    Ce qui rend un tableau dense LISIBLE n'est pas l'espace, c'est l'alignement —
    les nombres à droite en chiffres tabulaires, le texte à gauche, et une seule
    règle horizontale par ligne. */
+/* --- Le cadre d'un tableau -------------------------------------------------
+   Un tableau posé à même le fond de page se lit comme un document imprimé :
+   des colonnes, des filets, et rien qui dise où l'objet commence ni où il
+   finit. Le cadre en fait une SURFACE — c'est la différence entre une liste et
+   une application.
+
+   `overflow: hidden` sert le rendu autant que le débordement : sans lui, la
+   première et la dernière ligne dépassent des coins arrondis. */
+.cadre {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r3);
+  box-shadow: var(--lift-2);
+  overflow: hidden;
+}
+/* L'en-tête monte d'un cran pour se détacher du corps, et les cellules de bord
+   respirent : une colonne collée au filet du cadre a l'air d'un accident. */
+.cadre .table th {
+  background: var(--surface-2);
+}
+.cadre .table th:first-child,
+.cadre .table td:first-child {
+  padding-left: var(--s4);
+}
+.cadre .table th:last-child,
+.cadre .table td:last-child {
+  padding-right: var(--s4);
+}
+
 .table {
   width: 100%;
   border-collapse: separate;

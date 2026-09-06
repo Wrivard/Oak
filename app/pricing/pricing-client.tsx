@@ -162,9 +162,11 @@ export default function PricingClient({
         </div>
       </header>
 
+      {/* 520 px ne suffisaient pas : la grille des bandes en demandait 556 et
+          le panneau se coupait en plein mot. */}
       <div
         className="page-body page-body--flush"
-        style={{ display: 'grid', gridTemplateColumns: '520px 1fr', minHeight: 0 }}
+        style={{ display: 'grid', gridTemplateColumns: '560px 1fr', minHeight: 0 }}
       >
         <section
           style={{
@@ -194,6 +196,7 @@ export default function PricingClient({
             </div>
           )}
 
+          <div className="cadre">
           <table className="table">
             <thead>
               <tr>
@@ -247,6 +250,7 @@ export default function PricingClient({
               })}
             </tbody>
           </table>
+          </div>
 
           <p className="faint" style={{ fontSize: 11, marginTop: 'var(--s3)' }}>
             Net calculé avec {formatCents(shippingCents)} d&apos;expédition.

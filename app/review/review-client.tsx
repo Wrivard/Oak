@@ -82,7 +82,17 @@ export default function ReviewClient({
 }: Props) {
   const [queue, setQueue] = useState(scans);
   const [cursor, setCursor] = useState(0);
-  const [chosen, setChosen] = useState(0);
+  /**
+   * La sélection est calculée DÈS LE PREMIER RENDU, pas dans un effet.
+   *
+   * Un effet ne s'exécute qu'après l'hydratation : le serveur rendait la
+   * première ligne en surbrillance, puis le navigateur déplaçait la
+   * surbrillance sur la ligne désignée par le numéro. Un sautillement à chaque
+   * ouverture de la file, sur l'élément qu'on regarde en priorité.
+   */
+  const [chosen, setChosen] = useState(
+    () => candidatDuNumero(scans[0]?.ocrRead, scans[0]?.candidates ?? []) ?? 0,
+  );
   const [variant, setVariant] = useState<CardVariant | null>(null);
   const [condition, setCondition] = useState<CardCondition | null>(null);
   const [priceText, setPriceText] = useState('');

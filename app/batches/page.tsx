@@ -87,6 +87,10 @@ export default async function BatchesPage() {
             </Link>
           </div>
         ) : (
+          /* Le tableau vit DANS un cadre : posé à même le fond, il se lisait
+             comme un document imprimé plutôt que comme un objet de
+             l'application. */
+          <div className="cadre">
           <table className="table">
             <thead>
               <tr>
@@ -142,6 +146,7 @@ export default async function BatchesPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
         </div>
       </div>

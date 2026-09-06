@@ -34,6 +34,19 @@ interface Props {
   onChange: (next: string) => void;
 }
 
+/**
+ * Les colonnes d'une bande, définies UNE fois.
+ *
+ * L'en-tête et les lignes portaient chacun leur propre copie de la chaîne : il
+ * suffisait d'en modifier une pour que les titres cessent de correspondre aux
+ * champs, sans que rien ne le signale.
+ *
+ * Les largeurs sont serrées volontairement. À `96px 108px 96px 96px 1fr 28px`,
+ * la grille dépassait la colonne de gauche et le panneau se coupait en plein
+ * mot — un écran de réglages tronqué se lit comme un écran cassé.
+ */
+const COLONNES = '84px 100px 84px 100px 64px 24px';
+
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'] as const;
 const CANAUX = [
   ['ebay', 'eBay'],
@@ -196,7 +209,7 @@ export default function RulesEditor({ cfg, error, text, onChange }: Props) {
             className="label"
             style={{
               display: 'grid',
-              gridTemplateColumns: '96px 108px 96px 96px 1fr 28px',
+              gridTemplateColumns: COLONNES,
               gap: 'var(--s2)',
               alignItems: 'center',
             }}
@@ -205,7 +218,7 @@ export default function RulesEditor({ cfg, error, text, onChange }: Props) {
             <span>Mode</span>
             <span>Valeur</span>
             <span>Arrondi</span>
-            <span>Review</span>
+            <span style={{ textAlign: 'center' }}>À valider</span>
             <span />
           </div>
 
@@ -216,7 +229,7 @@ export default function RulesEditor({ cfg, error, text, onChange }: Props) {
                 key={i}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '96px 108px 96px 96px 1fr 28px',
+                  gridTemplateColumns: COLONNES,
                   gap: 'var(--s2)',
                   alignItems: 'center',
                 }}
@@ -275,14 +288,19 @@ export default function RulesEditor({ cfg, error, text, onChange }: Props) {
                   <option value="aucun">aucun</option>
                 </select>
 
+                {/* La case SEULE, sous son en-tête. La phrase « à valider
+                    avant publication » était répétée sur chaque ligne, prenait
+                    la moitié de la largeur du panneau et finissait coupée en
+                    trois morceaux illisibles. Elle est dans l'infobulle et
+                    sous le tableau — une fois, pas cinq. */}
                 <label
                   style={{
                     display: 'flex',
-                    gap: 6,
+                    justifyContent: 'center',
                     alignItems: 'center',
-                    fontSize: 12,
                     cursor: 'pointer',
                   }}
+                  title="Une carte tombant dans cette bande part en review au lieu d'être publiée automatiquement."
                 >
                   <input
                     type="checkbox"
@@ -297,7 +315,6 @@ export default function RulesEditor({ cfg, error, text, onChange }: Props) {
                       })
                     }
                   />
-                  <span className="dim">à valider avant publication</span>
                 </label>
 
                 {derniere ? (
@@ -324,6 +341,11 @@ export default function RulesEditor({ cfg, error, text, onChange }: Props) {
         </div>
 
         <p className="faint" style={{ fontSize: 11, margin: 'var(--s3) 0 0' }}>
+          Une bande cochée <strong>à valider</strong> envoie ses cartes en review au
+          lieu de les publier automatiquement.
+        </p>
+
+        <p className="faint" style={{ fontSize: 11, margin: 'var(--s2) 0 0' }}>
           La bande est choisie sur la valeur <strong>ajustée par la condition</strong>,
           avant l&apos;offset de canal — sinon une même carte changerait de bande
           selon qu&apos;on la publie sur eBay ou sur TCGplayer.

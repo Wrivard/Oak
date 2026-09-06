@@ -84,10 +84,14 @@ export default function BatchActions({ batch }: { batch: Batch }) {
 
   return (
     <div style={{ display: 'grid', gap: 6, justifyItems: 'end' }}>
+      {/* Les trois commandes sur UNE ligne. « Réparer » passait à la ligne
+          dessous et donnait des lignes de tableau de hauteurs différentes selon
+          le lot — un tableau qui ondule se relit à chaque coup d'oeil. */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <input
           className="input mono"
-          style={{ width: 68, height: 26, textAlign: 'right' }}
+          /* 68 px coupaient le mot « attendu » au milieu. */
+          style={{ width: 88, height: 26, textAlign: 'right' }}
           placeholder="attendu"
           value={expected}
           onChange={(e) => setExpectedValue(e.target.value.replace(/\D/g, ''))}
@@ -101,6 +105,15 @@ export default function BatchActions({ batch }: { batch: Batch }) {
           onClick={() => void close(false)}
         >
           Fermer
+        </button>
+        {/* Replié : c'est une réparation, pas une étape du flux normal. On ne
+            l'ouvre que lorsqu'un lot est resté à zéro carte. */}
+        <button
+          className="btn btn--ghost"
+          style={{ height: 26, fontSize: 11 }}
+          onClick={() => setOutils((v) => !v)}
+        >
+          {outils ? 'Masquer' : 'Réparer'}
         </button>
       </div>
 
@@ -120,16 +133,6 @@ export default function BatchActions({ batch }: { batch: Batch }) {
           Fermer quand même — l’écart sera tracé
         </button>
       )}
-
-      {/* Replié : c'est une réparation, pas une étape du flux normal. On ne
-          l'ouvre que lorsqu'un lot est resté à zéro carte. */}
-      <button
-        className="btn btn--ghost"
-        style={{ height: 22, fontSize: 11 }}
-        onClick={() => setOutils((v) => !v)}
-      >
-        {outils ? 'Masquer' : 'Réparer'}
-      </button>
 
       {outils && (
         <div style={{ display: 'grid', gap: 4, justifyItems: 'end' }}>
