@@ -513,12 +513,24 @@ a:hover {
   padding-left: var(--s3);
   border-left: 1px solid var(--border);
   line-height: 1.2;
+  /* Le sous-titre CÈDE la place. C'est le seul élément de l'en-tête qui peut
+     se raccourcir sans perte : le titre nomme l'écran, les actions se
+     cliquent. Sans cette règle, « 313 résolutions automatiques · page 1 / 6 »
+     passait sur deux lignes dans une fenêtre étroite et poussait les filtres
+     hors de leur rangée. */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .page-actions {
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: var(--s2);
+  /* Les actions ne se compriment pas : un bouton à moitié écrasé est pire
+     qu'un sous-titre coupé. */
+  flex-shrink: 0;
 }
 
 /* --- Typographie de contenu ------------------------------------------------
