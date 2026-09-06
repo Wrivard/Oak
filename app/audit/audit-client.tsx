@@ -26,8 +26,8 @@ import type { AuditRow } from './queries.js';
 function Vignette({ src, alt, titre }: { src: string; alt: string; titre: string }) {
   const [cassee, setCassee] = useState(false);
   const dimensions = {
-    width: 68,
-    height: 94,
+    width: 58,
+    height: 80,
     borderRadius: 'var(--r1)',
     background: 'var(--surface-2)',
   } as const;
@@ -113,21 +113,18 @@ export default function AuditClient({ rows }: { rows: AuditRow[] }) {
         hériteront de la même erreur. Corriger ici supprime l’empreinte fautive.
       </div>
 
-      <div style={{ display: 'grid', gap: 'var(--s2)' }}>
+      {/* UNE LISTE, pas soixante cartes espacées. À 132 px de haut, cinq lignes
+          tenaient à l'écran pour trois cent treize à vérifier : on passe son
+          temps à faire défiler au lieu de balayer. Les lignes d'un cadre
+          partagent leur filet et se lisent en colonne. */}
+      <div className="cadre">
         {rows.map((r) => {
           const corrigee = corrigees.has(r.scanId);
           return (
             <article
               key={r.scanId}
-              className="panel"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '68px 68px 1fr auto',
-                gap: 'var(--s3)',
-                alignItems: 'center',
-                padding: 'var(--s2) var(--s3)',
-                opacity: corrigee ? 0.45 : 1,
-              }}
+              className="verif-ligne"
+              style={{ opacity: corrigee ? 0.45 : 1 }}
             >
               {/* Survoler agrandit : à 68 px on distingue un Dracaufeu d'un
                   Pikachu, pas un Set de Base d'un Set de Base 2 — or c'est
@@ -146,8 +143,8 @@ export default function AuditClient({ rows }: { rows: AuditRow[] }) {
               ) : (
                 <span
                   style={{
-                    width: 68,
-                    height: 94,
+                    width: 58,
+                    height: 80,
                     borderRadius: 'var(--r1)',
                     background: 'var(--surface-2)',
                   }}

@@ -1453,6 +1453,25 @@ kbd,
    Ce qui rend un tableau dense LISIBLE n'est pas l'espace, c'est l'alignement —
    les nombres à droite en chiffres tabulaires, le texte à gauche, et une seule
    règle horizontale par ligne. */
+/* --- Une ligne de vérification ---------------------------------------------
+   Le scan, la carte choisie, ce qu'on sait d'elle, et le bouton qui dit que
+   c'est faux. Quatre colonnes, une hauteur, un filet entre les lignes. */
+.verif-ligne {
+  display: grid;
+  grid-template-columns: 58px 58px 1fr auto;
+  gap: var(--s3);
+  align-items: center;
+  padding: var(--s2) var(--s4);
+  border-bottom: 1px solid var(--border);
+  transition: background-color var(--vite);
+}
+.verif-ligne:last-child {
+  border-bottom: none;
+}
+.verif-ligne:hover {
+  background: var(--surface-2);
+}
+
 /* Une ligne qui préfère se couper plutôt que de pousser sa rangée sur deux
    hauteurs. Le texte complet reste dans l'infobulle. */
 .tronque {
