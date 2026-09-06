@@ -10,6 +10,7 @@ import {
 } from './actions.js';
 import HelpOverlay from './help-overlay.js';
 import type { ReviewScan } from './queries.js';
+import { candidatDuNumero } from '../../lib/review/numero.js';
 import { formatCents, netAfterFees, parseAmount } from '../../lib/pricing/net.js';
 import { FEES } from '../../lib/config/fees.js';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
@@ -102,6 +103,18 @@ export default function ReviewClient({
 
   const scan = queue[cursor];
 
+  /**
+   * Le candidat que le numéro lu désigne, ou `null`.
+   *
+   * C'est le seul indice DÉTERMINISTE de l'écran : une distance CLIP dit « ça
+   * se ressemble », un numéro imprimé dit « c'est cette édition-là ». Deux
+   * réimpressions du même artwork ne se séparent que par lui.
+   */
+  const indiceNumero = useMemo(
+    () => (scan ? candidatDuNumero(scan.ocrRead, scan.candidates) : null),
+    [scan],
+  );
+
   useEffect(() => {
     try {
       setSound(localStorage.getItem('review.sound') === '1');
@@ -112,8 +125,13 @@ export default function ReviewClient({
 
   // Réinitialise l'édition à chaque changement de carte : garder un prix saisi
   // d'une carte sur l'autre est le meilleur moyen de mal étiqueter une pile.
+  //
+  // La sélection part du candidat que le NUMÉRO désigne, et non du premier de
+  // la liste. Le premier de la liste est simplement le plus proche au sens
+  // CLIP, ce qui ne départage justement pas deux réimpressions du même
+  // artwork. La ligne est badgée à l'écran : on voit pourquoi elle est choisie.
   useEffect(() => {
-    setChosen(0);
+    setChosen(indiceNumero ?? 0);
     setVariant(null);
     setCondition(null);
     setPriceText('');
@@ -121,7 +139,7 @@ export default function ReviewClient({
     setSearching(false);
     setHits([]);
     setError(null);
-  }, [cursor]);
+  }, [cursor, indiceNumero]);
 
   const tier = useMemo(() => tierOf(scan?.valueCents ?? null, thresholds), [scan, thresholds]);
 
@@ -619,6 +637,21 @@ export default function ReviewClient({
                       bande {scan.ocrBand}
                     </span>
                   )}
+                  {/* Ce que le numéro CONCLUT, pas seulement ce qu'il dit. Sans
+                      cette ligne, l'écran affiche « 2/130 » en haut et « 2/130 »
+                      dans une ligne plus bas, et laisse comparer les caractères
+                      — quatre-vingt-cinq fois de suite. */}
+                  {indiceNumero !== null ? (
+                    <span className="faint" style={{ fontSize: 11 }}>
+                      → candidat {indiceNumero + 1}
+                    </span>
+                  ) : (
+                    scan.candidates.length > 1 && (
+                      <span className="faint" style={{ fontSize: 11 }}>
+                        ne désigne aucun candidat seul
+                      </span>
+                    )
+                  )}
                 </>
               ) : (
                 <span className="mono" style={{ color: 'var(--amber)' }}>
@@ -647,6 +680,7 @@ export default function ReviewClient({
                     onClick={() => setChosen(i)}
                     className="candidat"
                     data-choisi={i === chosen}
+                    data-numero={i === indiceNumero ? 'true' : undefined}
                   >
                     <kbd>{i + 1}</kbd>
                     {c.image ? (
@@ -690,15 +724,35 @@ export default function ReviewClient({
                       <span className="faint" style={{ fontSize: 11 }}>
                         {c.set_name}
                         {c.number && (
-                          <span className="mono">
+                          <span
+                            className="mono"
+                            style={
+                              i === indiceNumero
+                                ? { color: 'var(--green)', fontWeight: 600 }
+                                : undefined
+                            }
+                          >
                             {' · '}
                             {c.number}/{c.printedTotal ?? '—'}
                           </span>
                         )}
                       </span>
                     </span>
-                    <span className="mono faint" style={{ fontSize: 11 }}>
-                      {Number(c.distance).toFixed(3)}
+                    <span
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--s2)',
+                        justifySelf: 'end',
+                      }}
+                    >
+                      {/* Le badge dit POURQUOI cette ligne est choisie. Une
+                          sélection sans justification se fait relire à chaque
+                          carte, et relire coûte plus cher que décider. */}
+                      {i === indiceNumero && <span className="marque">n° lu</span>}
+                      <span className="mono faint" style={{ fontSize: 11 }}>
+                        {Number(c.distance).toFixed(3)}
+                      </span>
                     </span>
                   </button>
                 ))}

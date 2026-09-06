@@ -606,6 +606,29 @@ a:hover {
   background: var(--green);
   border-color: var(--green);
 }
+/* La ligne que le NUMÉRO désigne. Elle se distingue de la ligne simplement
+   sélectionnée : sélectionné veut dire « c'est ce que tu vas accepter »,
+   désigné veut dire « et voici la preuve ». Les deux coïncident presque
+   toujours — mais quand on change de ligne à la main, il faut voir qu'on
+   s'éloigne de la preuve. */
+.candidat[data-numero='true'] .marque {
+  color: var(--green);
+  background: var(--green-bg);
+  border-color: var(--green-border);
+}
+.marque {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  color: var(--text-faint);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
 .candidat-nom {
   display: block;
   font-weight: 500;
