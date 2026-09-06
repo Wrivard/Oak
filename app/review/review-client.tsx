@@ -425,6 +425,45 @@ export default function ReviewClient({
     }, 180);
   }, []);
 
+  /**
+   * Adopter un résultat de recherche comme candidat.
+   *
+   * Le numéro imprimé est repris du résultat. Il ne l'était pas : la carte
+   * choisie à la main apparaissait sans numéro dans la liste, donc sans le
+   * seul élément qui permet de vérifier qu'on a pris la bonne réimpression —
+   * exactement l'information qu'on cherchait en ouvrant la recherche.
+   */
+  const choisirHit = useCallback(
+    (h: SearchHit) => {
+      const id = scan?.id;
+      if (id === undefined) return;
+      setQueue((q) =>
+        q.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                candidates: [
+                  {
+                    card_id: h.card_id,
+                    name: h.name,
+                    set_name: h.set_name,
+                    distance: 0,
+                    number: h.number,
+                    printedTotal: h.printed_total,
+                  },
+                  ...s.candidates,
+                ],
+              }
+            : s,
+        ),
+      );
+      setChosen(0);
+      setSearching(false);
+      setHits([]);
+    },
+    [scan?.id],
+  );
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const el = e.target as HTMLElement | null;
@@ -845,6 +884,15 @@ export default function ReviewClient({
                   placeholder="nom de la carte…"
                   style={{ width: '100%' }}
                   onChange={(e) => runSearch(e.target.value)}
+                  /* ENTRÉE prend le premier résultat. Il fallait la souris pour
+                     choisir dans une liste, sur l'écran dont docs/06 §6 dit que
+                     chaque clic nécessaire est un bug. */
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    const premier = hits[0];
+                    if (premier) choisirHit(premier);
+                  }}
                 />
                 <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
                   {hits.map((h) => (
@@ -852,28 +900,7 @@ export default function ReviewClient({
                       key={h.card_id}
                       className="btn"
                       style={{ justifyContent: 'flex-start', height: 28 }}
-                      onClick={() => {
-                        setQueue((q) =>
-                          q.map((s) =>
-                            s.id === scan?.id
-                              ? {
-                                  ...s,
-                                  candidates: [
-                                    {
-                                      card_id: h.card_id,
-                                      name: h.name,
-                                      set_name: h.set_name,
-                                      distance: 0,
-                                    },
-                                    ...s.candidates,
-                                  ],
-                                }
-                              : s,
-                          ),
-                        );
-                        setChosen(0);
-                        setSearching(false);
-                      }}
+                      onClick={() => choisirHit(h)}
                     >
                       {h.name} <span className="dim">{h.set_name}</span>{' '}
                       <span className="mono faint">
@@ -939,6 +966,18 @@ export default function ReviewClient({
                   placeholder="—"
                   onChange={(e) => setPriceText(e.target.value)}
                   onBlur={() => setEditing(false)}
+                  /* ENTRÉE valide et accepte. Sans ça il fallait `E`, taper,
+                     `Échap` pour sortir du champ, puis `A` : quatre gestes pour
+                     une carte prixée, sur un budget de trois secondes. Entrée
+                     dans un champ de prix veut dire « c'est bon » partout
+                     ailleurs, et `A` accepte déjà d'une seule touche. */
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    setEditing(false);
+                    e.currentTarget.blur();
+                    accept();
+                  }}
                   style={{
                     width: '100%',
                     // Une saisie illisible était ignorée en silence : on croyait
@@ -1086,7 +1125,9 @@ export default function ReviewClient({
           <kbd>A</kbd> accepter
         </span>
         <span>
-          <kbd>E</kbd> prix
+          {/* Le prix se termine par Entrée : le dire ICI et pas seulement dans
+              l'aide, parce que c'est la séquence qu'on répète le plus. */}
+          <kbd>E</kbd> prix <kbd>⏎</kbd> valider
         </span>
         <span>
           <kbd>X</kbd> passer

@@ -14,6 +14,11 @@ const RACCOURCIS: { touches: string[]; action: string; note?: string }[] = [
   { touches: ['1', '…', '5'], action: 'Choisir le candidat n' },
   { touches: ['A'], action: 'Accepter et passer à la suivante', note: 'le chemin nominal' },
   { touches: ['E'], action: 'Éditer le prix final' },
+  {
+    touches: ['Entrée'],
+    action: 'Valider le prix et accepter',
+    note: 'dans le champ prix ; prend le premier résultat dans la recherche',
+  },
   { touches: ['X'], action: 'Passer sans résoudre', note: 'la carte reste en file' },
   { touches: ['S'], action: 'Rechercher dans le catalogue' },
   { touches: ['R'], action: 'Écarter — pas une carte', note: 'intercalaire, page blanche' },
