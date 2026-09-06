@@ -235,10 +235,20 @@ describe('repairBatch', () => {
    * reste à zéro carte pour toujours, sans erreur : c'est un état dont le
    * système ne savait pas sortir.
    */
+  /**
+   * Les jobs DE CE LOT, pas tous les `pair_upload` de la base.
+   *
+   * La version précédente comptait toute la table : n'importe quel envoi réel
+   * ou script d'essai ayant laissé un `pair_upload` faisait échouer les quatre
+   * tests de ce bloc, sans rapport avec ce qu'ils vérifient. Le nettoyage du
+   * fichier est déjà limité à sa session ; le comptage doit l'être aussi.
+   */
   async function jobs(): Promise<{ mode: string; sid: string }[]> {
     const { rows } = await query<{ mode: string; sid: string }>(
       `select payload->>'mode' as mode, payload->>'session_id' as sid
-         from jobs where type = 'pair_upload'`,
+         from jobs
+        where type = 'pair_upload' and payload->>'session_id' = $1`,
+      [sessionId],
     );
     return rows;
   }
