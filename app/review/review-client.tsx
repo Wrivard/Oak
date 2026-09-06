@@ -81,7 +81,7 @@ export default function ReviewClient({
   feesVerified,
 }: Props) {
   const [queue, setQueue] = useState(scans);
-  const [cursor, setCursor] = useState(0);
+  const [cursorBrut, setCursor] = useState(0);
   /**
    * La sélection est calculée DÈS LE PREMIER RENDU, pas dans un effet.
    *
@@ -121,6 +121,24 @@ export default function ReviewClient({
   const priceRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Le curseur, BORNÉ à la file.
+   *
+   * `accept` retire la carte de la file sans toucher au curseur — c'est voulu,
+   * la position suivante est la bonne. Mais sur la DERNIÈRE carte de la file,
+   * la file raccourcit et le curseur se retrouve un cran au-delà. Et rien ne
+   * l'attrapait : l'écran de fin ne se déclenche que sur une file vide, si bien
+   * qu'on obtenait la mise en page complète avec un scan `undefined` — en-tête
+   * « · #undefined », image demandée à `/api/scan/undefined/image`, aucun
+   * candidat — jusqu'à ce qu'on appuie sur une flèche.
+   *
+   * Le cas s'atteint dès qu'on clique la dernière ligne de la file avec des
+   * cartes au-dessus, ce qui est le geste normal pour finir un lot par la fin.
+   *
+   * Borner À LA LECTURE plutôt que corriger l'état dans un effet : un effet
+   * s'exécute après le rendu, donc après l'image cassée.
+   */
+  const cursor = Math.min(cursorBrut, Math.max(queue.length - 1, 0));
   const scan = queue[cursor];
 
   /**
@@ -349,8 +367,12 @@ export default function ReviewClient({
   const candidate = scan?.candidates[chosen];
 
   const move = useCallback(
-    (d: number) => setCursor((c) => Math.min(Math.max(c + d, 0), Math.max(queue.length - 1, 0))),
-    [queue.length],
+    // Le déplacement part du curseur BORNÉ, pas de l'état brut : sans ça, après
+    // une acceptation en fin de file, la première flèche ne fait que ramener le
+    // curseur dans les clous au lieu de bouger d'une carte.
+    (d: number) =>
+      setCursor(Math.min(Math.max(cursor + d, 0), Math.max(queue.length - 1, 0))),
+    [cursor, queue.length],
   );
 
   /**
