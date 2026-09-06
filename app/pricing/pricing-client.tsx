@@ -47,6 +47,17 @@ export default function PricingClient({
   const [text, setText] = useState(initialConfig);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /**
+   * La dernière version ENREGISTRÉE, pour savoir ce qui ne l'est pas.
+   *
+   * L'écran modifie la preview en direct, ce qui donne l'impression que le
+   * changement est pris. Il ne l'est pas tant qu'on n'a pas appuyé sur
+   * Enregistrer, et partir sans le faire perdait le travail sans un mot. Sur
+   * l'écran qui décide de tous les prix publiés, c'est le silence qui coûte
+   * cher.
+   */
+  const [enregistre, setEnregistre] = useState(initialConfig);
+  const modifie = text !== enregistre;
 
   /**
    * Texte débouncé pour la preview.
@@ -61,6 +72,21 @@ export default function PricingClient({
     const t = setTimeout(() => setDebounced(text), 200);
     return () => clearTimeout(t);
   }, [text]);
+
+  /**
+   * Recharger ou fermer l'onglet avec des règles non enregistrées demande
+   * confirmation. Ça ne couvre pas la navigation interne — le routeur de Next
+   * ne l'expose pas — mais ça couvre le geste le plus courant, et surtout le
+   * plus définitif.
+   */
+  useEffect(() => {
+    if (!modifie) return;
+    const avant = (e: BeforeUnloadEvent): void => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', avant);
+    return () => window.removeEventListener('beforeunload', avant);
+  }, [modifie]);
 
   const parsed = useMemo(() => {
     try {
@@ -106,8 +132,13 @@ export default function PricingClient({
   async function save() {
     setBusy(true);
     setSaved(null);
-    const res = await savePricingConfig(text);
+    const envoye = text;
+    const res = await savePricingConfig(envoye);
     setBusy(false);
+    // La référence prend le texte ENVOYÉ, pas le texte courant : on a pu
+    // continuer à taper pendant l'aller-retour, et ces frappes-là ne sont pas
+    // enregistrées.
+    if (res.ok) setEnregistre(envoye);
     setSaved(res.ok ? 'enregistré' : (res.error ?? 'échec'));
   }
 
@@ -141,7 +172,28 @@ export default function PricingClient({
           {synthetic ? 'échelle synthétique' : `${rows.length} SKUs réels`}
         </span>
         <div className="page-actions">
-          {saved && <span className="dim" style={{ fontSize: 12 }}>{saved}</span>}
+          {/* Un point ambre plutôt qu'une phrase : il se voit du coin de l'oeil
+              et ne pousse rien. Le bouton Enregistrer passe en vert juste à
+              côté, ce qui dit quoi faire sans l'écrire. */}
+          {modifie && (
+            <span
+              className="label"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                color: 'var(--amber)',
+              }}
+            >
+              <span className="dot dot--warn" />
+              non enregistré
+            </span>
+          )}
+          {saved && !modifie && (
+            <span className="dim" style={{ fontSize: 12 }}>
+              {saved}
+            </span>
+          )}
           {/* Voir l'effet d'une règle sur de VRAIES cartes sans attendre le
               cron. On enfile un job, on ne price pas ici : invariant 4. */}
           <button
