@@ -92,6 +92,21 @@ export default function Shell({ counts, children }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [manual, setManual] = useState(false);
 
+  /**
+   * L'écran demandé, tant qu'il n'est pas arrivé.
+   *
+   * Une page de cette application est rendue par le SERVEUR : entre le clic et
+   * l'affichage il s'écoule le temps de deux ou trois requêtes. Sans rien, le
+   * menu reste figé sur l'écran précédent pendant ce temps-là — on croit avoir
+   * raté le clic, on reclique, et l'application paraît lente alors qu'elle
+   * travaille.
+   *
+   * L'élément cliqué s'allume donc IMMÉDIATEMENT, avant même que la navigation
+   * commence. `pathname` change à l'arrivée et l'état s'efface tout seul.
+   */
+  const [enRoute, setEnRoute] = useState<string | null>(null);
+  useEffect(() => setEnRoute(null), [pathname]);
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('shell.collapsed');
@@ -131,6 +146,7 @@ export default function Shell({ counts, children }: Props) {
         <nav className="sidebar-nav">
           {NAV.map((item) => {
             const active = pathname === item.href;
+            const attendu = enRoute === item.href && !active;
             const badge =
               item.href === '/review' && counts.review > 0
                 ? String(counts.review)
@@ -142,6 +158,8 @@ export default function Shell({ counts, children }: Props) {
                 href={item.href}
                 className="nav-item"
                 title={item.label}
+                onClick={() => setEnRoute(item.href)}
+                data-attente={attendu ? 'true' : undefined}
                 {...(active ? { 'aria-current': 'page' as const } : {})}
               >
                 {ICONS[item.icon]}

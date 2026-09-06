@@ -252,6 +252,50 @@ a:hover {
 .nav-item[aria-current='page'] svg {
   color: var(--green);
 }
+
+/* --- L'écran demandé, pas encore arrivé ------------------------------------
+   Entre le clic et l'affichage il s'écoule le temps de deux ou trois requêtes
+   serveur. Sans retour immédiat, on croit avoir raté le clic et on reclique :
+   l'application paraît lente alors qu'elle travaille. L'élément s'éclaire donc
+   AVANT que la navigation commence, et une barre parcourt sa base tant qu'on
+   attend. */
+.nav-item[data-attente='true'] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.nav-item[data-attente='true']::after {
+  content: '';
+  position: absolute;
+  left: var(--s3);
+  right: var(--s3);
+  bottom: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--green-dim);
+  transform-origin: left;
+  animation: nav-attente 900ms ease-in-out infinite;
+}
+@keyframes nav-attente {
+  0% {
+    transform: scaleX(0.05);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(0.05);
+    opacity: 0.35;
+  }
+}
+/* Une animation qui ne s'arrête jamais est une gêne pour qui y est sensible. */
+@media (prefers-reduced-motion: reduce) {
+  .nav-item[data-attente='true']::after {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
 .nav-item svg {
   width: 17px;
   height: 17px;
@@ -1222,6 +1266,38 @@ kbd,
 .empty-icone svg {
   width: 20px;
   height: 20px;
+}
+
+/* --- Squelette de chargement -----------------------------------------------
+   Le balayage est LENT et FAIBLE. Un squelette qui scintille attire l'oeil sur
+   l'attente au lieu de la rendre supportable : on finit par regarder le
+   chargement plutôt que d'attendre le contenu. */
+.squelette {
+  display: block;
+  border-radius: var(--r1);
+  background: var(--surface-2);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 6%) 50%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: balayage 1400ms ease-in-out infinite;
+}
+@keyframes balayage {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .squelette {
+    animation: none;
+  }
 }
 
 /* --- Barre de progression -------------------------------------------------- */
