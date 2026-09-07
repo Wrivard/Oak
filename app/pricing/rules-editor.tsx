@@ -100,7 +100,14 @@ function NumField({
             const n = Number(draft);
             // Une saisie qui ne fait pas un nombre ne devient pas zéro : elle
             // est abandonnée. Zéro serait un prix, et un prix faux.
-            if (draft !== null && draft.trim() !== '' && Number.isFinite(n)) onCommit(n);
+            //
+            // ET une valeur INCHANGÉE ne commit pas. Sans ce test, passer dans
+            // un champ au clavier sans rien y toucher réécrivait le JSON entier
+            // — donc marquait la configuration « non enregistrée » et faisait
+            // clignoter l'aperçu des écarts, pour rien.
+            if (draft !== null && draft.trim() !== '' && Number.isFinite(n) && n !== value) {
+              onCommit(n);
+            }
             setDraft(null);
           }}
           style={suffix ? { paddingRight: 26 } : undefined}
