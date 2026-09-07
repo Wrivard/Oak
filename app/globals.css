@@ -1816,6 +1816,18 @@ kbd,
   text-align: left;
   font-variant-numeric: normal;
 }
+/* Une cellule de TEXTE, où qu'elle soit dans la rangée.
+   `td:first-child` a cessé de suffire le jour où une colonne de cases à cocher
+   est passée devant : le nom des cartes s'est retrouvé poussé à droite dans sa
+   cellule, et le tableau est devenu illisible sans qu'aucune règle n'ait changé.
+
+   Le sélecteur porte `.table td` : à `.cell-texte` seul, il pèse (0,1,0) contre
+   (0,1,1) pour `.table td`, et l'alignement à droite l'emportait. Une classe
+   qui ne s'applique pas est plus difficile à voir qu'une classe absente. */
+.table td.cell-texte {
+  text-align: left;
+  font-variant-numeric: normal;
+}
 .table tbody tr {
   transition: background-color var(--vite);
 }
@@ -1918,6 +1930,37 @@ kbd,
   color: var(--text);
   background: var(--border-lit);
   text-decoration: none;
+}
+
+/* --- La barre de sélection -------------------------------------------------
+   Flottante et centrée en bas : elle apparaît sans pousser le tableau — une
+   barre qui s'insère fait sauter cinquante lignes à chaque case cochée — et
+   elle reste sous la main où qu'on ait fait défiler. */
+.selection {
+  position: fixed;
+  left: 50%;
+  bottom: var(--s5);
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3);
+  transform: translateX(-50%);
+  background: var(--surface-2);
+  border: 1px solid var(--border-lit);
+  border-radius: 999px;
+  box-shadow: var(--lift-3);
+  animation: avis-entree 140ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .selection {
+    animation: none;
+  }
+}
+.selection-compte {
+  padding: 0 var(--s2) 0 var(--s3);
+  font-size: 12.5px;
+  white-space: nowrap;
 }
 
 /* --- L'inventaire en grille ------------------------------------------------

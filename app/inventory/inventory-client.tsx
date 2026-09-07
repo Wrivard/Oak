@@ -6,6 +6,7 @@ import { formatCents } from '../../lib/pricing/net.js';
 import type { InventoryPage, InventoryRow } from './queries.js';
 import Fiche from './fiche.js';
 import Astuce from '../shell/astuce.js';
+import { useAvis } from '../shell/toast.js';
 import { SENS_PAR_DEFAUT, type SortDir, type SortKey, type StockFilter, type Vue } from './tri.js';
 
 /**
@@ -38,6 +39,7 @@ export default function InventoryClient({
 }) {
   const router = useRouter();
   const params = useSearchParams();
+  const { avis } = useAvis();
 
   const sort = (params.get('sort') ?? 'value') as SortKey;
   const dir = (params.get('dir') ?? SENS_PAR_DEFAUT[sort]) as SortDir;
@@ -45,6 +47,15 @@ export default function InventoryClient({
   const [search, setSearch] = useState(params.get('q') ?? '');
   /** Le SKU ouvert en fiche, ou `null`. */
   const [fiche, setFiche] = useState<InventoryRow | null>(null);
+  /**
+   * Les SKUs cochés.
+   *
+   * La sélection ne SURVIT PAS au changement de page, et c'est voulu : elle vit
+   * dans l'écran, pas dans l'URL. Une sélection invisible qui traîne sur trois
+   * pages est le meilleur moyen de copier autre chose que ce qu'on regarde.
+   */
+  const [choisis, setChoisis] = useState<Set<string>>(new Set());
+  useEffect(() => setChoisis(new Set()), [data]);
   const [pending, setPending] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -87,6 +98,55 @@ export default function InventoryClient({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  const basculer = (sku: string): void =>
+    setChoisis((s) => {
+      const n = new Set(s);
+      if (n.has(sku)) n.delete(sku);
+      else n.add(sku);
+      return n;
+    });
+
+  const lignesChoisies = data.rows.filter((r) => choisis.has(r.sku));
+  const valeurChoisie = lignesChoisies.reduce((s, r) => s + (r.priceCents ?? 0), 0);
+
+  /**
+   * Copier la sélection, en SKUs seuls ou en tableau.
+   *
+   * Ce sont les deux gestes réels : coller une liste de SKUs dans un champ de
+   * recherche TCGplayer, ou coller un tableau dans un tableur pour compter. Le
+   * séparateur est la tabulation — c'est ce qu'un tableur attend, et un
+   * point-virgule dépend de la langue du logiciel.
+   */
+  async function copier(format: 'sku' | 'tableur'): Promise<void> {
+    const LIGNE = '\n';
+    const COL = '\t';
+    const texte =
+      format === 'sku'
+        ? lignesChoisies.map((r) => r.sku).join(LIGNE)
+        : [
+            ['sku', 'carte', 'set', 'variant', 'condition', 'qte', 'prix'].join(COL),
+            ...lignesChoisies.map((r) =>
+              [
+                r.sku,
+                r.name,
+                r.set_name,
+                r.variant,
+                r.condition,
+                String(r.qty_on_hand),
+                r.priceCents === null ? '' : (r.priceCents / 100).toFixed(2),
+              ].join(COL),
+            ),
+          ].join(LIGNE);
+
+    try {
+      await navigator.clipboard.writeText(texte);
+      avis('ok', `${lignesChoisies.length} ligne${lignesChoisies.length > 1 ? 's' : ''} copiée${lignesChoisies.length > 1 ? 's' : ''}`,
+        format === 'sku' ? 'Les SKUs, un par ligne.' : 'Colonnes séparées par des tabulations.');
+    } catch {
+      avis('warn', 'Copie impossible', 'Le navigateur a refusé l’accès au presse-papiers.');
+    }
+  }
 
   const { totals } = data;
 
@@ -234,6 +294,25 @@ export default function InventoryClient({
           <table className="table" style={{ opacity: pending ? 0.55 : 1, transition: 'opacity 120ms' }}>
             <thead>
               <tr>
+                <th style={{ width: 30 }}>
+                  <input
+                    type="checkbox"
+                    className="check"
+                    aria-label="Tout sélectionner sur cette page"
+                    checked={choisis.size > 0 && choisis.size === data.rows.length}
+                    // `indeterminate` n'existe pas en HTML : c'est une propriété
+                    // du noeud. Sans elle, une sélection partielle affiche une
+                    // case vide et on croit n'avoir rien coché.
+                    ref={(el) => {
+                      if (el) el.indeterminate = choisis.size > 0 && choisis.size < data.rows.length;
+                    }}
+                    onChange={() =>
+                      setChoisis((s) =>
+                        s.size === data.rows.length ? new Set() : new Set(data.rows.map((r) => r.sku)),
+                      )
+                    }
+                  />
+                </th>
                 {COLONNES.map((c) => (
                   /* Recliquer la colonne active INVERSE le sens. Sans ça,
                      « la moins chère » était inaccessible : on ne pouvait
@@ -310,7 +389,18 @@ export default function InventoryClient({
                     setFiche(r);
                   }}
                 >
-                  <td>
+                  {/* La case ARRÊTE le clic : la ligne entière ouvre la fiche,
+                      et cocher n'est pas ouvrir. */}
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="check"
+                      aria-label={`Sélectionner ${r.name}`}
+                      checked={choisis.has(r.sku)}
+                      onChange={() => basculer(r.sku)}
+                    />
+                  </td>
+                  <td className="cell-texte">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
                       {r.image && (
                         /* eslint-disable-next-line @next/next/no-img-element */
@@ -430,6 +520,42 @@ export default function InventoryClient({
               ))}
             </tbody>
           </table>
+          </div>
+        )}
+
+        {/*
+          LA BARRE DE SÉLECTION. En bas et flottante : elle apparaît sans
+          pousser le tableau, et elle reste sous la main quel que soit
+          l'endroit où on a fait défiler.
+
+          Ce qu'elle propose est volontairement SANS ÉCRITURE. Une action de
+          masse sur l'inventaire — changer une condition, un variant — change
+          le SKU, donc déplace des quantités d'une ligne à l'autre : c'est un
+          mouvement de stock, et ça ne se met pas derrière un bouton qui agit
+          sur cinquante lignes cochées à la volée.
+        */}
+        {choisis.size > 0 && (
+          <div className="selection">
+            <span className="selection-compte">
+              <span className="num">{choisis.size}</span> sélectionné
+              {choisis.size > 1 ? 's' : ''}
+              {valeurChoisie > 0 && (
+                <span className="faint"> · {formatCents(valeurChoisie)}</span>
+              )}
+            </span>
+            <button className="btn btn--sm" onClick={() => void copier('sku')}>
+              Copier les SKUs
+            </button>
+            <button className="btn btn--sm" onClick={() => void copier('tableur')}>
+              Copier en tableur
+            </button>
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={() => setChoisis(new Set())}
+              title="Tout décocher"
+            >
+              Effacer
+            </button>
           </div>
         )}
 
