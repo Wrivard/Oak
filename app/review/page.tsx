@@ -1,6 +1,7 @@
 import { THRESHOLDS } from '../../lib/config/thresholds.js';
 import { FEES } from '../../lib/config/fees.js';
 import { loadConfig } from '../pricing/queries.js';
+import type { PricingConfig } from '../../lib/pricing/rules.js';
 import { loadReviewQueue, OPTIONS } from './queries.js';
 import ReviewClient from './review-client.js';
 
@@ -32,6 +33,21 @@ async function seuilCarteChere(): Promise<number> {
   }
 }
 
+/**
+ * La configuration de prix, ou `null` si elle est illisible.
+ *
+ * Elle sert à montrer ce que vaudrait la carte dans chaque condition. La review
+ * doit s'afficher même avec une configuration de prix cassée : on perd
+ * l'échelle, pas l'écran.
+ */
+async function reglesDePrix(): Promise<PricingConfig | null> {
+  try {
+    return await loadConfig();
+  } catch {
+    return null;
+  }
+}
+
 export default async function ReviewPage({
   searchParams,
 }: {
@@ -41,9 +57,10 @@ export default async function ReviewPage({
   const brut = sp['lot'];
   const lot = (Array.isArray(brut) ? brut[0] : brut)?.trim();
 
-  const [scans, hardReviewMin] = await Promise.all([
+  const [scans, hardReviewMin, regles] = await Promise.all([
     loadReviewQueue(200, lot),
     seuilCarteChere(),
+    reglesDePrix(),
   ]);
 
   return (
@@ -59,6 +76,8 @@ export default async function ReviewPage({
       conditions={OPTIONS.conditions}
       feesVerified={FEES.verified}
       lot={lot === undefined || lot === '' ? null : lot}
+      regles={regles}
+      shippingCents={FEES.shippingCents}
     />
   );
 }

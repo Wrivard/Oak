@@ -15,6 +15,7 @@ import Astuce from '../shell/astuce.js';
 import { useAvis } from '../shell/toast.js';
 import { formatCents, netAfterFees, parseAmount } from '../../lib/pricing/net.js';
 import { FEES } from '../../lib/config/fees.js';
+import { suggestPrice, type PricingConfig } from '../../lib/pricing/rules.js';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
 
 /**
@@ -31,6 +32,9 @@ interface Props {
   feesVerified: boolean;
   /** Le lot auquel la file est restreinte, ou `null` pour tous. */
   lot: string | null;
+  /** Les règles de prix, pour montrer ce que vaut la carte dans chaque condition. */
+  regles: PricingConfig | null;
+  shippingCents: number;
 }
 
 type Tier = 'bulk' | 'watch' | 'hard';
@@ -84,6 +88,8 @@ export default function ReviewClient({
   conditions,
   feesVerified,
   lot,
+  regles,
+  shippingCents,
 }: Props) {
   /**
    * Les avis servent ici aux ÉCHECS, jamais aux acceptations.
@@ -1178,6 +1184,49 @@ export default function ReviewClient({
                 </span>
               </div>
             </section>
+
+            {/*
+              CE QUE VAUT LA CARTE DANS CHAQUE CONDITION.
+
+              La condition est une décision qu'on prend carte par carte, à
+              l'oeil, et l'écran ne disait pas ce qu'elle coûte. « LP plutôt que
+              NM » sur une carte à 40 $, c'est six dollars — et sur mille cartes
+              par soirée, une habitude de sur-noter ou de sous-noter est le
+              genre d'erreur qui ne se voit jamais ligne par ligne.
+
+              Calculé avec `suggestPrice`, la MÊME fonction que le worker : une
+              échelle qui réimplémenterait la règle mentirait le jour où les
+              deux divergent. Absente si la carte n'a pas de valeur estimée —
+              on ne devine pas un prix qu'on n'a pas mesuré.
+            */}
+            {regles !== null && scan?.valueCents != null && (
+              <section className="panel" style={{ padding: 'var(--s3)' }}>
+                <div className="panel-head">
+                  <Astuce texte="Ce que la règle de prix donnerait pour cette carte selon la condition retenue. La ligne en surbrillance est la condition sélectionnée.">
+                    <span className="label">Selon la condition</span>
+                  </Astuce>
+                </div>
+                <div className="echelle-tete faint">
+                  <span>condition</span>
+                  <span>prix</span>
+                  <span>net</span>
+                </div>
+                <div className="echelle">
+                  {conditions.map((c) => {
+                    const p = suggestPrice(scan.valueCents as number, c, regles, 'ebay');
+                    return (
+                      <div key={c} className="echelle-ligne" data-actif={c === effCondition ? 'true' : undefined}>
+                        <span className="mono">{c}</span>
+                        <span className="num">{formatCents(p.priceCents)}</span>
+                        <span className="mono faint">
+                          {formatCents(netAfterFees(p.priceCents, shippingCents, 'ebay').netCents)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             <section className="panel" style={{ padding: 'var(--s3)' }}>
               <div className="panel-head">

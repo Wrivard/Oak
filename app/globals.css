@@ -2630,6 +2630,45 @@ kbd,
   background: var(--surface-3);
 }
 
+/* --- L'échelle des conditions ----------------------------------------------
+   Trois colonnes serrées : condition, prix, net. La ligne sélectionnée est
+   éclairée — c'est la seule des cinq qui compte à l'instant où on regarde, et
+   les quatre autres ne sont là que pour dire ce que le choix coûte. */
+.echelle {
+  display: grid;
+  gap: 1px;
+}
+.echelle-ligne,
+.echelle-tete {
+  display: grid;
+  grid-template-columns: 42px 1fr 1fr;
+  gap: var(--s2);
+  align-items: baseline;
+  padding: 2px var(--s2);
+  font-size: 12px;
+  border-radius: var(--r1);
+}
+.echelle-ligne > :nth-child(2),
+.echelle-ligne > :nth-child(3),
+.echelle-tete > :nth-child(2),
+.echelle-tete > :nth-child(3) {
+  text-align: right;
+}
+.echelle-ligne {
+  color: var(--text-faint);
+}
+.echelle-ligne[data-actif='true'] {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.echelle-tete {
+  margin-bottom: 3px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 /* --- Un état, en un mot ----------------------------------------------------
    « EBAY TCG » en gris demandait de connaître le code couleur pour savoir si
    une carte était en vente. Une pastille avec un mot dedans le dit sans qu'on
