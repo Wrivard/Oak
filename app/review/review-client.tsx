@@ -586,25 +586,71 @@ export default function ReviewClient({
   const secPerCard = treated === 0 ? 0 : (Date.now() - startedAt.current) / 1000 / treated;
 
   if (queue.length === 0) {
+    /**
+     * Une file de LOT vidée n'est pas la même nouvelle qu'une file globale
+     * vidée.
+     *
+     * Quand on finit un lot, l'étape suivante est de le FERMER : c'est la
+     * réconciliation, le seul contrôle qui attrape une carte physique sans
+     * ligne d'inventaire. C'est aussi l'étape qu'on oublie, parce que rien ne
+     * la réclame — on ferme la page et on va se coucher. Le moment où on vient
+     * de finir est le seul moment où la demander a du sens.
+     */
+    const lotFini = lot !== null && !refilling.current;
+
     return (
       <>
         <HelpOverlay />
         <header className="page-head">
           <h1 className="page-title">Review</h1>
+          {lot !== null && (
+            <span className="filtre-lot">
+              <span>lot {lot}</span>
+              <a href="/review" title="Revoir toute la file">
+                ×
+              </a>
+            </span>
+          )}
         </header>
         <div className="page-body">
           <div className="empty">
             <div style={{ fontSize: 15, fontWeight: 600 }}>
-              {refilling.current ? 'Chargement…' : 'Rien à reviewer'}
+              {refilling.current
+                ? 'Chargement…'
+                : lotFini
+                  ? `${lot} est trié`
+                  : 'Rien à reviewer'}
             </div>
             <div className="dim">
               {refilling.current
                 ? 'Récupération des scans suivants.'
-                : 'Tout ce qui est entré a été résolu par les niveaux 1 et 2.'}
+                : lotFini
+                  ? 'Plus une seule carte de ce lot en attente.'
+                  : 'Tout ce qui est entré a été résolu par les niveaux 1 et 2.'}
             </div>
+
+            {lotFini && (
+              <>
+                <div className="faint" style={{ fontSize: 12, marginTop: 'var(--s2)', maxWidth: 420 }}>
+                  Il reste à le <strong>fermer</strong> en saisissant le nombre de cartes
+                  réellement passées au scanner. C’est la seule vérification qui attrape une
+                  carte physique sans ligne d’inventaire — et un lot qu’on oublie de fermer
+                  ne la signale jamais.
+                </div>
+                <div style={{ display: 'flex', gap: 'var(--s2)', marginTop: 'var(--s3)' }}>
+                  <a className="btn btn--primary" href="/batches">
+                    Fermer le lot
+                  </a>
+                  <a className="btn" href="/review">
+                    Voir toute la file
+                  </a>
+                </div>
+              </>
+            )}
+
             {/* Sans cette ligne, on recharge la page à la main pendant que le
                 worker travaille juste derrière. La file se remplit seule. */}
-            {!refilling.current && (
+            {!refilling.current && !lotFini && (
               <div className="faint" style={{ fontSize: 12, marginTop: 'var(--s2)' }}>
                 Cette page se remplit d&apos;elle-même : inutile de recharger si le
                 worker traite encore un lot.
