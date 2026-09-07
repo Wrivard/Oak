@@ -39,6 +39,16 @@ export interface InventoryRow {
    * jamais sortir de la requête.
    */
   priceMethod: string | null;
+  /**
+   * Depuis combien de temps la ligne existe, en clair : « 2 j », « 3 sem ».
+   *
+   * Une date absolue demande de faire la soustraction ; ce qu'on veut savoir
+   * d'un SKU non listé, c'est s'il dort depuis hier ou depuis deux mois.
+   * Calculé par Postgres — le serveur et le navigateur n'ont pas forcément le
+   * même fuseau, et une carte « ajoutée dans 2 h » est le genre de détail qui
+   * fait douter du reste.
+   */
+  ajouteIlYA: string;
 }
 
 export interface InventoryPage {
@@ -123,6 +133,7 @@ interface Row {
   last_priced_at: string | null;
   price_reason: string | null;
   price_method: string | null;
+  ajoute_il_y_a: string;
   total: string;
 }
 
@@ -149,6 +160,16 @@ export async function loadInventory(params: InventoryParams = {}): Promise<Inven
             -- prixé » sans raison envoie relire les journaux du worker.
             i.price_breakdown->'details'->>'raison' as price_reason,
             i.price_breakdown->>'method' as price_method,
+            -- Une durée, pas une date. Arrondie au plus grand pallier utile :
+            -- à la minute près on ne décide de rien.
+            case
+              when i.created_at > now() - interval '1 hour' then 'à l’instant'
+              when i.created_at > now() - interval '1 day'
+                then floor(extract(epoch from now() - i.created_at) / 3600)::text || ' h'
+              when i.created_at > now() - interval '30 days'
+                then floor(extract(epoch from now() - i.created_at) / 86400)::text || ' j'
+              else floor(extract(epoch from now() - i.created_at) / 2592000)::text || ' mois'
+            end as ajoute_il_y_a,
             count(*) over ()::text as total
        from inventory i
        join cards c on c.id = i.card_id
@@ -179,6 +200,7 @@ export async function loadInventory(params: InventoryParams = {}): Promise<Inven
       tcgDirty: r.tcg_dirty,
       lastPricedAt: r.last_priced_at,
       priceMethod: r.price_method,
+      ajouteIlYA: r.ajoute_il_y_a,
       // La méthode seule ne dit rien d'actionnable ; c'est la raison qui dit
       // quoi corriger. On retombe dessus quand il n'y a pas de raison détaillée.
       priceReason:

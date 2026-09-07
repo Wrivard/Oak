@@ -2539,6 +2539,37 @@ kbd,
   background: var(--surface-3);
 }
 
+/* --- Un état, en un mot ----------------------------------------------------
+   « EBAY TCG » en gris demandait de connaître le code couleur pour savoir si
+   une carte était en vente. Une pastille avec un mot dedans le dit sans qu'on
+   l'apprenne. */
+.etat {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.etat--ok {
+  color: var(--green);
+  background: var(--green-bg);
+  border-color: var(--green-border);
+}
+.etat--attente {
+  color: var(--amber);
+  background: var(--amber-bg);
+  border-color: var(--amber-border);
+}
+.etat--muet {
+  color: var(--text-faint);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
 /* --- Un groupe de filtres exclusifs ----------------------------------------
    Cinq boutons côte à côte se lisent comme cinq ACTIONS. Un segmenté se lit
    comme un seul réglage à plusieurs positions — ce qu'il est. La différence

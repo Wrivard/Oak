@@ -199,7 +199,8 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
                   </th>
                 ))}
                 <th>Prix</th>
-                <th>Canaux</th>
+                <th>État</th>
+                <th>Ajouté</th>
               </tr>
             </thead>
             <tbody>
@@ -306,35 +307,36 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
                       formatCents(r.priceCents)
                     )}
                   </td>
+                  {/* UN ÉTAT, pas deux étiquettes de trois lettres. « EBAY
+                      TCG » en gris demandait de connaître le code couleur pour
+                      savoir si la carte était en vente. Un mot le dit. */}
                   <td>
                     <span style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <Astuce
-                        cote="fin"
-                        texte={r.listedEbay ? 'Listée sur eBay.' : 'Pas encore sur eBay.'}
-                      >
-                        <span
-                          className="label"
-                          style={{ color: r.listedEbay ? 'var(--green)' : 'var(--text-faint)' }}
+                      {r.qty_on_hand === 0 ? (
+                        <span className="etat etat--muet">épuisée</span>
+                      ) : r.priceCents === null ? (
+                        <Astuce cote="fin" texte={r.priceReason ?? 'Aucun prix calculé pour ce SKU.'}>
+                          <span className="etat etat--attente">sans prix</span>
+                        </Astuce>
+                      ) : r.listedEbay ? (
+                        <span className="etat etat--ok">listée</span>
+                      ) : (
+                        <Astuce cote="fin" texte="Prixée mais pas encore mise en vente sur eBay.">
+                          <span className="etat etat--muet">à lister</span>
+                        </Astuce>
+                      )}
+                      {r.tcgDirty && (
+                        <Astuce
+                          cote="fin"
+                          texte="Modifiée depuis le dernier export : elle partira dans le prochain fichier TCGplayer."
                         >
-                          eBay
-                        </span>
-                      </Astuce>
-                      <Astuce
-                        cote="fin"
-                        texte={
-                          r.tcgDirty
-                            ? 'Modifiée depuis le dernier export : elle partira dans le prochain fichier TCGplayer.'
-                            : 'À jour dans le dernier export TCGplayer.'
-                        }
-                      >
-                        <span
-                          className="label"
-                          style={{ color: r.tcgDirty ? 'var(--amber)' : 'var(--text-faint)' }}
-                        >
-                          TCG
-                        </span>
-                      </Astuce>
+                          <span className="etat etat--attente">TCG</span>
+                        </Astuce>
+                      )}
                     </span>
+                  </td>
+                  <td className="mono faint" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+                    {r.ajouteIlYA}
                   </td>
                 </tr>
               ))}
