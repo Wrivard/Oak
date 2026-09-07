@@ -31,7 +31,17 @@ function Progress({ b }: { b: Batch }) {
       {/* Sur une seule ligne : ce détail passait sur deux dans une fenêtre
           étroite et déséquilibrait la hauteur des lignes du tableau. */}
       <div className="mono faint" style={{ fontSize: 11, marginTop: 3, whiteSpace: 'nowrap' }}>
-        {b.resolved} résolues · {b.review} en review
+        {b.resolved} résolues ·{' '}
+        {/* Le chemin le plus court entre « ce lot a 18 cartes en review » et
+            « je les traite » : sans ce lien il fallait ouvrir la review, la
+            trouver dans une file mélangée, et se rappeler où on en était. */}
+        {b.review > 0 ? (
+          <Link href={`/review?lot=${encodeURIComponent(b.name)}`} title={`Reviewer ${b.name}`}>
+            {b.review} en review
+          </Link>
+        ) : (
+          <>{b.review} en review</>
+        )}
         {b.rejected > 0 && ` · ${b.rejected} écartées`}
         {b.pending > 0 && ` · ${b.pending} en cours`}
       </div>

@@ -38,6 +38,8 @@ interface Props {
   derniers: LotRecent[];
   /** Rendu côté serveur : un `Link` ne traverse pas la frontière client. */
   lienLots: ReactNode;
+  /** Idem, mais par lot : « review » mène directement à la file de CE lot. */
+  lienReview: (nom: string) => ReactNode;
 }
 
 interface Rejected {
@@ -57,6 +59,7 @@ export default function UploadClient({
   defaultSession,
   derniers,
   lienLots,
+  lienReview,
 }: Props) {
   const [session, setSession] = useState(defaultSession);
   const [variant, setVariant] = useState<CardVariant>('normal');
@@ -529,7 +532,18 @@ export default function UploadClient({
                       <i style={{ width: part(b.pending), background: 'var(--border-strong)' }} />
                     </span>
                     <span className="recent-compte mono">
-                      {total === 0 ? '—' : `${total} carte${total > 1 ? 's' : ''}`}
+                      {/* Le nombre de cartes en review devient le lien vers
+                          elles : c'est la seule chose qu'on veut faire d'un lot
+                          qu'on vient d'envoyer. */}
+                      {b.review > 0 ? (
+                        <>
+                          {b.review} en {lienReview(b.name)}
+                        </>
+                      ) : total === 0 ? (
+                        '—'
+                      ) : (
+                        `${total} carte${total > 1 ? 's' : ''}`
+                      )}
                     </span>
                     <span className={`recent-etat${b.status === 'open' ? '' : ' recent-etat--clos'}`}>
                       {b.status === 'open' ? 'ouvert' : 'fermé'}

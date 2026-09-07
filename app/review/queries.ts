@@ -78,7 +78,22 @@ interface Row {
   default_language: string;
 }
 
-export async function loadReviewQueue(limit = 200): Promise<ReviewScan[]> {
+/**
+ * La file de review, éventuellement RESTREINTE À UN LOT.
+ *
+ * On scanne lot par lot et on ferme un lot par lot : le comptage attendu, la
+ * réconciliation, l'écart — tout ce qui protège d'une carte perdue se mesure
+ * sur un lot. Mais la file les mélangeait tous, et rien ne permettait de
+ * terminer celui du soir avant d'entamer le suivant. L'ordre par date les
+ * gardait contigus ; il ne les séparait pas.
+ *
+ * Le nom du lot n'est pas interpolé : il vient de l'URL.
+ */
+export async function loadReviewQueue(
+  limit = 200,
+  lot?: string | undefined,
+): Promise<ReviewScan[]> {
+  const filtre = lot === undefined || lot === '' ? null : lot;
   const { rows } = await query<Row>(
     `select s.id, s.seq, ss.name as session_name, s.variant_conflict,
             s.ocr_read, s.ocr_band,
@@ -86,9 +101,10 @@ export async function loadReviewQueue(limit = 200): Promise<ReviewScan[]> {
             ss.default_language
        from scans s join sessions ss on ss.id = s.session_id
       where s.status = 'needs_review'
+        and ($2::text is null or ss.name = $2)
       order by s.created_at, s.seq
       limit $1`,
-    [limit],
+    [limit, filtre],
   );
 
   if (rows.length === 0) return [];

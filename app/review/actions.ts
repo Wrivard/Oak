@@ -158,9 +158,15 @@ export async function rejectScan(scanId: string, reason = 'pas une carte'): Prom
  * `exclude` évite de recharger celles déjà à l'écran, y compris celles dont la
  * confirmation est encore en vol.
  */
-export async function loadMore(exclude: readonly string[], limit = 200) {
+export async function loadMore(
+  exclude: readonly string[],
+  limit = 200,
+  lot?: string | undefined,
+) {
   const { loadReviewQueue } = await import('./queries.js');
-  const next = await loadReviewQueue(limit + exclude.length);
+  // Le rechargement doit porter le MÊME filtre que le premier rendu : sans lui,
+  // une file restreinte à un lot se remplissait toute seule avec les autres.
+  const next = await loadReviewQueue(limit + exclude.length, lot);
   const seen = new Set(exclude);
   return next.filter((s) => !seen.has(s.id)).slice(0, limit);
 }

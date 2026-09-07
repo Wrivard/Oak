@@ -32,9 +32,17 @@ async function seuilCarteChere(): Promise<number> {
   }
 }
 
-export default async function ReviewPage() {
+export default async function ReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const brut = sp['lot'];
+  const lot = (Array.isArray(brut) ? brut[0] : brut)?.trim();
+
   const [scans, hardReviewMin] = await Promise.all([
-    loadReviewQueue(),
+    loadReviewQueue(200, lot),
     seuilCarteChere(),
   ]);
 
@@ -50,6 +58,7 @@ export default async function ReviewPage() {
       variants={OPTIONS.variants}
       conditions={OPTIONS.conditions}
       feesVerified={FEES.verified}
+      lot={lot === undefined || lot === '' ? null : lot}
     />
   );
 }

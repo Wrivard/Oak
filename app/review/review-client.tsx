@@ -29,6 +29,8 @@ interface Props {
   variants: readonly CardVariant[];
   conditions: readonly CardCondition[];
   feesVerified: boolean;
+  /** Le lot auquel la file est restreinte, ou `null` pour tous. */
+  lot: string | null;
 }
 
 type Tier = 'bulk' | 'watch' | 'hard';
@@ -81,6 +83,7 @@ export default function ReviewClient({
   variants,
   conditions,
   feesVerified,
+  lot,
 }: Props) {
   /**
    * Les avis servent ici aux ÉCHECS, jamais aux acceptations.
@@ -317,7 +320,7 @@ export default function ReviewClient({
 
       refilling.current = true;
       try {
-        const more = await loadMore(courante.map((s) => s.id));
+        const more = await loadMore(courante.map((s) => s.id), 200, lot ?? undefined);
         if (vivant && more.length > 0) setQueue((q) => [...q, ...more]);
       } catch (err) {
         if (vivant) setError(`chargement de la suite : ${String(err)}`);
@@ -336,7 +339,10 @@ export default function ReviewClient({
       clearInterval(t);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, []);
+    // `lot` fixe le périmètre du rechargement. Il ne change pas sans que la
+    // page soit re-rendue, mais l'oublier ici ferait recharger toute la file
+    // dans une vue restreinte le jour où il changerait.
+  }, [lot]);
 
   /**
    * Écarte la carte courante. Optimiste comme l'accept : l'écriture part
@@ -629,6 +635,17 @@ export default function ReviewClient({
         <span className="page-sub">
           {scan?.session_name} · #{scan?.seq}
         </span>
+        {/* Une file restreinte doit LE DIRE. Sans ça, « 12 en attente » sur un
+            arriéré de cent se lit comme un pipeline qui a rattrapé son retard,
+            et on va se coucher. */}
+        {lot !== null && (
+          <span className="filtre-lot">
+            <span>lot {lot}</span>
+            <a href="/review" title="Revoir toute la file">
+              ×
+            </a>
+          </span>
+        )}
         <div className="page-actions">
           {treated > 0 && (
             <span className="mono faint" style={{ fontSize: 12 }}>
@@ -798,7 +815,9 @@ export default function ReviewClient({
                 fontSize: 12,
               }}
             >
-              <span className="label">Numéro lu</span>
+              <span className="label" style={{ whiteSpace: 'nowrap' }}>
+                Numéro lu
+              </span>
               {scan?.ocrRead ? (
                 <>
                   <span className="mono" style={{ color: 'var(--green)' }}>

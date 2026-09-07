@@ -34,6 +34,11 @@ export default async function UploadPage() {
         rejected: b.rejected,
       }))}
       lienLots={<Link href="/batches" className="btn btn--ghost btn--sm">Tous les lots</Link>}
+      lienReview={(nom) => (
+        <Link href={`/review?lot=${encodeURIComponent(nom)}`} title={`Reviewer ${nom}`}>
+          review
+        </Link>
+      )}
     />
   );
 }
