@@ -19,6 +19,7 @@ interface Counts {
   health: 'ok' | 'warn' | 'alarm';
   workerMuet: boolean;
   enAttente: number;
+  lots: { nom: string; review: number }[];
 }
 
 interface Props {
@@ -166,7 +167,7 @@ export default function Shell({ counts, children }: Props) {
        action lancée depuis la coquille — il n'y en a pas encore, mais il y en
        aura — doit pouvoir en poser un. */
     <AvisProvider>
-    <Palette />
+    <Palette lots={counts.lots} />
     <div className="shell" data-collapsed={shown}>
       <aside className="sidebar">
         <div className="sidebar-brand">

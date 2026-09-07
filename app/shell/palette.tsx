@@ -57,7 +57,7 @@ const RACCOURCIS: Omit<Entree, 'section'>[] = [
   },
 ];
 
-export default function Palette() {
+export default function Palette({ lots }: { lots: { nom: string; review: number }[] }) {
   const router = useRouter();
   const [ouverte, setOuverte] = useState(false);
   const [q, setQ] = useState('');
@@ -68,6 +68,16 @@ export default function Palette() {
   const entrees = useMemo<Entree[]>(() => {
     const base: Entree[] = [
       ...NAV.map((e) => ({ ...e, section: 'Aller à' })),
+      // Les lots qui ont encore des cartes à trier, AVANT les vues génériques :
+      // « Ctrl+K, bulk » doit mener aux dix-neuf cartes de `bulk-vintage`, pas
+      // obliger à passer par l'écran des lots pour recopier un nom.
+      ...lots.map((l) => ({
+        titre: `Reviewer ${l.nom}`,
+        mots: `lot session ${l.nom}`,
+        section: 'Lots à trier',
+        indice: `${l.review} carte${l.review > 1 ? 's' : ''}`,
+        aller: `/review?lot=${encodeURIComponent(l.nom)}`,
+      })),
       ...RACCOURCIS.map((e) => ({ ...e, section: 'Vues' })),
     ];
     const trouvees = filtrer(base, q);
@@ -86,7 +96,7 @@ export default function Palette() {
       });
     }
     return trouvees;
-  }, [q]);
+  }, [q, lots]);
 
   const fermer = useCallback(() => {
     setOuverte(false);
