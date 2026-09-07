@@ -67,6 +67,8 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
     function onKey(e: KeyboardEvent) {
       const el = e.target as HTMLElement | null;
       if (el?.tagName === 'INPUT') return;
+      // Même raison que dans la review : `Ctrl+/` appartient au navigateur.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === '/') {
         e.preventDefault();
         searchRef.current?.focus();

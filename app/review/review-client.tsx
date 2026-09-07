@@ -520,6 +520,16 @@ export default function ReviewClient({
       // « alakazam » déclenche accept (docs/06 §6).
       if (typing) return;
 
+      /**
+       * Un raccourci du SYSTÈME n'est pas un raccourci d'ici.
+       *
+       * Sans ce filtre, `Ctrl+A` — « tout sélectionner », le réflexe de tout le
+       * monde — déclenchait ACCEPT et enregistrait la carte affichée. `Ctrl+K`
+       * la faisait remonter d'un cran au lieu d'ouvrir la palette. On ne
+       * regarde pas `shiftKey` : `Maj+A` reste un `a` volontaire.
+       */
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
       if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); move(1); return; }
       if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); move(-1); return; }
       if (/^[1-5]$/.test(e.key)) {
@@ -1174,7 +1184,7 @@ export default function ReviewClient({
         <span>
           {/* Le prix se termine par Entrée : le dire ICI et pas seulement dans
               l'aide, parce que c'est la séquence qu'on répète le plus. */}
-          <kbd>E</kbd> prix <kbd>⏎</kbd> valider
+          <kbd>E</kbd> prix <kbd>Entrée</kbd> valider
         </span>
         <span>
           <kbd>X</kbd> passer

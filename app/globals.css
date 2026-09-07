@@ -449,6 +449,21 @@ a:hover {
   flex-shrink: 0;
 }
 
+/* Le rappel de la palette, au-dessus du bouton de réduction. Il porte
+   `collapse-label`, donc il disparaît avec les autres libellés dans le rail. */
+.palette-rappel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px var(--s3) var(--s2);
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.palette-rappel > span {
+  margin-left: 2px;
+}
+
 .collapse-btn {
   display: flex;
   align-items: center;
@@ -1777,6 +1792,154 @@ kbd,
 }
 .table tbody tr:last-child td {
   border-bottom: none;
+}
+
+/* --- La palette de commandes -----------------------------------------------
+   Placée HAUT, pas centrée. Le regard part du haut de l'écran, et une boîte
+   centrée verticalement oblige à redescendre pour lire la première ligne. 18 %
+   de la hauteur laisse aussi voir l'écran de départ derrière — on sait d'où on
+   vient. */
+.palette-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: center;
+  /* `flex-start` est indispensable : à `stretch` — le défaut — la boîte
+     s'étire sur toute la hauteur autorisée et le pied se retrouve au milieu
+     d'un rectangle vide, quel que soit le nombre de résultats. */
+  align-items: flex-start;
+  padding-top: 18vh;
+  background: rgb(0 0 0 / 55%);
+  /* Le flou dit « ceci est au-dessus » mieux qu'un voile seul, et il coûte peu
+     sur une surface unie. */
+  backdrop-filter: blur(2px);
+  animation: palette-fond 120ms ease-out;
+}
+@keyframes palette-fond {
+  from {
+    opacity: 0;
+  }
+}
+.palette {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 2 * var(--s4)));
+  max-height: min(60vh, 520px);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-lit);
+  border-radius: var(--r4);
+  box-shadow: var(--lift-3);
+  animation: palette-entree 140ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes palette-entree {
+  from {
+    opacity: 0;
+    /* Elle DESCEND de huit pixels et grandit d'un pour cent. Le mouvement dit
+       qu'elle arrive par-dessus ; plus ample, on regarde l'animation. */
+    transform: translateY(-8px) scale(0.99);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .palette-fond,
+  .palette {
+    animation: none;
+  }
+}
+.palette-champ {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 0 var(--s4);
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.palette-champ svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+.palette-champ input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text);
+  background: none;
+  border: none;
+  outline: none;
+}
+.palette-champ input::placeholder {
+  color: var(--text-faint);
+}
+.palette-liste {
+  /* Elle prend ce qui reste et défile ; le champ et le pied ne bougent pas. */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--s2);
+}
+.palette-section {
+  padding: var(--s2) var(--s2) 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  height: 34px;
+  padding: 0 var(--s2);
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--r2);
+  cursor: pointer;
+}
+/* Pas de `:hover` : le curseur est piloté par les flèches ET par la souris
+   (`onMouseMove`), et deux surbrillances simultanées font croire à deux
+   sélections. Une seule ligne est active, quel qu'ait été le dernier geste. */
+.palette-item[data-actif='true'] {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.palette-titre {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.palette-indice {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.palette-vide {
+  padding: var(--s4) var(--s2);
+  font-size: 13px;
+  color: var(--text-faint);
+}
+.palette-pied {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s2) var(--s4);
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 /* --- Les avis d'action -----------------------------------------------------

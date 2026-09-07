@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
+import Palette from './palette.js';
 import { AvisProvider } from './toast.js';
 
 /**
@@ -165,6 +166,7 @@ export default function Shell({ counts, children }: Props) {
        action lancée depuis la coquille — il n'y en a pas encore, mais il y en
        aura — doit pouvoir en poser un. */
     <AvisProvider>
+    <Palette />
     <div className="shell" data-collapsed={shown}>
       <aside className="sidebar">
         <div className="sidebar-brand">
@@ -214,6 +216,15 @@ export default function Shell({ counts, children }: Props) {
         </nav>
 
         <div className="sidebar-foot">
+          {/* Le rappel de la palette. Un raccourci qu'on ne voit nulle part
+              n'existe pas : celui-ci remplace trois allers-retours à la souris
+              par minute, encore faut-il apprendre qu'il est là. Il disparaît
+              avec les libellés quand le menu se réduit. */}
+          <span className="palette-rappel collapse-label">
+            <kbd>Ctrl</kbd>
+            <kbd>K</kbd>
+            <span>tout ouvrir</span>
+          </span>
           <button className="collapse-btn" onClick={toggle} title="Réduire le menu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="17" height="17">
               <path
