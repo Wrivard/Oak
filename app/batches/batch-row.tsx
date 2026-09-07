@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { closeBatch, repairBatch, setExpected } from './actions.js';
 import type { Batch } from './queries.js';
 import Astuce from '../shell/astuce.js';
+import Dialogue from '../shell/dialogue.js';
 import { useAvis } from '../shell/toast.js';
 
 /**
@@ -22,6 +23,8 @@ export default function BatchActions({ batch }: { batch: Batch }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmGap, setConfirmGap] = useState(false);
+  /** L'écart mesuré par le serveur, gardé pour le formuler dans la confirmation. */
+  const [ecart, setEcart] = useState(0);
   const [outils, setOutils] = useState(false);
 
   if (batch.status !== 'open') {
@@ -107,7 +110,10 @@ export default function BatchActions({ batch }: { batch: Batch }) {
     avis('alarm', `${batch.name} : fermeture refusée`, res.error ?? 'échec');
     // Un écart n'est pas un refus définitif : il ouvre une confirmation
     // explicite, tracée en base si elle est donnée.
-    if (res.ecart !== undefined && res.ecart !== 0) setConfirmGap(true);
+    if (res.ecart !== undefined && res.ecart !== 0) {
+      setEcart(res.ecart);
+      setConfirmGap(true);
+    }
   }
 
   return (
@@ -156,16 +162,38 @@ export default function BatchActions({ batch }: { batch: Batch }) {
         </span>
       )}
 
-      {confirmGap && (
-        <button
-          className="btn"
-          style={{ height: 24, borderColor: 'var(--red)', color: 'var(--red)' }}
-          disabled={busy}
-          onClick={() => void close(true)}
-        >
-          Fermer quand même — l’écart sera tracé
-        </button>
-      )}
+      {/* La décision sort de la cellule. Deux boutons de même taille dans deux
+          cents pixels, pour un choix qui fige un écart d'inventaire en base,
+          se cliquent sans être lus. */}
+      <Dialogue
+        ouvert={confirmGap}
+        titre={`Fermer ${batch.name} avec un écart ?`}
+        confirmer="Fermer quand même"
+        annuler="Ne pas fermer"
+        danger
+        onAnnuler={() => setConfirmGap(false)}
+        onConfirmer={() => void close(true)}
+      >
+        <p style={{ margin: '0 0 var(--s3)' }}>
+          {ecart > 0 ? (
+            <>
+              Le scanner a produit <strong>{ecart} carte{ecart > 1 ? 's' : ''} de plus</strong>{' '}
+              que ce que tu as compté. Une feuille est passée deux fois, ou le comptage
+              attendu est faux.
+            </>
+          ) : (
+            <>
+              Il <strong>manque {-ecart} carte{-ecart > 1 ? 's' : ''}</strong> par rapport à
+              ton comptage. Deux feuilles collées font une carte physique sans ligne
+              d’inventaire : elle ne se vend pas et ne se retrouve jamais.
+            </>
+          )}
+        </p>
+        <p style={{ margin: 0 }}>
+          Fermer maintenant écrit l’écart en base et le rend explicable plus tard. Un lot
+          fermé ne se rouvre pas.
+        </p>
+      </Dialogue>
 
       {outils && (
         <div style={{ display: 'grid', gap: 4, justifyItems: 'end' }}>
