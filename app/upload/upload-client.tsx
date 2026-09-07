@@ -489,6 +489,34 @@ export default function UploadClient({
           )}
 
           {/*
+            L'AUTRE CHEMIN D'ENTRÉE, écrit là où on se pose la question.
+
+            Le worker surveille `inbox/` en permanence : un scanner qui écrit
+            directement dedans n'a jamais besoin de cette page. Mais ça ne
+            marche qu'avec le nommage de PaperStream et un lot déjà ouvert, et
+            ces deux conditions n'étaient écrites que dans docs/02. Sans elles,
+            les fichiers finissent dans `rejected/` — jamais supprimés, mais
+            silencieux.
+          */}
+          <details className="depliant">
+            <summary>Faire entrer les photos sans passer par cette page</summary>
+            <p>
+              Le worker surveille le dossier <span className="mono">inbox/</span>. Un
+              fichier nommé <span className="mono">{'{lot}_000001_front.jpg'}</span> —
+              le nommage de PaperStream — y est pris automatiquement, sans rien
+              glisser ici.
+            </p>
+            <p>
+              Deux conditions, sinon le fichier part dans{' '}
+              <span className="mono">rejected/</span> sans être supprimé : le lot doit
+              <strong> exister et être ouvert</strong> (il ne s’en crée jamais à la
+              volée — c’est le variant par défaut du lot qui protège de l’erreur la
+              plus chère du système), et le nom du lot ne doit pas contenir de{' '}
+              <span className="mono">_</span>, qui est le séparateur.
+            </p>
+          </details>
+
+          {/*
             Après un envoi, les barres des derniers lots se remplissent pendant
             que le worker travaille. Sans rafraîchissement, elles restent figées
             sur l'état d'il y a une minute et il faut recharger pour savoir si

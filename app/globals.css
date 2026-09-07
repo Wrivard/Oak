@@ -1809,6 +1809,50 @@ kbd,
   border-bottom: none;
 }
 
+/* --- Un dépliant -----------------------------------------------------------
+   Ce qui n'est utile qu'une fois, mais qui doit être trouvable au moment où on
+   se pose la question — pas seulement dans un fichier de documentation qu'on
+   ouvre quand on sait déjà quoi chercher. */
+.depliant {
+  margin-top: var(--s4);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.depliant > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 3px 0;
+  color: var(--text-faint);
+  cursor: pointer;
+  list-style: none;
+  transition: color var(--vite);
+}
+.depliant > summary::-webkit-details-marker {
+  display: none;
+}
+/* Un chevron dessiné, qui tourne. Le triangle du navigateur est gris clair et
+   d'une taille qu'on ne contrôle pas. */
+.depliant > summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  transform: rotate(-45deg);
+  transition: transform var(--vite);
+}
+.depliant[open] > summary::before {
+  transform: rotate(45deg);
+}
+.depliant > summary:hover {
+  color: var(--text-dim);
+}
+.depliant > p {
+  margin: var(--s2) 0 0 var(--s4);
+  line-height: 1.55;
+}
+
 /* --- Ce que l'édition change, dans l'aperçu des prix ------------------------
    L'aperçu montrait les NOUVEAUX prix, jamais les anciens : on passait un
    multiplicateur de 1,15 à 1,2, les nombres bougeaient, et rien ne disait de
