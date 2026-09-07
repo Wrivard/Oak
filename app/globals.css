@@ -733,9 +733,13 @@ a:hover {
 .compare-tete {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: var(--s2);
   min-height: 14px;
+}
+/* Le dernier élément de la légende va à droite, quel que soit leur nombre :
+   « Scan » et « pleine résolution » aux deux bords, la valeur entre les deux. */
+.compare-tete > :last-child {
+  margin-left: auto;
 }
 .compare-img {
   display: block;

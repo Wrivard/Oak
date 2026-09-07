@@ -778,6 +778,30 @@ export default function ReviewClient({
             <figure className="compare-vue">
               <figcaption className="compare-tete">
                 <span className="label">Scan</span>
+                {/*
+                  LE CHIFFRE, pas seulement la couleur du cadre.
+                  §7 dit qu'une carte chère se signale par une bordure colorée
+                  et un bip. Les deux disent « fais attention » ; aucun ne dit
+                  COMBIEN, et « fais attention » sur une carte à 3 $ et sur une
+                  carte à 300 $ n'appelle pas le même soin.
+
+                  Il n'existe que si le SKU pressenti est DÉJÀ en stock — c'est
+                  ce qu'estime `valueCents`. Sur une carte jamais vue, on
+                  n'affiche rien : le système ne devine pas un prix qu'il n'a pas
+                  mesuré, ici comme ailleurs.
+                */}
+                {scan?.valueCents != null && (
+                  <Astuce
+                    texte="Valeur estimée du SKU pressenti, telle qu'elle est déjà en stock. Absente si cette carte n'a jamais été résolue."
+                  >
+                    <span
+                      className="num"
+                      style={{ fontSize: 12, color: TIER_COLOR[tier] === 'var(--border)' ? 'var(--text-dim)' : TIER_COLOR[tier] }}
+                    >
+                      {formatCents(scan.valueCents)}
+                    </span>
+                  </Astuce>
+                )}
                 {!imageManquante && (
                   <a
                     href={`/api/scan/${scan?.id}/image?full=1`}
