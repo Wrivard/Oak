@@ -6,9 +6,11 @@ import {
   SENS,
   SENS_PAR_DEFAUT,
   TRIS,
+  VUES,
   type SortDir,
   type SortKey,
   type StockFilter,
+  type Vue,
 } from './tri.js';
 
 /**
@@ -54,7 +56,7 @@ export default async function InventoryPage({
 
   return (
     <Suspense>
-      <InventoryClient data={data} />
+      <InventoryClient data={data} vue={dans<Vue>(VUES, one('vue'), 'tableau')} />
     </Suspense>
   );
 }

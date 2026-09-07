@@ -1920,6 +1920,97 @@ kbd,
   text-decoration: none;
 }
 
+/* --- L'inventaire en grille ------------------------------------------------
+   Les mêmes lignes que le tableau, la même pagination, le même tri : seule la
+   mise en page change. Une vue qui filtrerait autrement serait une seconde
+   application à tenir à jour.
+
+   Des tuiles ÉTROITES — 132 px — parce que la question à laquelle cette vue
+   répond est « est-ce que j'ai celle-là », et qu'elle se répond sur
+   l'illustration. Plus large, on en voit deux fois moins pour rien. */
+.inv-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: var(--s3);
+  align-content: start;
+}
+.tuile {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  padding: var(--s2);
+  font: inherit;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  cursor: pointer;
+  transition: border-color var(--vite), background-color var(--vite);
+}
+.tuile:hover,
+.tuile[data-ouverte='true'] {
+  background: var(--surface-2);
+  border-color: var(--border-lit);
+}
+.tuile-image {
+  position: relative;
+  display: block;
+  aspect-ratio: 5 / 7;
+  margin-bottom: 3px;
+  overflow: hidden;
+  background: var(--bg);
+  border-radius: var(--r1);
+}
+.tuile-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.tuile-vide {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+/* La quantité par-dessus l'image, comme sur une pile. Fond opaque : elle se
+   pose sur une illustration dont on ne contrôle pas les couleurs. */
+.tuile-qte,
+.tuile-epuisee {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: rgb(10 12 14 / 85%);
+  border: 1px solid var(--border-lit);
+}
+.tuile-qte {
+  color: var(--text);
+}
+.tuile-epuisee {
+  color: var(--text-faint);
+}
+.tuile-nom {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+.tuile-sous {
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+.tuile-prix {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 17px;
+  margin-top: 1px;
+  font-size: 12px;
+}
+
 /* --- La grille des lots ----------------------------------------------------
    Un tableau range des colonnes comparables. Un lot n'est pas une ligne de
    chiffres : c'est une pile physique posée sur un scanner, et ce qu'on veut en
@@ -2611,6 +2702,15 @@ kbd,
   color: var(--text-dim);
   background: var(--surface-2);
   text-decoration: none;
+}
+/* Un segment qui ne porte qu'une icône : carré, pas de rembourrage latéral
+   hérité du texte. */
+.seg > svg {
+  width: 15px;
+  height: 15px;
+}
+.seg:has(> svg:only-child) {
+  padding: 0 8px;
 }
 .seg[data-actif='true'] {
   color: var(--text);

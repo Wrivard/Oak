@@ -31,3 +31,15 @@ export const FILTRES: readonly StockFilter[] = [
   'unpriced',
   'unlisted',
 ];
+
+/**
+ * Tableau ou grille.
+ *
+ * Le tableau compare — prix, quantité, ancienneté, alignés en colonnes. La
+ * grille RECONNAÎT : un vendeur de cartes retrouve une carte par son
+ * illustration bien avant de lire son nom, et c'est le geste qu'on fait pour
+ * répondre à « est-ce que j'ai celle-là ». Deux questions différentes, deux
+ * mises en page, et l'URL porte le choix pour qu'il survive à la navigation.
+ */
+export type Vue = 'tableau' | 'grille';
+export const VUES: readonly Vue[] = ['tableau', 'grille'];

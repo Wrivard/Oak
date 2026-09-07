@@ -6,7 +6,7 @@ import { formatCents } from '../../lib/pricing/net.js';
 import type { InventoryPage, InventoryRow } from './queries.js';
 import Fiche from './fiche.js';
 import Astuce from '../shell/astuce.js';
-import { SENS_PAR_DEFAUT, type SortDir, type SortKey, type StockFilter } from './tri.js';
+import { SENS_PAR_DEFAUT, type SortDir, type SortKey, type StockFilter, type Vue } from './tri.js';
 
 /**
  * Table d'inventaire. Voir docs/06-ui.md.
@@ -29,7 +29,13 @@ const COLONNES: { key: SortKey; label: string; align?: 'right' }[] = [
   { key: 'value', label: 'Valeur', align: 'right' },
 ];
 
-export default function InventoryClient({ data }: { data: InventoryPage }) {
+export default function InventoryClient({
+  data,
+  vue,
+}: {
+  data: InventoryPage;
+  vue: Vue;
+}) {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -101,6 +107,37 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
             value={search}
             onChange={(e) => onSearch(e.target.value)}
           />
+          {/* Le tableau COMPARE, la grille RECONNAÎT. Un vendeur de cartes
+              retrouve une carte par son illustration bien avant de lire son
+              nom ; c'est le geste qu'on fait pour répondre à « est-ce que j'ai
+              celle-là ». Le choix vit dans l'URL, il survit à la navigation. */}
+          <div className="segmente">
+            <button
+              className="seg"
+              data-actif={vue === 'tableau' ? 'true' : undefined}
+              onClick={() => navigate({ vue: undefined })}
+              title="Tableau"
+              aria-label="Vue tableau"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
+              </svg>
+            </button>
+            <button
+              className="seg"
+              data-actif={vue === 'grille' ? 'true' : undefined}
+              onClick={() => navigate({ vue: 'grille' })}
+              title="Grille"
+              aria-label="Vue grille"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+                <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+                <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+                <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+              </svg>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -140,6 +177,57 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
                 ? 'Aucun SKU ne correspond à cette recherche.'
                 : 'L’inventaire se remplit à mesure que les cartes sont résolues.'}
             </div>
+          </div>
+        ) : vue === 'grille' ? (
+          /*
+            LA GRILLE. Les mêmes lignes, la même pagination, le même tri — seule
+            la mise en page change. Une vue qui filtrerait autrement que le
+            tableau serait une seconde application à tenir à jour.
+
+            La tuile porte le strict nécessaire pour reconnaître et décider :
+            l'illustration, le nom, le prix, la quantité, l'état. Le reste est
+            dans la fiche, à un clic.
+          */
+          <div
+            className="inv-grille"
+            style={{ opacity: pending ? 0.55 : 1, transition: 'opacity 120ms' }}
+          >
+            {data.rows.map((r) => (
+              <button
+                key={r.sku}
+                className="tuile"
+                data-ouverte={fiche?.sku === r.sku ? 'true' : undefined}
+                onClick={() => setFiche(r)}
+                title={`${r.name} — ${r.sku}`}
+              >
+                <span className="tuile-image">
+                  {r.image !== null ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={r.image} alt="" loading="lazy" />
+                  ) : (
+                    <span className="tuile-vide">pas d’image</span>
+                  )}
+                  {/* La quantité EN SURIMPRESSION, comme sur une pile : au-delà
+                      de un, c'est l'information qui décide d'un export. */}
+                  {r.qty_on_hand > 1 && <span className="tuile-qte">×{r.qty_on_hand}</span>}
+                  {r.qty_on_hand === 0 && <span className="tuile-epuisee">épuisée</span>}
+                </span>
+                <span className="tuile-nom tronque">{r.name}</span>
+                <span className="tuile-sous tronque">
+                  {r.set_name} · {r.condition}
+                </span>
+                <span className="tuile-prix">
+                  {r.priceCents === null ? (
+                    <span className="etat etat--attente">sans prix</span>
+                  ) : (
+                    <>
+                      <span className="num">{formatCents(r.priceCents)}</span>
+                      {r.listedEbay && <span className="etat etat--ok">listée</span>}
+                    </>
+                  )}
+                </span>
+              </button>
+            ))}
           </div>
         ) : (
           <div className="cadre">
