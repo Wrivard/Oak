@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { filtrer } from '../../lib/shell/filtre.js';
+import { filtrer, ouvrePalette } from '../../lib/shell/filtre.js';
 
 /**
  * La palette de commandes. Ctrl+K, ou ⌘K.
@@ -116,7 +116,7 @@ export default function Palette({ lots }: { lots: { nom: string; review: number 
   /** Ctrl+K / ⌘K ouvre, où qu'on soit — y compris depuis un champ de saisie. */
   useEffect(() => {
     function onKey(ev: KeyboardEvent) {
-      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') {
+      if (ouvrePalette(ev)) {
         ev.preventDefault();
         setOuverte((v) => !v);
         return;

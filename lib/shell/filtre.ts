@@ -66,3 +66,26 @@ export function filtrer<T extends Filtrable>(items: readonly T[], requete: strin
   notes.sort((a, b) => a.note - b.note || a.rang - b.rang);
   return notes.map((n) => n.item);
 }
+
+/**
+ * Est-ce l'appui qui ouvre la palette ?
+ *
+ * Extrait de la palette pour être testable : le morceau qui casse n'est pas
+ * l'affichage, c'est la décision. Elle a déjà été fausse ailleurs — les
+ * raccourcis de la review ne regardaient pas les modificateurs, si bien que
+ * `Ctrl+A` déclenchait l'acceptation d'une carte.
+ *
+ * `Ctrl` ou `Cmd`, jamais avec `Alt` : `Ctrl+Alt+K` appartient au système sur
+ * plusieurs claviers, et le lui voler donne une application qui se met en
+ * travers de l'ordinateur.
+ */
+export function ouvrePalette(e: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+}): boolean {
+  if (e.altKey) return false;
+  if (!e.ctrlKey && !e.metaKey) return false;
+  return e.key.toLowerCase() === 'k';
+}

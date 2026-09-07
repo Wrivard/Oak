@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filtrer, normaliser, score } from '../lib/shell/filtre.js';
+import { filtrer, normaliser, ouvrePalette, score } from '../lib/shell/filtre.js';
 
 describe('normaliser', () => {
   it('retire les accents et la casse', () => {
@@ -73,5 +73,35 @@ describe('filtrer', () => {
 
   it('rend une liste vide plutôt que tout', () => {
     expect(filtrer(ITEMS, 'zzz')).toEqual([]);
+  });
+});
+
+describe('ouvrePalette', () => {
+  const appui = (o: Partial<Parameters<typeof ouvrePalette>[0]>) =>
+    ouvrePalette({ key: 'k', ctrlKey: false, metaKey: false, altKey: false, ...o });
+
+  it('s’ouvre sur Ctrl+K et sur Cmd+K', () => {
+    expect(appui({ ctrlKey: true })).toBe(true);
+    expect(appui({ metaKey: true })).toBe(true);
+  });
+
+  it('accepte la majuscule', () => {
+    // Verrouillage des majuscules, ou Maj tenue par réflexe.
+    expect(appui({ key: 'K', ctrlKey: true })).toBe(true);
+  });
+
+  it('ne s’ouvre pas sur K seul', () => {
+    // Sinon taper « Kabuto » dans un champ de recherche ouvrirait la palette.
+    expect(appui({})).toBe(false);
+  });
+
+  it('laisse Ctrl+Alt+K au système', () => {
+    expect(appui({ ctrlKey: true, altKey: true })).toBe(false);
+  });
+
+  it('ignore les autres touches avec Ctrl', () => {
+    for (const key of ['a', 's', 'p', 'Enter', 'ArrowDown']) {
+      expect(appui({ key, ctrlKey: true })).toBe(false);
+    }
   });
 });
