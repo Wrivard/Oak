@@ -6,10 +6,21 @@
  * jamais la CHARGER — un `ntile()` imbriqué que Postgres refuse ne se voit pas
  * à la compilation. Un build vert n'est pas une page rendue.
  *
- * Deux états comptent et se testent séparément :
+ * Deux états comptent :
  *   - base VIDE, l'état d'un lundi matin. Une page qui plante sur zéro ligne
  *     est la première chose qu'on voit en arrivant.
  *   - base PLEINE, l'état de tous les autres jours.
+ *
+ * CE QUI EST RÉELLEMENT COUVERT. Ce script tape la base telle qu'elle est,
+ * donc l'état plein dès qu'il y a des données. Les branches « zéro ligne » sont
+ * atteintes par des URL qui ne ramènent rien — une recherche d'inventaire sans
+ * résultat, une file de review restreinte à un lot inexistant, un filtre
+ * d'audit vide. Elles couvrent les écrans dont le vide se pilote par l'adresse.
+ *
+ * `/batches` et `/dashboard` ne se vident pas par URL : leur état vide ne se
+ * teste qu'avec une base vide, c'est-à-dire après `pnpm reset:data --confirm`
+ * sur une base d'essai. Le commentaire le dit plutôt que de laisser croire le
+ * contraire.
  *
  * Usage : pnpm smoke [base-url]
  * Sans argument, démarre le serveur de prod lui-même sur un port libre.
@@ -31,6 +42,24 @@ const ROUTES = [
   '/pricing',
   '/diagnostics',
   '/dashboard',
+] as const;
+
+/**
+ * Les branches « zéro ligne », atteintes par l'adresse.
+ *
+ * Un `map` vide, un `rows[0]` sur un tableau vide, une division par un total
+ * nul : ces plantages-là ne se voient jamais sur une base pleine, et ils
+ * tombent exactement le jour où on arrive devant une base propre.
+ *
+ * Les paramètres de tri absurdes sont là aussi : ils ont déjà produit un
+ * `order by undefined` avant d'être validés.
+ */
+const ROUTES_VIDES = [
+  '/inventory?q=zzz-aucun-resultat-possible',
+  '/inventory?filter=out&q=zzz',
+  '/inventory?sort=nimporte-quoi&dir=nimporte-quoi',
+  '/review?lot=zzz-lot-inexistant',
+  '/audit?source=manual&page=999',
 ] as const;
 
 /**
@@ -180,6 +209,7 @@ async function main(): Promise<void> {
     // En série : mesurer une latence pendant que huit autres requêtes tapent le
     // même pool de 5 connexions ne mesurerait que la contention.
     for (const route of ROUTES) results.push(await check(base, route));
+    for (const route of ROUTES_VIDES) results.push(await check(base, route));
 
     const w = Math.max(...results.map((r) => r.route.length));
     console.log('');
