@@ -32,13 +32,15 @@ export default async function UploadPage() {
         review: b.review,
         pending: b.pending,
         rejected: b.rejected,
+        // L'ÉLÉMENT, pas une fonction qui le fabrique : une fonction ne
+        // traverse pas la frontière serveur/client.
+        lienReview: (
+          <Link href={`/review?lot=${encodeURIComponent(b.name)}`} title={`Reviewer ${b.name}`}>
+            review
+          </Link>
+        ),
       }))}
       lienLots={<Link href="/batches" className="btn btn--ghost btn--sm">Tous les lots</Link>}
-      lienReview={(nom) => (
-        <Link href={`/review?lot=${encodeURIComponent(nom)}`} title={`Reviewer ${nom}`}>
-          review
-        </Link>
-      )}
     />
   );
 }

@@ -165,6 +165,30 @@ async function etatDuBuild(): Promise<EtatBuild> {
   }
 }
 
+/**
+ * Ce que le serveur a écrit sur sa sortie d'erreur pendant les vérifications.
+ *
+ * LE POINT AVEUGLE QUE ÇA FERME. Une page peut rendre un HTML parfait — la
+ * coquille est là, aucun marqueur d'erreur dans le corps — et casser ensuite,
+ * à l'hydratation. C'est arrivé : passer une FONCTION d'un composant serveur à
+ * un composant client rend le HTML, puis échoue avec « Functions cannot be
+ * passed directly to Client Components ». Les neuf pages étaient annoncées
+ * vertes alors que l'écran d'envoi était mort.
+ *
+ * Next préfixe ses erreurs d'un `⨯`. Une seule suffit à faire échouer la
+ * vérification : sur neuf pages rendues à la demande, le serveur n'a aucune
+ * raison d'en écrire.
+ */
+let journal = '';
+
+function erreursServeur(): string[] {
+  return journal
+    .split(/\r?\n/)
+    .filter((l) => l.includes('⨯'))
+    .map((l) => l.trim())
+    .slice(0, 5);
+}
+
 async function main(): Promise<void> {
   const given = process.argv[2];
   let child: ChildProcess | undefined;
@@ -197,8 +221,16 @@ async function main(): Promise<void> {
     // ne sait pas exécuter, et le second ajoute un intermédiaire qu'un kill ne
     // traverse pas — le serveur survivait au script et le laissait pendu.
     child = spawn(process.execPath, [NEXT_BIN, 'start', '-p', String(port)], {
-      stdio: ['ignore', 'ignore', 'inherit'],
+      // La sortie d'erreur est CAPTURÉE, pas seulement affichée. Voir
+      // `erreursServeur` : une page peut rendre un HTML parfait et échouer
+      // ensuite, et le seul témoin est cette sortie.
+      stdio: ['ignore', 'ignore', 'pipe'],
       env: { ...process.env },
+    });
+    child.stderr?.on('data', (c: Buffer) => {
+      const texte = c.toString();
+      journal += texte;
+      process.stderr.write(texte);
     });
   }
 
@@ -222,14 +254,28 @@ async function main(): Promise<void> {
       );
     }
 
+    // Laisser au serveur le temps d'écrire ce qu'il a à écrire : la trace d'une
+    // erreur d'hydratation arrive après la réponse HTTP.
+    await sleep(400);
+    const plaintes = erreursServeur();
+    if (plaintes.length > 0) {
+      console.log('');
+      console.log(`  ${plaintes.length} erreur(s) écrite(s) par le serveur pendant le rendu :`);
+      for (const l of plaintes) console.log(`    ${l.slice(0, 160)}`);
+    }
+
     const echecs = results.filter((r) => r.probleme);
     const lent = results.filter((r) => !r.probleme && r.ms > 1500);
     console.log('');
     if (lent.length > 0) {
       console.log(`  ${lent.length} page(s) au-dessus de 1,5 s : ${lent.map((r) => r.route).join(', ')}`);
     }
-    if (echecs.length > 0) {
-      console.log(`  ${echecs.length} page(s) en échec sur ${results.length}.`);
+    if (echecs.length > 0 || plaintes.length > 0) {
+      console.log(
+        `  ${echecs.length} page(s) en échec sur ${results.length}` +
+          (plaintes.length > 0 ? `, et ${plaintes.length} erreur(s) serveur` : '') +
+          '.',
+      );
       process.exitCode = 1;
     } else {
       console.log(`  ${results.length} pages rendues, aucune en échec.`);

@@ -29,6 +29,15 @@ export interface LotRecent {
   review: number;
   pending: number;
   rejected: number;
+  /**
+   * Le lien vers la file de ce lot, rendu par le SERVEUR.
+   *
+   * Un élément traverse la frontière client ; une FONCTION qui le fabrique,
+   * non. Passer `(nom) => <Link/>` faisait rendre l'écran d'envoi côté serveur
+   * puis échouer à l'hydratation, avec « Functions cannot be passed directly to
+   * Client Components ». Le HTML était correct, la page ne l'était pas.
+   */
+  lienReview: ReactNode;
 }
 
 interface Props {
@@ -38,8 +47,6 @@ interface Props {
   derniers: LotRecent[];
   /** Rendu côté serveur : un `Link` ne traverse pas la frontière client. */
   lienLots: ReactNode;
-  /** Idem, mais par lot : « review » mène directement à la file de CE lot. */
-  lienReview: (nom: string) => ReactNode;
 }
 
 interface Rejected {
@@ -59,7 +66,6 @@ export default function UploadClient({
   defaultSession,
   derniers,
   lienLots,
-  lienReview,
 }: Props) {
   const [session, setSession] = useState(defaultSession);
   const [variant, setVariant] = useState<CardVariant>('normal');
@@ -565,7 +571,7 @@ export default function UploadClient({
                           qu'on vient d'envoyer. */}
                       {b.review > 0 ? (
                         <>
-                          {b.review} en {lienReview(b.name)}
+                          {b.review} en {b.lienReview}
                         </>
                       ) : total === 0 ? (
                         '—'
