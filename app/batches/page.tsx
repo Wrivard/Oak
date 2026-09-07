@@ -2,6 +2,7 @@ import Link from 'next/link';
 import AutoRefresh from '../shell/auto-refresh.js';
 import BatchActions from './batch-row.js';
 import { loadAnomalies, loadBatches, type Batch } from './queries.js';
+import { formatCents } from '../../lib/pricing/net.js';
 
 /**
  * Suivi des lots envoyés. Rendue à la demande et rafraîchie : c'est l'écran
@@ -50,12 +51,17 @@ function Progress({ b }: { b: Batch }) {
 }
 
 export default async function BatchesPage() {
-  const [batches, anomalies] = await Promise.all([loadBatches(), loadAnomalies()]);
+  const [batches, anomalies] = await Promise.all([loadBatches(40, true), loadAnomalies()]);
 
   const totalCards = batches.reduce(
     (s, b) => s + b.resolved + b.review + b.pending + b.rejected,
     0,
   );
+  // La bande de chiffres de l'en-tête. Ce qu'on veut savoir en arrivant :
+  // combien de lots, combien de cartes, combien de travail humain reste, et ce
+  // que tout ça vaut. Quatre nombres, pas une phrase.
+  const totalReview = batches.reduce((s, b) => s + b.review, 0);
+  const totalValeur = batches.reduce((s, b) => s + (b.valeurCents ?? 0), 0);
 
   return (
     <>
@@ -65,6 +71,15 @@ export default async function BatchesPage() {
         <span className="page-sub">
           {batches.length} lot{batches.length > 1 ? 's' : ''} ·{' '}
           {totalCards.toLocaleString('fr')} cartes
+          {totalReview > 0 && (
+            <>
+              {' · '}
+              <Link href="/review" style={{ color: 'var(--amber)' }}>
+                {totalReview.toLocaleString('fr')} en review
+              </Link>
+            </>
+          )}
+          {totalValeur > 0 && ` · ${formatCents(totalValeur)}`}
         </span>
         <div className="page-actions">
           <Link href="/upload" className="btn btn--primary">
@@ -99,77 +114,87 @@ export default async function BatchesPage() {
             </Link>
           </div>
         ) : (
-          /* Le tableau vit DANS un cadre : posé à même le fond, il se lisait
-             comme un document imprimé plutôt que comme un objet de
-             l'application. */
-          <div className="cadre">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Lot</th>
-                <th style={{ textAlign: 'left' }}>Avancement</th>
-                <th>Résolution</th>
-                <th>Comptage</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {batches.map((b) => {
-                const ecart =
-                  b.expected !== null && b.expected !== b.scanned
-                    ? b.scanned - b.expected
-                    : 0;
+          /*
+            UNE GRILLE DE CARTES, pas un tableau.
 
-                return (
-                  <tr key={b.id}>
-                    {/* Largeur BORNÉE et texte coupé à l'ellipse. Sur une
-                        fenêtre étroite, « 2026-09-06 05:14 · reverseHolofoil ·
-                        NM · adf » passait sur trois lignes et cette ligne du
-                        tableau devenait une fois et demie plus haute que ses
-                        voisines. Un tableau qui ondule se relit à chaque coup
-                        d'oeil. */}
-                    <td style={{ maxWidth: 320 }}>
-                      <div className="tronque" style={{ fontWeight: 500 }}>
-                        {b.name}
-                      </div>
-                      <div
-                        className="faint tronque"
-                        style={{ fontSize: 11 }}
-                        title={`${b.openedAt} · ${b.variant} · ${b.condition} · ${b.lane}`}
-                      >
+            Un tableau range des colonnes comparables. Un lot n'est pas une
+            ligne de chiffres : c'est une pile physique qu'on a posée sur le
+            scanner, et ce qu'on veut en savoir d'abord — qu'est-ce qu'il y a
+            dedans, combien ça vaut, qu'est-ce qu'il reste à faire — ne se lit
+            pas en balayant sept colonnes. La carte la plus chère du lot en
+            vignette dit en une image ce qu'aucun nom de lot ne dira.
+          */
+          <div className="lots-grille">
+            {batches.map((b) => {
+              const total = b.resolved + b.review + b.pending + b.rejected;
+              const ecart =
+                b.expected !== null && b.expected !== b.scanned ? b.scanned - b.expected : 0;
+
+              return (
+                <article key={b.id} className="lot">
+                  <div className="lot-vignette">
+                    {b.image !== null ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={b.image} alt="" loading="lazy" />
+                    ) : (
+                      /* Une silhouette de carte plutôt qu'un rectangle vide :
+                         la grille garde son rythme, et le message dit ce qui
+                         manque au lieu de laisser un trou. */
+                      <span className="lot-vignette-vide">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+                          <rect x="6" y="3" width="12" height="18" rx="2" />
+                          <path d="M9 9h6M9 13h4" strokeLinecap="round" />
+                        </svg>
+                        {total === 0 ? 'aucune carte' : 'rien de résolu'}
+                      </span>
+                    )}
+                    <span className={`lot-etat lot-etat--${b.status === 'open' ? 'ouvert' : 'clos'}`}>
+                      {b.status === 'open' ? 'ouvert' : 'fermé'}
+                    </span>
+                  </div>
+
+                  <div className="lot-corps">
+                    <div>
+                      <div className="lot-nom tronque">{b.name}</div>
+                      <div className="faint tronque" style={{ fontSize: 11 }}>
                         {b.openedAt} · {b.variant} · {b.condition} · {b.lane}
                       </div>
-                    </td>
-                    <td style={{ textAlign: 'left' }}>
-                      <Progress b={b} />
-                    </td>
-                    <td className="mono faint" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
-                      {b.ownHistory > 0 && <div>{b.ownHistory} empreinte</div>}
-                      {b.catalog > 0 && <div>{b.catalog} catalogue</div>}
-                      {b.manual > 0 && <div>{b.manual} manuel</div>}
-                      {b.ownHistory + b.catalog + b.manual === 0 && <div>—</div>}
-                    </td>
-                    <td>
-                      {/* L'écart de comptage est le pire bug possible parce
-                          qu'il est silencieux : une carte physique sans ligne
-                          d'inventaire. Voir docs/02 §1. */}
+                    </div>
+
+                    <Progress b={b} />
+
+                    <div className="lot-chiffres">
+                      <span className="num">
+                        {b.valeurCents === null || b.valeurCents === 0 ? (
+                          <span className="faint">—</span>
+                        ) : (
+                          formatCents(b.valeurCents)
+                        )}
+                      </span>
+                      {/* L'écart de comptage passe AVANT tout le reste : c'est
+                          le seul signal d'une carte physique perdue. */}
                       {ecart !== 0 ? (
-                        <span style={{ color: 'var(--red)' }} className="num">
+                        <span className="num" style={{ color: 'var(--red)' }}>
                           {ecart > 0 ? '+' : ''}
-                          {ecart}
+                          {ecart} de comptage
                         </span>
                       ) : (
-                        <span className="mono faint">{b.scanned}</span>
+                        <span className="mono faint" style={{ fontSize: 11 }}>
+                          {b.ownHistory > 0 && `${b.ownHistory} empreinte`}
+                          {b.ownHistory > 0 && b.catalog > 0 && ' · '}
+                          {b.catalog > 0 && `${b.catalog} catalogue`}
+                          {b.manual > 0 && ` · ${b.manual} manuel`}
+                        </span>
                       )}
-                    </td>
-                    <td>
+                    </div>
+
+                    <div className="lot-actions">
                       <BatchActions batch={b} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
         </div>
