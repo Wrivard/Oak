@@ -2011,6 +2011,13 @@ kbd,
   font-size: 12px;
 }
 
+/* Le formulaire de recherche des lots : un `form` GET, donc un bloc — il ne
+   doit pas casser l'alignement de la rangée d'actions. */
+.lots-recherche {
+  display: flex;
+  margin: 0;
+}
+
 /* --- La grille des lots ----------------------------------------------------
    Un tableau range des colonnes comparables. Un lot n'est pas une ligne de
    chiffres : c'est une pile physique posée sur un scanner, et ce qu'on veut en

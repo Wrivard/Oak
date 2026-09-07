@@ -72,7 +72,19 @@ interface Row {
  * qui se rafraîchit toutes les douze secondes après un envoi et n'affiche
  * aucune image.
  */
-export async function loadBatches(limit = 40, vedette = false): Promise<Batch[]> {
+export interface BatchFiltre {
+  /** Sous-chaîne du nom du lot. Insensible à la casse et aux accents. */
+  recherche?: string | undefined;
+  /** `open`, `closed`, ou rien pour les deux. */
+  statut?: 'open' | 'closed' | undefined;
+}
+
+export async function loadBatches(
+  limit = 40,
+  vedette = false,
+  filtre: BatchFiltre = {},
+): Promise<Batch[]> {
+  const recherche = (filtre.recherche ?? '').trim();
   const { rows } = await query<Row>(
     `select ss.id, ss.name, ss.lane, ss.default_variant::text as variant,
             ss.default_condition::text as condition, ss.status,
@@ -121,10 +133,12 @@ export async function loadBatches(limit = 40, vedette = false): Promise<Batch[]>
               ) somme on true`
            : ''
        }
+      where ($2 = '' or ss.name ilike '%' || $2 || '%')
+        and ($3::text is null or ss.status::text = $3)
       group by ss.id, a.n${vedette ? ', v.image_small, somme.total' : ''}
       order by ss.opened_at desc
       limit $1`,
-    [limit],
+    [limit, recherche, filtre.statut ?? null],
   );
 
   return rows.map((r) => ({

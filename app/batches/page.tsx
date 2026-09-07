@@ -11,6 +11,15 @@ import { formatCents } from '../../lib/pricing/net.js';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Lots' };
 
+/** L'adresse d'un état du filtre, en gardant la recherche en cours. */
+function lienLot(recherche: string, statut: 'open' | 'closed' | undefined): string {
+  const p = new URLSearchParams();
+  if (recherche !== '') p.set('q', recherche);
+  if (statut !== undefined) p.set('statut', statut);
+  const s = p.toString();
+  return s === '' ? '/batches' : `/batches?${s}`;
+}
+
 function Progress({ b }: { b: Batch }) {
   // Les écartées comptent dans le total : sans elles, un lot contenant des
   // intercalaires afficherait une barre qui ne se remplit jamais.
@@ -50,8 +59,29 @@ function Progress({ b }: { b: Batch }) {
   );
 }
 
-export default async function BatchesPage() {
-  const [batches, anomalies] = await Promise.all([loadBatches(40, true), loadAnomalies()]);
+/** `open`, `closed`, ou rien. Validé plutôt que casté, comme sur l'inventaire. */
+const STATUTS = ['open', 'closed'] as const;
+
+export default async function BatchesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const un = (k: string): string | undefined => {
+    const v = sp[k];
+    return Array.isArray(v) ? v[0] : v;
+  };
+  const recherche = (un('q') ?? '').trim();
+  const brut = un('statut');
+  const statut = STATUTS.includes(brut as (typeof STATUTS)[number])
+    ? (brut as 'open' | 'closed')
+    : undefined;
+
+  const [batches, anomalies] = await Promise.all([
+    loadBatches(40, true, { recherche, statut }),
+    loadAnomalies(),
+  ]);
 
   const totalCards = batches.reduce(
     (s, b) => s + b.resolved + b.review + b.pending + b.rejected,
@@ -82,6 +112,45 @@ export default async function BatchesPage() {
           {totalValeur > 0 && ` · ${formatCents(totalValeur)}`}
         </span>
         <div className="page-actions">
+          {/* Recherche et filtre en LIEN, pas en champ contrôlé : cette page est
+              rendue par le serveur et n'a pas de composant client. Un formulaire
+              GET fait exactement le travail, garde l'état dans l'URL, et le
+              retour arrière du navigateur fonctionne. */}
+          <form method="get" className="lots-recherche">
+            {statut !== undefined && <input type="hidden" name="statut" value={statut} />}
+            <input
+              className="input"
+              type="search"
+              name="q"
+              defaultValue={recherche}
+              placeholder="Nom du lot…"
+              style={{ width: 190, height: 30 }}
+              aria-label="Rechercher un lot"
+            />
+          </form>
+          <div className="segmente">
+            <Link
+              href={lienLot(recherche, undefined)}
+              className="seg"
+              data-actif={statut === undefined ? 'true' : undefined}
+            >
+              Tous
+            </Link>
+            <Link
+              href={lienLot(recherche, 'open')}
+              className="seg"
+              data-actif={statut === 'open' ? 'true' : undefined}
+            >
+              Ouverts
+            </Link>
+            <Link
+              href={lienLot(recherche, 'closed')}
+              className="seg"
+              data-actif={statut === 'closed' ? 'true' : undefined}
+            >
+              Fermés
+            </Link>
+          </div>
           <Link href="/upload" className="btn btn--primary">
             Envoyer un lot
           </Link>
@@ -107,11 +176,23 @@ export default async function BatchesPage() {
 
         {batches.length === 0 ? (
           <div className="empty" style={{ height: 260 }}>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>Aucun lot</div>
-            <div className="dim">Commence par envoyer des photos.</div>
-            <Link href="/upload" className="btn btn--primary" style={{ marginTop: 'var(--s2)' }}>
-              Envoyer un lot
-            </Link>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>
+              {recherche !== '' || statut !== undefined ? 'Aucun lot ne correspond' : 'Aucun lot'}
+            </div>
+            <div className="dim">
+              {recherche !== '' || statut !== undefined
+                ? 'Change le filtre, ou vide la recherche.'
+                : 'Commence par envoyer des photos.'}
+            </div>
+            {recherche !== '' || statut !== undefined ? (
+              <Link href="/batches" className="btn" style={{ marginTop: 'var(--s2)' }}>
+                Voir tous les lots
+              </Link>
+            ) : (
+              <Link href="/upload" className="btn btn--primary" style={{ marginTop: 'var(--s2)' }}>
+                Envoyer un lot
+              </Link>
+            )}
           </div>
         ) : (
           /*
