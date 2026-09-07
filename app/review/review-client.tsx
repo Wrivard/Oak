@@ -730,7 +730,16 @@ export default function ReviewClient({
                   sans frontière, et on ne sait pas si on a fini le lot du soir
                   ou si on a déjà entamé le suivant. */}
               {s.session_name !== queue[i - 1]?.session_name && (
-                <div className="file-lot">{s.session_name}</div>
+                <div className="file-lot">
+                  <span>{s.session_name}</span>
+                  {/* Le compte du lot, pas seulement son nom. « Il m'en reste
+                      dix-neuf » est la question qu'on se pose en arrivant sur
+                      une frontière, et compter des lignes à l'oeil dans une
+                      colonne qui défile n'est pas une réponse. */}
+                  <span className="mono">
+                    {queue.filter((q) => q.session_name === s.session_name).length}
+                  </span>
+                </div>
               )}
             <button
               ref={(el) => {
@@ -898,8 +907,14 @@ export default function ReviewClient({
             </div>
 
             <section>
+              {/* L'explication de la distance vit ICI, une fois, et pas sur
+                  chacune des cinq lignes : cinq soulignés pointillés dans une
+                  colonne de nombres qu'on balaie sont du bruit, et la même
+                  phrase répétée cinq fois n'est pas cinq fois plus lue. */}
               <div className="label" style={{ marginBottom: 'var(--s2)' }}>
-                Candidats
+                <Astuce texte="Le nombre à droite est la distance visuelle au scan : zéro serait identique. Elle dit que ça se RESSEMBLE, jamais que c’est la même édition — c’est le numéro imprimé qui tranche entre deux réimpressions.">
+                  Candidats
+                </Astuce>
               </div>
               {scan?.candidates.length === 0 && (
                 <div className="faint" style={{ fontSize: 13 }}>
@@ -987,14 +1002,9 @@ export default function ReviewClient({
                           sélection sans justification se fait relire à chaque
                           carte, et relire coûte plus cher que décider. */}
                       {i === indiceNumero && <span className="marque">n° lu</span>}
-                      <Astuce
-                        cote="fin"
-                        texte="Distance visuelle au scan : zéro serait identique. Elle dit que ça se RESSEMBLE, jamais que c’est la même édition — c’est le numéro imprimé qui tranche entre deux réimpressions."
-                      >
-                        <span className="mono faint" style={{ fontSize: 11 }}>
-                          {Number(c.distance).toFixed(3)}
-                        </span>
-                      </Astuce>
+                      <span className="mono faint" style={{ fontSize: 11 }}>
+                        {Number(c.distance).toFixed(3)}
+                      </span>
                     </span>
                   </button>
                 ))}
