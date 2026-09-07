@@ -30,6 +30,15 @@ export interface InventoryRow {
   lastPricedAt: string | null;
   /** Pourquoi il n'y a pas de prix, quand il n'y en a pas. */
   priceReason: string | null;
+  /**
+   * COMMENT le prix a été obtenu — `market`, `sold_median`, `floor`, `no_data`.
+   *
+   * La ligne du tableau n'en a pas besoin : elle montre un montant, et la
+   * méthode ne change pas ce qu'on en fait. Le panneau de détail, lui, existe
+   * pour répondre à « d'où sort ce chiffre » — et il était déjà lu en base sans
+   * jamais sortir de la requête.
+   */
+  priceMethod: string | null;
 }
 
 export interface InventoryPage {
@@ -169,6 +178,7 @@ export async function loadInventory(params: InventoryParams = {}): Promise<Inven
       listedEbay: r.ebay_listing_id !== null,
       tcgDirty: r.tcg_dirty,
       lastPricedAt: r.last_priced_at,
+      priceMethod: r.price_method,
       // La méthode seule ne dit rien d'actionnable ; c'est la raison qui dit
       // quoi corriger. On retombe dessus quand il n'y a pas de raison détaillée.
       priceReason:

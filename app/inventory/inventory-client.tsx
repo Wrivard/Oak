@@ -3,7 +3,8 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatCents } from '../../lib/pricing/net.js';
-import type { InventoryPage } from './queries.js';
+import type { InventoryPage, InventoryRow } from './queries.js';
+import Fiche from './fiche.js';
 import { SENS_PAR_DEFAUT, type SortDir, type SortKey, type StockFilter } from './tri.js';
 
 /**
@@ -35,6 +36,8 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
   const dir = (params.get('dir') ?? SENS_PAR_DEFAUT[sort]) as SortDir;
   const filter = (params.get('filter') ?? 'in_stock') as StockFilter;
   const [search, setSearch] = useState(params.get('q') ?? '');
+  /** Le SKU ouvert en fiche, ou `null`. */
+  const [fiche, setFiche] = useState<InventoryRow | null>(null);
   const [pending, setPending] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -200,7 +203,23 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
             </thead>
             <tbody>
               {data.rows.map((r) => (
-                <tr key={r.sku}>
+                /* La LIGNE ENTIÈRE ouvre la fiche. Un bouton « détail » en
+                   bout de ligne demanderait de viser une cible de vingt pixels
+                   au bout d'un tableau de mille pixels, cinquante fois par
+                   page. `tabIndex` et Entrée pour que ça marche aussi au
+                   clavier, comme le reste de l'application. */
+                <tr
+                  key={r.sku}
+                  className="ligne-cliquable"
+                  data-ouverte={fiche?.sku === r.sku ? 'true' : undefined}
+                  tabIndex={0}
+                  onClick={() => setFiche(r)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    setFiche(r);
+                  }}
+                >
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
                       {r.image && (
@@ -310,6 +329,8 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
           </table>
           </div>
         )}
+
+        <Fiche row={fiche} onFermer={() => setFiche(null)} />
 
         {data.pages > 1 && (
           <div
