@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
+import { AvisProvider } from './toast.js';
 
 /**
  * Coquille de l'application. Voir docs/06-ui.md.
@@ -160,6 +161,10 @@ export default function Shell({ counts, children }: Props) {
   }
 
   return (
+    /* Le fournisseur d'avis enveloppe TOUT, y compris la barre latérale : une
+       action lancée depuis la coquille — il n'y en a pas encore, mais il y en
+       aura — doit pouvoir en poser un. */
+    <AvisProvider>
     <div className="shell" data-collapsed={shown}>
       <aside className="sidebar">
         <div className="sidebar-brand">
@@ -255,5 +260,6 @@ export default function Shell({ counts, children }: Props) {
         </div>
       </div>
     </div>
+    </AvisProvider>
   );
 }

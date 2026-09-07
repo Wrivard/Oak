@@ -1779,6 +1779,123 @@ kbd,
   border-bottom: none;
 }
 
+/* --- Les avis d'action -----------------------------------------------------
+   En bas à DROITE. En haut, ils recouvrent l'en-tête de l'écran — c'est-à-dire
+   le titre et les boutons qu'on vient d'utiliser. En bas à gauche, ils tombent
+   sur la file de review. Le coin bas-droit est le seul qui ne cache rien sur
+   les sept écrans.
+
+   `pointer-events` : la pile ne prend pas le curseur, chaque avis oui. Sinon un
+   rectangle invisible de 380 px flotte en permanence au-dessus du contenu et
+   avale les clics de la dernière colonne des tableaux. */
+.avis-pile {
+  position: fixed;
+  right: var(--s4);
+  bottom: var(--s4);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  width: min(380px, calc(100vw - 2 * var(--s4)));
+  pointer-events: none;
+}
+.avis {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 16px 1fr 18px;
+  gap: var(--s3);
+  align-items: start;
+  padding: var(--s3) var(--s3) var(--s3) var(--s4);
+  background: var(--surface-2);
+  border: 1px solid var(--border-lit);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--r3);
+  box-shadow: var(--lift-3);
+  animation: avis-entree 160ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes avis-entree {
+  from {
+    opacity: 0;
+    /* Il MONTE de sa propre hauteur : il vient du bas de l'écran, pas de nulle
+       part. Douze pixels suffisent à le dire, au-delà on regarde le mouvement
+       au lieu du texte. */
+    transform: translateY(12px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .avis {
+    animation: none;
+  }
+}
+.avis[data-ton='ok'] {
+  border-left-color: var(--green);
+}
+.avis[data-ton='warn'] {
+  border-left-color: var(--amber);
+}
+.avis[data-ton='alarm'] {
+  border-left-color: var(--red);
+}
+.avis-icone {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+.avis-icone svg {
+  width: 16px;
+  height: 16px;
+}
+.avis[data-ton='ok'] .avis-icone {
+  color: var(--green);
+}
+.avis[data-ton='warn'] .avis-icone {
+  color: var(--amber);
+}
+.avis[data-ton='alarm'] .avis-icone {
+  color: var(--red);
+}
+.avis-texte {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.avis-titre {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.avis-detail {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dim);
+  /* Un message d'erreur de base de données n'a pas de mot court : sans ça il
+     élargit la carte au lieu de passer à la ligne. */
+  overflow-wrap: anywhere;
+}
+.avis-fermer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--text-faint);
+  background: none;
+  border: none;
+  border-radius: var(--r1);
+  cursor: pointer;
+  transition: color var(--vite), background-color var(--vite);
+}
+.avis-fermer svg {
+  width: 13px;
+  height: 13px;
+}
+.avis-fermer:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
 /* --- Un groupe de filtres exclusifs ----------------------------------------
    Cinq boutons côte à côte se lisent comme cinq ACTIONS. Un segmenté se lit
    comme un seul réglage à plusieurs positions — ce qu'il est. La différence

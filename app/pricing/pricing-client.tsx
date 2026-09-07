@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { savePricingConfig, triggerPriceRefresh } from './actions.js';
 import RulesEditor from './rules-editor.js';
+import { useAvis } from '../shell/toast.js';
 import type { PreviewSku } from './queries.js';
 import { formatCents, netAfterFees } from '../../lib/pricing/net.js';
 import { parsePricingConfig, suggestPrice } from '../../lib/pricing/rules.js';
@@ -44,6 +45,7 @@ export default function PricingClient({
   feesVerified,
   shippingCents,
 }: Props) {
+  const { avis } = useAvis();
   const [text, setText] = useState(initialConfig);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -138,7 +140,12 @@ export default function PricingClient({
     // La référence prend le texte ENVOYÉ, pas le texte courant : on a pu
     // continuer à taper pendant l'aller-retour, et ces frappes-là ne sont pas
     // enregistrées.
-    if (res.ok) setEnregistre(envoye);
+    if (res.ok) {
+      setEnregistre(envoye);
+      avis('ok', 'Règles de prix enregistrées', 'Le prochain repricing les utilisera.');
+    } else {
+      avis('alarm', 'Enregistrement refusé', res.error ?? 'échec');
+    }
     setSaved(res.ok ? 'enregistré' : (res.error ?? 'échec'));
   }
 
@@ -155,6 +162,15 @@ export default function PricingClient({
     setSaved(null);
     const res = await triggerPriceRefresh();
     setBusy(false);
+    if (!res.ok) {
+      avis('alarm', 'Repricing refusé', res.error ?? 'échec');
+    } else if (res.enfile) {
+      avis('ok', 'Repricing enfilé', 'Le worker s’en occupe ; les prix bougeront d’eux-mêmes.');
+    } else {
+      // Pas une erreur, et pas un succès non plus : l'action n'a rien fait, et
+      // le dire évite de recliquer trois fois en croyant que ça n'a pas pris.
+      avis('warn', 'Un repricing est déjà en file', 'Le second clic n’enfile rien.');
+    }
     setSaved(
       res.ok
         ? res.enfile

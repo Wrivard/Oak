@@ -11,6 +11,7 @@ import {
 import HelpOverlay from './help-overlay.js';
 import type { ReviewScan } from './queries.js';
 import { candidatDuNumero } from '../../lib/review/numero.js';
+import { useAvis } from '../shell/toast.js';
 import { formatCents, netAfterFees, parseAmount } from '../../lib/pricing/net.js';
 import { FEES } from '../../lib/config/fees.js';
 import type { CardCondition, CardVariant } from '../../lib/sku.js';
@@ -80,6 +81,18 @@ export default function ReviewClient({
   conditions,
   feesVerified,
 }: Props) {
+  /**
+   * Les avis servent ici aux ÉCHECS, jamais aux acceptations.
+   *
+   * Trois secondes par carte, mille cartes par soirée : un avis par carte
+   * acceptée serait le bruit le plus cher de l'application. L'acceptation a
+   * déjà son retour — le flash sur l'image, le compteur, la carte suivante.
+   *
+   * Un échec, lui, arrive après coup : la carte est déjà repartie de l'écran
+   * quand la base répond. Le message inline vit dans la colonne de droite,
+   * qu'on ne regarde pas en triant.
+   */
+  const { avis: poserAvis } = useAvis();
   const [queue, setQueue] = useState(scans);
   const [cursorBrut, setCursor] = useState(0);
   /**
@@ -339,6 +352,7 @@ export default function ReviewClient({
     void rejectScan(scan.id).then((res) => {
       if (res.ok) return;
       setError(res.error ?? 'échec');
+      poserAvis('alarm', 'Mise à l’écart refusée', `${res.error ?? 'échec'} — la carte est revenue dans la file.`);
       setQueue((q) => [...q.slice(0, position), scan, ...q.slice(position)]);
     });
   }, [scan, cursor]);
@@ -411,7 +425,9 @@ export default function ReviewClient({
     void confirmScan(payload)
       .then((res) => {
         if (res.ok) return;
-        setError(`${scan.candidates[chosen]?.name ?? scan.id} : ${res.error ?? 'échec'}`);
+        const nom = scan.candidates[chosen]?.name ?? `scan #${scan.seq}`;
+        setError(`${nom} : ${res.error ?? 'échec'}`);
+        poserAvis('alarm', `${nom} n’a pas été enregistrée`, `${res.error ?? 'échec'} — la carte est revenue dans la file.`);
         // Remise à sa place, pas en fin de file : on la retrouve où on l'a
         // laissée plutôt que de devoir la rechercher.
         setQueue((q) => [...q.slice(0, position), scan, ...q.slice(position)]);
@@ -419,6 +435,7 @@ export default function ReviewClient({
       })
       .catch((err: unknown) => {
         setError(String(err));
+        poserAvis('alarm', 'Enregistrement impossible', `${String(err)} — la carte est revenue dans la file.`);
         setQueue((q) => [...q.slice(0, position), scan, ...q.slice(position)]);
         setTreated((n) => Math.max(0, n - 1));
       })

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { reopenScan } from './actions.js';
 import type { AuditRow } from './queries.js';
+import { useAvis } from '../shell/toast.js';
 
 /**
  * Audit visuel des résolutions automatiques.
@@ -69,6 +70,7 @@ function Vignette({ src, alt, titre }: { src: string; alt: string; titre: string
 }
 
 export default function AuditClient({ rows }: { rows: AuditRow[] }) {
+  const { avis } = useAvis();
   const [corrigees, setCorrigees] = useState<Set<string>>(new Set());
   const [erreur, setErreur] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -80,9 +82,18 @@ export default function AuditClient({ rows }: { rows: AuditRow[] }) {
     setBusy(null);
     if (!res.ok) {
       setErreur(res.error ?? 'échec');
+      avis('alarm', 'Correction refusée', res.error ?? 'échec');
       return;
     }
     setCorrigees((s) => new Set(s).add(scanId));
+    // Trois effets d'un seul clic, dont deux invisibles depuis cet écran. Les
+    // taire, c'est laisser croire qu'on a seulement grisé une ligne.
+    const nom = rows.find((r) => r.scanId === scanId)?.cardName;
+    avis(
+      'ok',
+      nom === undefined ? 'Renvoyée en review' : `${nom} renvoyée en review`,
+      'Quantité décrémentée, empreinte fautive supprimée.',
+    );
   }
 
   if (rows.length === 0) {

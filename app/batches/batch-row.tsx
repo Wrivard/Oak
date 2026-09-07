@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { closeBatch, repairBatch, setExpected } from './actions.js';
 import type { Batch } from './queries.js';
+import { useAvis } from '../shell/toast.js';
 
 /**
  * Actions d'un lot : renseigner le comptage attendu, puis fermer.
@@ -13,6 +14,7 @@ import type { Batch } from './queries.js';
  * le contrôle ne vérifie rien.
  */
 export default function BatchActions({ batch }: { batch: Batch }) {
+  const { avis } = useAvis();
   const [expected, setExpectedValue] = useState(
     batch.expected === null ? '' : String(batch.expected),
   );
@@ -42,6 +44,17 @@ export default function BatchActions({ batch }: { batch: Batch }) {
     const res = await setExpected(batch.id, n);
     setBusy(false);
     setError(res.ok ? null : (res.error ?? 'échec'));
+    // La saisie part au `blur` : sans avis, on quitte le champ et rien ne dit
+    // si le chiffre est parti en base ou s'il n'a jamais quitté l'écran.
+    if (res.ok) {
+      avis(
+        'ok',
+        n === null ? `Comptage effacé sur ${batch.name}` : `${n} cartes attendues sur ${batch.name}`,
+        n === null ? 'La réconciliation ne pourra plus vérifier ce lot.' : undefined,
+      );
+    } else {
+      avis('alarm', 'Comptage refusé', res.error ?? 'échec');
+    }
   }
 
   /**
@@ -65,6 +78,14 @@ export default function BatchActions({ batch }: { batch: Batch }) {
         : (res.error ?? 'échec'),
     );
     if (res.ok && res.enfile) setOutils(false);
+
+    if (!res.ok) {
+      avis('alarm', 'Appariement refusé', res.error ?? 'échec');
+    } else if (res.enfile) {
+      avis('ok', `Appariement relancé sur ${batch.name}`, 'Les pages déjà traitées sont ignorées.');
+    } else {
+      avis('warn', 'Un appariement identique est déjà en file', 'Rien de plus n’a été enfilé.');
+    }
   }
 
   async function close(force: boolean) {
@@ -74,9 +95,15 @@ export default function BatchActions({ batch }: { batch: Batch }) {
     setBusy(false);
     if (res.ok) {
       setConfirmGap(false);
+      avis(
+        'ok',
+        `Lot ${batch.name} fermé`,
+        force ? 'Fermé avec écart — la trace est en base.' : 'Le comptage balance.',
+      );
       return;
     }
     setError(res.error ?? 'échec');
+    avis('alarm', `${batch.name} : fermeture refusée`, res.error ?? 'échec');
     // Un écart n'est pas un refus définitif : il ouvre une confirmation
     // explicite, tracée en base si elle est donnée.
     if (res.ecart !== undefined && res.ecart !== 0) setConfirmGap(true);
