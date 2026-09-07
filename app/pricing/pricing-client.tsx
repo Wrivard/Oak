@@ -106,6 +106,23 @@ export default function PricingClient({
   if (parsed.cfg) lastGood.current = parsed.cfg;
   const previewCfg = parsed.cfg ?? lastGood.current;
 
+  /**
+   * La config ENREGISTRÉE, pour montrer ce que l'édition change.
+   *
+   * L'aperçu montrait les nouveaux prix. Il ne montrait pas les anciens : on
+   * passait un multiplicateur de 1,15 à 1,2, les nombres bougeaient, et rien ne
+   * disait de combien ni sur combien de cartes. Sur un écran qui décide du prix
+   * de tout l'inventaire, « ça a changé » n'est pas une réponse — « 2,49 → 2,59
+   * sur quatre lignes » en est une.
+   */
+  const cfgEnregistree = useMemo(() => {
+    try {
+      return parsePricingConfig(JSON.parse(enregistre));
+    } catch {
+      return null;
+    }
+  }, [enregistre]);
+
   const rows: Row[] = useMemo(() => {
     const real = skus
       .filter((s): s is PreviewSku & { valueCents: number } => s.valueCents !== null)
@@ -272,8 +289,16 @@ export default function PricingClient({
                 const tcg = suggestPrice(r.valueCents, r.condition, previewCfg, 'tcgplayer');
                 const net = netAfterFees(ebay.priceCents, shippingCents, 'ebay').netCents;
 
+                // Le même calcul avec la config enregistrée : c'est l'écart qui
+                // porte l'information, pas la nouvelle valeur seule.
+                const avant =
+                  modifie && cfgEnregistree !== null
+                    ? suggestPrice(r.valueCents, r.condition, cfgEnregistree, 'ebay').priceCents
+                    : null;
+                const bouge = avant !== null && avant !== ebay.priceCents;
+
                 return (
-                  <tr key={`${r.label}-${i}`}>
+                  <tr key={`${r.label}-${i}`} data-bouge={bouge ? 'true' : undefined}>
                     <td>
                       {r.label}{' '}
                       <span className="faint" style={{ fontSize: 11 }}>
@@ -285,7 +310,12 @@ export default function PricingClient({
                       {ebay.band.mode === 'floor' ? 'plancher' : `×${ebay.band.value}`}
                       {ebay.flagReview && <span style={{ color: 'var(--red)' }}> ⚑</span>}
                     </td>
-                    <td className="mono">{formatCents(ebay.priceCents)}</td>
+                    <td className="mono">
+                      {bouge && (
+                        <span className="prix-avant">{formatCents(avant)}</span>
+                      )}
+                      {formatCents(ebay.priceCents)}
+                    </td>
                     <td className="mono dim">{formatCents(tcg.priceCents)}</td>
                     {/* Le net en direct pendant qu'on bouge le plancher :
                         docs/03 §4 veut ce chiffre AVANT de décider. */}

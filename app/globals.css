@@ -1794,6 +1794,24 @@ kbd,
   border-bottom: none;
 }
 
+/* --- Ce que l'édition change, dans l'aperçu des prix ------------------------
+   L'aperçu montrait les NOUVEAUX prix, jamais les anciens : on passait un
+   multiplicateur de 1,15 à 1,2, les nombres bougeaient, et rien ne disait de
+   combien ni sur combien de lignes. Sur l'écran qui décide du prix de tout
+   l'inventaire, « ça a changé » n'est pas une réponse.
+
+   Le liseré ambre à gauche compte autant que le prix barré : il permet de
+   voir COMBIEN de lignes bougent sans les lire une par une. */
+.table tr[data-bouge='true'] td:first-child {
+  box-shadow: inset 2px 0 0 var(--amber);
+}
+.prix-avant {
+  margin-right: var(--s2);
+  color: var(--text-faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--border-strong);
+}
+
 /* Le rappel d'une vue restreinte, dans l'en-tête. Une file filtrée qui ne le
    dit pas se lit comme une file vide : « 12 en attente » sur un arriéré de cent
    fait croire que le pipeline a rattrapé son retard. */
