@@ -38,9 +38,11 @@ function Progress({ b }: { b: Batch }) {
         <span style={{ width: pct(b.rejected), background: 'var(--text-faint)' }} />
         <span style={{ width: pct(b.pending), background: 'var(--border-lit)' }} />
       </div>
-      {/* Sur une seule ligne : ce détail passait sur deux dans une fenêtre
-          étroite et déséquilibrait la hauteur des lignes du tableau. */}
-      <div className="mono faint" style={{ fontSize: 11, marginTop: 3, whiteSpace: 'nowrap' }}>
+      {/* Sur une seule ligne, et COUPÉ À L'ELLIPSE s'il déborde. En `nowrap`
+          seul, il sortait de la carte et se faisait trancher par son
+          `overflow: hidden` : on lisait « 12 catalog » sans savoir qu'il
+          manquait quelque chose. */}
+      <div className="mono faint tronque" style={{ fontSize: 11, marginTop: 3 }}>
         {b.resolved} résolues ·{' '}
         {/* Le chemin le plus court entre « ce lot a 18 cartes en review » et
             « je les traite » : sans ce lien il fallait ouvrir la review, la
@@ -260,7 +262,7 @@ export default async function BatchesPage({
                           {ecart} de comptage
                         </span>
                       ) : (
-                        <span className="mono faint" style={{ fontSize: 11 }}>
+                        <span className="mono faint tronque" style={{ fontSize: 11 }}>
                           {b.ownHistory > 0 && `${b.ownHistory} empreinte`}
                           {b.ownHistory > 0 && b.catalog > 0 && ' · '}
                           {b.catalog > 0 && `${b.catalog} catalogue`}

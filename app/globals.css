@@ -2243,6 +2243,13 @@ kbd,
   gap: var(--s3);
   min-height: 18px;
 }
+/* Le montant ne cède jamais, le détail de résolution oui. */
+.lot-chiffres > .num {
+  flex-shrink: 0;
+}
+.lot-chiffres > .tronque {
+  min-width: 0;
+}
 .lot-chiffres > .num {
   font-size: 15px;
 }
