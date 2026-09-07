@@ -28,6 +28,7 @@ interface Entree {
 }
 
 const NAV: Omit<Entree, 'section'>[] = [
+  { titre: 'Aujourd’hui', mots: 'accueil tâches à faire', aller: '/' },
   { titre: 'Envoyer des photos', mots: 'upload lot scanner dossier', aller: '/upload' },
   { titre: 'Lots', mots: 'batches sessions fermer comptage', aller: '/batches' },
   { titre: 'Review', mots: 'file trier candidats identifier', aller: '/review' },

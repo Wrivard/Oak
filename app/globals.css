@@ -2061,6 +2061,84 @@ kbd,
   margin: 0;
 }
 
+/* --- Les tâches de l'accueil -----------------------------------------------
+   Le CHIFFRE d'abord, en gros, à gauche : c'est lui qui dit si la tâche vaut le
+   coup d'être commencée maintenant. Le titre explique, le détail justifie, et
+   la flèche dit que la ligne mène quelque part.
+
+   La ligne ENTIÈRE est le lien. Une tâche dont seul le titre est cliquable
+   demande de viser un mot dans une ligne de sept cents pixels. */
+.taches {
+  display: grid;
+  gap: var(--s2);
+}
+.tache {
+  display: grid;
+  grid-template-columns: 86px 1fr 18px;
+  gap: var(--s4);
+  align-items: center;
+  padding: var(--s3) var(--s4);
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--r3);
+  box-shadow: var(--lift-2);
+  transition: background-color var(--vite), border-color var(--vite);
+}
+.tache:hover {
+  background: var(--surface-2);
+  border-color: var(--border-lit);
+  border-left-color: var(--border-strong);
+  text-decoration: none;
+}
+.tache[data-ton='faire'] {
+  border-left-color: var(--green);
+}
+.tache[data-ton='verifier'] {
+  border-left-color: var(--amber);
+}
+.tache[data-ton='alerte'] {
+  border-left-color: var(--red);
+}
+.tache-compte {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  justify-content: flex-end;
+}
+.tache-compte .num {
+  font-size: 24px;
+}
+.tache-unite {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.tache-bang {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--red);
+}
+.tache-texte {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.tache-titre {
+  font-size: 14px;
+  font-weight: 600;
+}
+.tache-detail {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.tache-fleche {
+  width: 16px;
+  height: 16px;
+  color: var(--text-faint);
+}
+
 /* --- La grille des lots ----------------------------------------------------
    Un tableau range des colonnes comparables. Un lot n'est pas une ligne de
    chiffres : c'est une pile physique posée sur un scanner, et ce qu'on veut en

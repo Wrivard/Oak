@@ -28,6 +28,12 @@ interface Props {
 }
 
 const ICONS: Record<string, ReactNode> = {
+  accueil: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8.5Z" strokeLinejoin="round" />
+      <path d="M9.5 20v-6h5v6" strokeLinejoin="round" />
+    </svg>
+  ),
   upload: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M12 16V4m0 0L7 9m5-5 5 5" strokeLinecap="round" strokeLinejoin="round" />
@@ -92,6 +98,7 @@ const NAV = [
   {
     titre: 'Flux',
     items: [
+      { href: '/', label: 'Aujourd’hui', icon: 'accueil' },
       { href: '/upload', label: 'Envoyer', icon: 'upload' },
       { href: '/batches', label: 'Lots', icon: 'batches' },
       { href: '/review', label: 'Review', icon: 'review' },
