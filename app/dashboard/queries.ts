@@ -18,6 +18,17 @@ export interface Metric {
   health: Health;
   /** Le seuil qui déclenche l'alarme, affiché pour qu'il ne soit pas mystérieux. */
   threshold: string;
+  /**
+   * L'écran où l'on VA quand cette métrique dérange, quand il y en a un.
+   *
+   * Une alarme sur laquelle on ne peut pas cliquer se lit puis se traduit à la
+   * main : « 97 cartes en review » → ouvrir le menu → Review. Trois gestes pour
+   * une information qui désigne déjà sa destination.
+   *
+   * Toutes n'en ont pas : la taille de la base ne mène nulle part dans cette
+   * application, et un lien qui ne fait rien est pire que pas de lien.
+   */
+  lien?: string;
 }
 
 /** Capacité de review estimée par jour, à 3 s par carte sur 2 h de travail. */
@@ -112,6 +123,7 @@ async function dernierExport(): Promise<Metric> {
   const m = computeExport(run);
   return {
     label: 'Dernier export TCGplayer',
+    lien: '/inventory?filter=unlisted',
     value: m.value,
     detail: m.detail,
     health: m.health,
@@ -254,6 +266,7 @@ async function needsReview(): Promise<Metric> {
 
   return {
     label: 'Cartes en review',
+    lien: '/review',
     value: String(n),
     detail:
       n === 0
@@ -287,6 +300,7 @@ async function reconciliationGap(): Promise<Metric> {
 
   return {
     label: 'Écart de comptage de session',
+    lien: '/batches',
     value: r.value,
     detail: r.detail,
     health: r.health,

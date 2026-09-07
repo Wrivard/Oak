@@ -1687,6 +1687,19 @@ kbd,
   align-content: start;
 }
 
+/* Une carte de santé qui mène quelque part. Elle se soulève au survol — c'est
+   le seul indice qu'elle est cliquable, et il ne coûte pas une icône de plus
+   dans un écran qui doit se lire d'un coup d'oeil. */
+.sante-carte {
+  color: inherit;
+  transition: border-color var(--vite), background-color var(--vite);
+}
+.sante-carte:hover {
+  background: var(--surface-2);
+  border-color: var(--border-lit);
+  text-decoration: none;
+}
+
 /* --- Le cadre d'un tableau -------------------------------------------------
    Un tableau posé à même le fond de page se lit comme un document imprimé :
    des colonnes, des filets, et rien qui dise où l'objet commence ni où il

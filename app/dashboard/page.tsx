@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import AutoRefresh from '../shell/auto-refresh.js';
 import { loadMetrics, type Health } from './queries.js';
 
@@ -42,18 +43,17 @@ export default async function DashboardPage() {
             d'oeil. En deux colonnes, tout tient au-dessus de la ligne de
             flottaison. */}
         <div className="large sante">
-          {metrics.map((m) => (
-            <article
-              key={m.label}
-              className="panel"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr auto',
-                gap: 'var(--s4)',
-                alignItems: 'center',
-                borderLeft: `2px solid var(--${m.health === 'ok' ? 'border' : m.health === 'warn' ? 'amber' : 'red'})`,
-              }}
-            >
+          {metrics.map((m) => {
+            const style = {
+              display: 'grid',
+              gridTemplateColumns: '1fr auto',
+              gap: 'var(--s4)',
+              alignItems: 'center',
+              borderLeft: `2px solid var(--${m.health === 'ok' ? 'border' : m.health === 'warn' ? 'amber' : 'red'})`,
+            } as const;
+
+            const contenu = (
+              <>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 600 }}>{m.label}</div>
                 <div className="dim mono" style={{ marginTop: 2 }}>
@@ -84,8 +84,24 @@ export default async function DashboardPage() {
               >
                 {m.value}
               </div>
-            </article>
-          ))}
+              </>
+            );
+
+            /* Une carte qui MÈNE quelque part est un lien, pas une carte avec
+               un lien dedans : la cible devient la carte entière et non six
+               caractères de libellé. Celles qui ne mènent nulle part restent
+               des `article` — un lien qui ne fait rien est pire que pas de
+               lien. */
+            return m.lien === undefined ? (
+              <article key={m.label} className="panel" style={style}>
+                {contenu}
+              </article>
+            ) : (
+              <Link key={m.label} href={m.lien} className="panel sante-carte" style={style}>
+                {contenu}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </>
