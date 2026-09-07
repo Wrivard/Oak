@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { closeBatch, repairBatch, setExpected } from './actions.js';
 import type { Batch } from './queries.js';
+import Astuce from '../shell/astuce.js';
 import { useAvis } from '../shell/toast.js';
 
 /**
@@ -115,16 +116,21 @@ export default function BatchActions({ batch }: { batch: Batch }) {
           dessous et donnait des lignes de tableau de hauteurs différentes selon
           le lot — un tableau qui ondule se relit à chaque coup d'oeil. */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <input
-          className="input mono"
-          /* 68 px coupaient le mot « attendu » au milieu. */
-          style={{ width: 88, height: 26, textAlign: 'right' }}
-          placeholder="attendu"
-          value={expected}
-          onChange={(e) => setExpectedValue(e.target.value.replace(/\D/g, ''))}
-          onBlur={() => void saveExpected()}
-          title="Nombre de cartes réellement mises dans le scanner"
-        />
+        <Astuce
+          nu
+          cote="fin"
+          texte="Le nombre de cartes réellement mises dans le scanner. Sans lui, la réconciliation ne peut rien vérifier à la fermeture — et l’écart de comptage est le seul signal d’une carte perdue."
+        >
+          <input
+            className="input mono"
+            /* 68 px coupaient le mot « attendu » au milieu. */
+            style={{ width: 88, height: 26, textAlign: 'right' }}
+            placeholder="attendu"
+            value={expected}
+            onChange={(e) => setExpectedValue(e.target.value.replace(/\D/g, ''))}
+            onBlur={() => void saveExpected()}
+          />
+        </Astuce>
         <button
           className="btn"
           style={{ height: 26 }}

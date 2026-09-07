@@ -1794,6 +1794,67 @@ kbd,
   border-bottom: none;
 }
 
+/* --- Les infobulles --------------------------------------------------------
+   Celles du navigateur arrivent après une demi-seconde d'immobilité, dans le
+   style du système, au ras du curseur : elles ne se lisent jamais. Une
+   explication qu'on ne lit pas n'a pas été écrite.
+
+   Celles-ci apparaissent en 90 ms, AU-DESSUS de leur ancre, à la largeur d'une
+   phrase. Pas de bibliothèque de placement : les nôtres sont au milieu de
+   l'écran, et `data-cote="fin"` suffit pour les colonnes de bout de tableau. */
+.astuce {
+  position: relative;
+  cursor: help;
+  /* Le pointillé sous le texte annonce qu'il y a quelque chose à lire. Sans
+     lui, une infobulle ne se découvre qu'en passant dessus par accident. */
+  text-decoration: underline dotted var(--border-strong);
+  text-underline-offset: 3px;
+}
+.astuce::after {
+  content: attr(data-astuce);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 0;
+  z-index: 50;
+  width: max-content;
+  max-width: 260px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface-3);
+  border: 1px solid var(--border-lit);
+  border-radius: var(--r2);
+  box-shadow: var(--lift-3);
+  opacity: 0;
+  /* `visibility` en plus de l'opacité : à opacité nulle seule, la boîte reste
+     cliquable et avale le survol de ce qui se trouve au-dessus. */
+  visibility: hidden;
+  transition: opacity 90ms ease-out, visibility 90ms;
+  pointer-events: none;
+}
+.astuce[data-cote='fin']::after {
+  left: auto;
+  right: 0;
+}
+.astuce:hover::after,
+.astuce:focus-visible::after,
+.astuce:focus-within::after {
+  opacity: 1;
+  visibility: visible;
+}
+/* Enveloppant un champ ou un bouton : ni soulignement ni curseur d'aide, la
+   cible garde son apparence de contrôle. */
+.astuce[data-nu='true'] {
+  cursor: inherit;
+  text-decoration: none;
+  display: inline-flex;
+}
+
 /* --- La fiche d'un SKU -----------------------------------------------------
    Un panneau qui GLISSE depuis la droite, pas une boîte au milieu. La ligne
    qu'on vient de cliquer reste visible à gauche : on garde le contexte, et on

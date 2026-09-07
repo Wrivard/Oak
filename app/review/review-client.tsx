@@ -11,6 +11,7 @@ import {
 import HelpOverlay from './help-overlay.js';
 import type { ReviewScan } from './queries.js';
 import { candidatDuNumero } from '../../lib/review/numero.js';
+import Astuce from '../shell/astuce.js';
 import { useAvis } from '../shell/toast.js';
 import { formatCents, netAfterFees, parseAmount } from '../../lib/pricing/net.js';
 import { FEES } from '../../lib/config/fees.js';
@@ -921,9 +922,14 @@ export default function ReviewClient({
                           sélection sans justification se fait relire à chaque
                           carte, et relire coûte plus cher que décider. */}
                       {i === indiceNumero && <span className="marque">n° lu</span>}
-                      <span className="mono faint" style={{ fontSize: 11 }}>
-                        {Number(c.distance).toFixed(3)}
-                      </span>
+                      <Astuce
+                        cote="fin"
+                        texte="Distance visuelle au scan : zéro serait identique. Elle dit que ça se RESSEMBLE, jamais que c’est la même édition — c’est le numéro imprimé qui tranche entre deux réimpressions."
+                      >
+                        <span className="mono faint" style={{ fontSize: 11 }}>
+                          {Number(c.distance).toFixed(3)}
+                        </span>
+                      </Astuce>
                     </span>
                   </button>
                 ))}
@@ -1083,9 +1089,14 @@ export default function ReviewClient({
                     au-dessus, le titre n'a pas à le répéter. */}
                 <span className="label">Prix · port compris</span>
                 {!feesVerified && (
-                  <span className="faint" style={{ fontSize: 11 }} title="Les taux de frais eBay et TCGplayer n'ont pas été vérifiés contre une facture réelle.">
-                    frais non vérifiés
-                  </span>
+                  <Astuce
+                    cote="fin"
+                    texte="Les taux de frais eBay et TCGplayer viennent de lib/config/fees.ts et n’ont pas été vérifiés contre une facture réelle. Le net affiché est donc indicatif."
+                  >
+                    <span className="faint" style={{ fontSize: 11 }}>
+                      frais non vérifiés
+                    </span>
+                  </Astuce>
                 )}
               </div>
 

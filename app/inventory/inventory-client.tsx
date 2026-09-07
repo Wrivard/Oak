@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatCents } from '../../lib/pricing/net.js';
 import type { InventoryPage, InventoryRow } from './queries.js';
 import Fiche from './fiche.js';
+import Astuce from '../shell/astuce.js';
 import { SENS_PAR_DEFAUT, type SortDir, type SortKey, type StockFilter } from './tri.js';
 
 /**
@@ -307,20 +308,32 @@ export default function InventoryClient({ data }: { data: InventoryPage }) {
                   </td>
                   <td>
                     <span style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <span
-                        className="label"
-                        style={{ color: r.listedEbay ? 'var(--green)' : 'var(--text-faint)' }}
-                        title={r.listedEbay ? 'listée sur eBay' : 'pas encore sur eBay'}
+                      <Astuce
+                        cote="fin"
+                        texte={r.listedEbay ? 'Listée sur eBay.' : 'Pas encore sur eBay.'}
                       >
-                        eBay
-                      </span>
-                      <span
-                        className="label"
-                        style={{ color: r.tcgDirty ? 'var(--amber)' : 'var(--text-faint)' }}
-                        title={r.tcgDirty ? 'à pousser vers TCGplayer' : 'à jour chez TCGplayer'}
+                        <span
+                          className="label"
+                          style={{ color: r.listedEbay ? 'var(--green)' : 'var(--text-faint)' }}
+                        >
+                          eBay
+                        </span>
+                      </Astuce>
+                      <Astuce
+                        cote="fin"
+                        texte={
+                          r.tcgDirty
+                            ? 'Modifiée depuis le dernier export : elle partira dans le prochain fichier TCGplayer.'
+                            : 'À jour dans le dernier export TCGplayer.'
+                        }
                       >
-                        TCG
-                      </span>
+                        <span
+                          className="label"
+                          style={{ color: r.tcgDirty ? 'var(--amber)' : 'var(--text-faint)' }}
+                        >
+                          TCG
+                        </span>
+                      </Astuce>
                     </span>
                   </td>
                 </tr>
